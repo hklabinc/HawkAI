@@ -34,6 +34,11 @@ builder.Services.AddAuthentication()
 
 var app = builder.Build();
 
+
+// Add for external access
+builder.WebHost.UseUrls("http://*:8080;https://*:8081");    //builder.WebHost.UseUrls("http://*:8080");  // Only for http
+
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
