@@ -1,6 +1,6 @@
 {
   "Version": 1,
-  "Hash": "AzTzZTl8BYg9oqOmhilvusOgmt9NstsDiB5N1Yyqt4c=",
+  "Hash": "v27daGykZM76AnRxElt7xA74hhLLA1BF7BG9z2l1f8U=",
   "Source": "HawkAI",
   "BasePath": "_content/HawkAI",
   "Mode": "Default",
@@ -1290,6 +1290,40 @@
       "CopyToOutputDirectory": "Never",
       "CopyToPublishDirectory": "PreserveNewest",
       "OriginalItemSpec": "wwwroot\\favicon.ico"
+    },
+    {
+      "Identity": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\img\\HawkAI_Logo.jpg",
+      "SourceId": "HawkAI",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\",
+      "BasePath": "_content/HawkAI",
+      "RelativePath": "img/HawkAI_Logo.jpg",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\img\\HawkAI_Logo.jpg"
+    },
+    {
+      "Identity": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\img\\HawkAI_Logo3.jpg",
+      "SourceId": "HawkAI",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\",
+      "BasePath": "_content/HawkAI",
+      "RelativePath": "img/HawkAI_Logo3.jpg",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\img\\HawkAI_Logo3.jpg"
     },
     {
       "Identity": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\img\\icon-192.png",

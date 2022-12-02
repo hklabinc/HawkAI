@@ -1,0 +1,123 @@
+﻿@page "/mqtt"
+
+<PageTitle>Chat with MQTT</PageTitle> 
+
+@using MQTTnet;
+@using MQTTnet.Client;
+@using System.Text;
+
+<PageTitle>Index</PageTitle>
+
+<div class="form-group">
+    <label>
+        Server Address:        
+        <input @bind="servAddr" placeholder="ictrobot.hknu.ac.kr"/>
+    </label>    
+    <label>
+        Server Port:
+        <input @bind="servPort" placeholder="8085"/>
+    </label>
+    <label>
+        Subscribe Topic:
+        <input @bind="topicSub" placeholder="test_sub"/>
+    </label>
+</div>
+<button @onclick="Subscribe">Subscribe</button>
+
+<div class="form-group">
+    <label>
+        Publish Topic:
+        <input @bind="topicPub" placeholder="test_pub"/>
+    </label>
+</div>
+<div class="form-group">
+    <label>
+        Message:
+        <input @bind="messageInput" size="50"  placeholder="Hello!"/>
+    </label>
+</div>
+<button @onclick="Send">Send</button>
+
+<hr>
+
+<ul id="messagesList">
+    @foreach (var message in messages)
+    {
+        <li>@message</li>
+    }
+</ul>
+
+@code {
+    // Create a new MQTT client.
+    private static MqttFactory factory = new MqttFactory();
+    private static IMqttClient mqttClient = factory.CreateMqttClient();
+
+    private List<string> messages = new List<string>();
+    private string? servAddr = "hawkai.hknu.ac.kr";
+    private int? servPort = 8085;
+    private string? topicSub = "test_sub";
+    private string? topicPub = "test_pub";
+    private string? messageInput;
+    
+    private async Task Subscribe()
+    {
+        // Use WebSocket connection.
+        var options = new MqttClientOptionsBuilder()
+            .WithClientId(Guid.NewGuid().ToString())
+            //.WithWebSocketServer("ictrobot.hknu.ac.kr:8090/mqtt")     // 현재는 http에서만 동작!
+            .WithTcpServer(servAddr, servPort)
+            //.WithTls()
+            .WithCleanSession()
+            .Build();
+
+        await mqttClient.ConnectAsync(options, CancellationToken.None); // Since 3.0.5 with CancellationToken        
+    
+        if (mqttClient is not null)
+        {
+            // Subscribe to a topic
+            await mqttClient.SubscribeAsync(new MqttTopicFilterBuilder().WithTopic(topicSub).Build());
+
+            //// 메시지 수신시 실행 
+            //mqttClient.UseApplicationMessageReceivedHandler(e =>
+            //{
+            //    //Console.WriteLine("### RECEIVED APPLICATION MESSAGE ###");
+            //    //Console.WriteLine($"+ Topic = {e.ApplicationMessage.Topic}");
+            //    //Console.WriteLine($"+ Payload = {Encoding.UTF8.GetString(e.ApplicationMessage.Payload)}");
+            //    //Console.WriteLine($"+ QoS = {e.ApplicationMessage.QualityOfServiceLevel}");
+            //    //Console.WriteLine($"+ Retain = {e.ApplicationMessage.Retain}");
+            //    //Console.WriteLine();
+
+            //    // 화면에 보여줌
+            //    var encodedMsg = $"{Encoding.UTF8.GetString(e.ApplicationMessage.Payload)}";
+            //    Console.WriteLine($"[Received Message]: {encodedMsg}");
+            //    messages.Add(encodedMsg);
+            //    InvokeAsync(StateHasChanged);
+            //});
+
+            // 메시지 수신시 실행 
+            mqttClient.ApplicationMessageReceivedAsync += async e =>
+            {
+                // 화면에 보여줌
+                var encodedMsg = $"{Encoding.UTF8.GetString(e.ApplicationMessage.Payload)}";
+                Console.WriteLine($"[Received Message]: {encodedMsg}");
+                messages.Add(encodedMsg);
+                await InvokeAsync(StateHasChanged);
+            };
+        }
+    }
+
+    private async Task Send()
+    {
+        if (mqttClient is not null)
+        {
+            var message = new MqttApplicationMessageBuilder()
+                .WithTopic(topicPub)
+                .WithPayload(messageInput)
+                .WithQualityOfServiceLevel(MQTTnet.Protocol.MqttQualityOfServiceLevel.ExactlyOnce)
+                .WithRetainFlag()
+                .Build();
+
+            await mqttClient.PublishAsync(message, CancellationToken.None); // Since 3.0.5 with CancellationToken
+        }
+    }
+}

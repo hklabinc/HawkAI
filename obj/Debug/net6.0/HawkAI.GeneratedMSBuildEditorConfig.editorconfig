@@ -27,8 +27,28 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRmV0Y2hEYXRhLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
+[C:/Users/user/source/repos/HawkAI/Pages/Hero.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcSGVyby5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
 [C:/Users/user/source/repos/HawkAI/Pages/Index.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcSW5kZXgucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/user/source/repos/HawkAI/Pages/Mqtt.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcTXF0dC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/user/source/repos/HawkAI/Pages/SuperHeroes.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcU3VwZXJIZXJvZXMucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/user/source/repos/HawkAI/Pages/VideoGame.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcVmlkZW9HYW1lLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[C:/Users/user/source/repos/HawkAI/Pages/VideoGames.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXNcVmlkZW9HYW1lcy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
 [C:/Users/user/source/repos/HawkAI/Shared/LoginDisplay.razor]

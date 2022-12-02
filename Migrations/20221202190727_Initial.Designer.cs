@@ -10,9 +10,9 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace HawkAI.Migrations
 {
-    [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20221201170659_Initial-Create")]
-    partial class InitialCreate
+    [DbContext(typeof(AuthDbContext))]
+    [Migration("20221202190727_Initial")]
+    partial class Initial
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {

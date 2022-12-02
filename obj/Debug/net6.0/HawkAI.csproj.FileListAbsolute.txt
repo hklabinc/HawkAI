@@ -48,7 +48,6 @@ C:\Users\user\source\repos\HawkAI\bin\Debug\net6.0\runtimes\win\lib\netcoreapp3.
 C:\Users\user\source\repos\HawkAI\bin\Debug\net6.0\runtimes\win\lib\netstandard2.0\System.Runtime.Caching.dll
 C:\Users\user\source\repos\HawkAI\bin\Debug\net6.0\runtimes\win\lib\netstandard2.0\System.Security.Cryptography.ProtectedData.dll
 C:\Users\user\source\repos\HawkAI\bin\Debug\net6.0\runtimes\win\lib\netcoreapp3.0\System.Windows.Extensions.dll
-C:\Users\user\source\repos\HawkAI\obj\Debug\net6.0\HawkAI.csproj.AssemblyReference.cache
 C:\Users\user\source\repos\HawkAI\obj\Debug\net6.0\HawkAI.GeneratedMSBuildEditorConfig.editorconfig
 C:\Users\user\source\repos\HawkAI\obj\Debug\net6.0\HawkAI.AssemblyInfoInputs.cache
 C:\Users\user\source\repos\HawkAI\obj\Debug\net6.0\HawkAI.AssemblyInfo.cs
@@ -85,3 +84,5 @@ C:\Users\user\source\repos\HawkAI\bin\Debug\net6.0\WebEssentials.AspNetCore.Pwa.
 C:\Users\user\source\repos\HawkAI\bin\Debug\net6.0\MySqlConnector.dll
 C:\Users\user\source\repos\HawkAI\bin\Debug\net6.0\Pomelo.EntityFrameworkCore.MySql.dll
 C:\Users\user\source\repos\HawkAI\bin\Debug\net6.0\Microsoft.AspNetCore.Authentication.Google.dll
+C:\Users\user\source\repos\HawkAI\obj\Debug\net6.0\HawkAI.csproj.AssemblyReference.cache
+C:\Users\user\source\repos\HawkAI\bin\Debug\net6.0\MQTTnet.dll
