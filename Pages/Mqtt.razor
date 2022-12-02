@@ -23,6 +23,7 @@
     </label>
 </div>
 <button @onclick="Subscribe">Subscribe</button>
+<button @onclick="Disconnect">Disconnect</button>
 
 <div class="form-group">
     <label>
@@ -71,7 +72,8 @@
             .Build();
 
         await mqttClient.ConnectAsync(options, CancellationToken.None); // Since 3.0.5 with CancellationToken        
-    
+        messages.Add("MQTT Subscribed");
+
         if (mqttClient is not null)
         {
             // Subscribe to a topic
@@ -100,7 +102,7 @@
                 // 화면에 보여줌
                 var encodedMsg = $"{Encoding.UTF8.GetString(e.ApplicationMessage.Payload)}";
                 Console.WriteLine($"[Received Message]: {encodedMsg}");
-                messages.Add(encodedMsg);
+                messages.Add($"[Received Message]: {encodedMsg}");
                 await InvokeAsync(StateHasChanged);
             };
         }
@@ -118,6 +120,17 @@
                 .Build();
 
             await mqttClient.PublishAsync(message, CancellationToken.None); // Since 3.0.5 with CancellationToken
+            messages.Add($"[Sent Message]: {messageInput}");
+        }
+    }
+
+    // 페이지 나갈때 MQTT close 해줘야!!
+    private async Task Disconnect()
+    {
+        if (mqttClient is not null)
+        {
+            await mqttClient.DisconnectAsync();
+            messages.Add("MQTT Diconnection");
         }
     }
 }
