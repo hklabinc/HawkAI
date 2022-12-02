@@ -8,5 +8,7 @@ namespace HawkAI.Data
         Task CreateGame(Game game);
         Task UpdateGame(Game game, int id);
         Task DeleteGame(int id);
+
+        Task<IEnumerable<Game>> GetAll();
     }
 }

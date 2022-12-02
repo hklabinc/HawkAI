@@ -61,5 +61,11 @@ namespace HawkAI.Data
             await _context.SaveChangesAsync();
             _navigationManager.NavigateTo("videogames");
         }
+
+        public async Task<IEnumerable<Game>> GetAll()
+        {
+            Games = await _context.Games.ToListAsync();
+            return Games;
+        }
     }
 }
