@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.EntityFrameworkCore;
 
-namespace HawkAI.Data
+namespace HawkAI.Data.GameService
 {
     public class GameService : IGameService
     {
@@ -62,10 +62,5 @@ namespace HawkAI.Data
             _navigationManager.NavigateTo("videogames");
         }
 
-        public async Task<IEnumerable<Game>> GetAll()
-        {
-            Games = await _context.Games.ToListAsync();
-            return Games;
-        }
     }
 }

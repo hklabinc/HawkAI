@@ -1,6 +1,8 @@
 using HawkAI.Areas.Identity;
 using HawkAI.Data;
 using HawkAI.Data.SuperHeroService;
+using HawkAI.Data.CameraService;
+using HawkAI.Data.GameService;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
@@ -29,8 +31,11 @@ builder.Services.AddScoped<AuthenticationStateProvider, RevalidatingIdentityAuth
 builder.Services.AddSingleton<WeatherForecastService>();
 
 builder.Services.AddProgressiveWebApp();    // for PWA
+
+builder.Services.AddScoped<ICameraService, CameraService>(); 
 builder.Services.AddScoped<IGameService, GameService>();
 builder.Services.AddScoped<ISuperHeroService, SuperHeroService>();
+
 
 builder.Services.AddAuthentication()
     .AddGoogle(googleOptions =>

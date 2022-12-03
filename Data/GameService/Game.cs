@@ -1,4 +1,4 @@
-namespace HawkAI.Data
+namespace HawkAI.Data.GameService
 {
     public class Game
     {

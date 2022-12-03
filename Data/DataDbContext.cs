@@ -1,5 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using HawkAI.Data.SuperHeroService;
+using HawkAI.Data.GameService;
+using HawkAI.Data.CameraService;
 
 namespace HawkAI.Data
 {
@@ -52,14 +54,67 @@ namespace HawkAI.Data
                     ComicId = 2
                 }
             );
+
+
+            modelBuilder.Entity<Camera>().HasData(
+                new Camera
+                {
+                    Id = 1,
+                    Name = "HK_PiCam01",
+                    User = "hhchoi",
+                    Location = "Lab",
+                    Parameter = "Interval:0.5",
+                },
+                new Camera
+                {
+                    Id = 2,
+                    Name = "HK_PiCam02",
+                    User = "hhchoi",
+                    Location = "Home",
+                    Parameter = "Interval:0.5",
+                },
+                new Camera
+                {
+                    Id = 3,
+                    Name = "HK_PiCam03",
+                    User = "hhchoi",
+                    Location = "Office",
+                    Parameter = "Interval:0.5",
+                },
+                new Camera
+                {
+                    Id = 4,
+                    Name = "HK_ComCam01",
+                    User = "hhchoi",
+                    Location = "Office",
+                    Parameter = "Interval:0.5",
+                },
+                new Camera
+                {
+                    Id = 5,
+                    Name = "HK_PhoneCam01",
+                    User = "hhchoi",
+                    Location = "My hand",
+                    Parameter = "Interval:0.5",
+                },
+                new Camera
+                {
+                    Id = 6,
+                    Name = "HK_PhoneCam02",
+                    User = "hhchoi",
+                    Location = "My hand",
+                    Parameter = "Interval:0.5",
+                }
+            );
         }
 
         public DbSet<Game> Games => Set<Game>();
 
-        
+        public DbSet<Camera> Cameras => Set<Camera>();
 
         public DbSet<SuperHero> SuperHeroes { get; set; }
 
         public DbSet<Comic> Comics { get; set; }
+
     }
 }

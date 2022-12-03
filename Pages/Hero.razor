@@ -1,5 +1,6 @@
 ﻿@page "/hero"
 @page "/hero/{id:int}"
+@attribute [Authorize]
 @inject ISuperHeroService SuperHeroService
 
 @if (Id == null)

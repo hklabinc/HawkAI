@@ -1,0 +1,53 @@
+﻿@page "/cameras"
+@attribute [Authorize]
+@inject ICameraService CameraService
+@inject NavigationManager NavigationManager
+
+<h3>Registered Cameras</h3>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Camera</th>
+            <th>User</th>
+            <th>Location</th>
+            <th>Parameter</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var camera in CameraService.Cameras)
+        {
+            <tr>
+                <td>@camera.Name</td>
+                <td>@camera.User</td>
+                <td>@camera.Location</td>
+                <td>@camera.Parameter</td>
+                <td>
+                    <button class="btn btn-primary"
+                        @onclick="(() => ShowCamera(camera.Id))">
+                        <i class="oi oi-pencil"></i>
+                    </button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+<button class="btn btn-primary" @onclick="CreateNewCamera">Create New Camera</button>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await CameraService.LoadCameras();
+    }
+
+    void ShowCamera(int id)
+    {
+        NavigationManager.NavigateTo($"camera/{id}");
+    }
+
+    void CreateNewCamera()
+    {
+        NavigationManager.NavigateTo("camera");
+    }
+}
