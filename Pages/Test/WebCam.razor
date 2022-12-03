@@ -1,0 +1,28 @@
+﻿@page "/test/webcam"
+
+@*자바스크립트 사용을 위한 injection*@
+@inject IJSRuntime _JsRuntime
+
+<h3>WebCam</h3>
+
+<div class="row">
+    <button class="btn btn-primary m-2" style="width:300px;" @onclick="StartWebCam">Start WebCam</button>
+    <button class="btn btn-secondary m-2" style="width:300px;" id="webcam_snapshot">Take Snapshot</button>
+</div>
+
+<div class="row">
+    <div class="col-6">
+        <video id="webcam_video" width="640" height="480" autoplay></video>
+    </div>
+    <div class="col-6">
+        <canvas id="webcam_canvas" width="640" height="480"></canvas>
+    </div>
+</div>
+
+
+@code {
+    private async Task StartWebCam()
+    {
+        await _JsRuntime.InvokeVoidAsync("ShowVideo");      // 자바스크립트 함수 ShowVideo을 호출
+    }
+}

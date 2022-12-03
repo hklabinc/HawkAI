@@ -1,4 +1,4 @@
-﻿@page "/videogames"
+﻿@page "/example/videogames"
 @attribute [Authorize]
 @inject IGameService GameService
 @inject NavigationManager NavigationManager
@@ -41,11 +41,11 @@
 
     void ShowGame(int id)
     {
-        NavigationManager.NavigateTo($"videogame/{id}");
+        NavigationManager.NavigateTo($"example/videogame/{id}");
     }
 
     void CreateNewGame()
     {
-        NavigationManager.NavigateTo("videogame");
+        NavigationManager.NavigateTo("example/videogame");
     }
 }

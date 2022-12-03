@@ -1,4 +1,4 @@
-﻿@page "/mqtt"
+﻿@page "/test/mqtt"
 @attribute [Authorize]
 
 <PageTitle>Chat with MQTT</PageTitle> 
@@ -9,36 +9,36 @@
 
 <PageTitle>Index</PageTitle>
 
-<div class="form-group">
-    <label>
-        Server Address:        
-        <input @bind="servAddr" placeholder="ictrobot.hknu.ac.kr"/>
-    </label>    
-    <label>
-        Server Port:
-        <input @bind="servPort" placeholder="8085"/>
-    </label>
-    <label>
-        Subscribe Topic:
-        <input @bind="topicSub" placeholder="test_sub"/>
-    </label>
-</div>
-<button @onclick="Subscribe">Subscribe</button>
-<button @onclick="Disconnect">Disconnect</button>
 
 <div class="form-group">
+    <button class="btn btn-success" @onclick="Subscribe">Connect</button>
+    <button class="btn btn-danger" @onclick="Disconnect">Disconnect</button>
     <label>
-        Publish Topic:
-        <input @bind="topicPub" placeholder="test_pub"/>
+        Server:        
+        <input @bind="servAddr" size="15" placeholder="ictrobot.hknu.ac.kr"/>
+    </label>    
+    <label>
+        Port:
+        <input @bind="servPort" size="3" placeholder="8085"/>
+    </label>
+    <label>
+        SubTopic:
+        <input @bind="topicSub" size="10" placeholder="test_sub"/>
+    </label>
+    <label>
+        PubTopic:
+        <input @bind="topicPub" size="10" placeholder="test_pub"/>
     </label>
 </div>
-<div class="form-group">
+
+<div class="form-group">    
     <label>
         Message:
-        <input @bind="messageInput" size="50"  placeholder="Hello!"/>
+        <input @bind="messageInput" size="50"  placeholder="Some messages.."/>
     </label>
+    <button class="btn btn-warning" @onclick="Send">Send</button>
 </div>
-<button @onclick="Send">Send</button>
+
 
 <hr>
 
@@ -59,7 +59,7 @@
     private int? servPort = 8085;
     private string? topicSub = "test_sub";
     private string? topicPub = "test_pub";
-    private string? messageInput;
+    private string? messageInput = "Some messages..";
     
     private async Task Subscribe()
     {

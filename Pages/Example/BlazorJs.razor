@@ -1,0 +1,76 @@
+﻿@page "/example/blazorJs"
+
+@*자바스크립트 사용을 위한 injection*@
+@inject IJSRuntime _JsRuntime
+
+<h3>BlazorJs</h3>
+
+<div class="row">
+    <button class="btn btn-secondary m-2" style="width:631px;" @onclick="TestConfirmBox">Test Confirm Button</button>
+</div>
+
+<br />
+<div class="row" style="width:700px;">
+    <button class="btn btn-success m-2" style="width:200px;" @onclick="ToastrSuccess">Toast Success</button>
+    <button class="btn btn-danger m-2" style="width:200px;" @onclick="ToastrFailure">Toast Failure</button>
+    <button class="btn btn-warning m-2" style="width:200px;" @onclick="ToastrWarning"><font color="white">Toast Warning</font></button>
+</div>
+
+<br />
+<div class="row" style="width:700px;">
+    <button class="btn btn-success m-2" style="width:308px;" @onclick="SweetAlertSuccess">SweetAlert Success</button>
+    <button class="btn btn-danger m-2" style="width:308px;" @onclick="SweetAlertFailure">SweetAlert Failure</button>
+</div>
+
+<div class="row">
+    @if (ConfirmResult)
+    {
+        <p>Confirmation has been made!</p>
+    }
+    else
+    {
+        <p>Confirmation pending!</p>
+    }
+
+</div>
+
+
+@code {
+    private string ConfirmMessage = "Are you sure you want to click?";
+    private bool ConfirmResult { get; set; }
+
+    private async Task TestConfirmBox()
+    {
+        ConfirmResult = await _JsRuntime.InvokeAsync<bool>("confirm", ConfirmMessage);      // built-in 자바스크립트 함수 confirm을 호출
+    }
+
+    private async Task ToastrSuccess()
+    {
+        await _JsRuntime.ToastrSuccess("Operation Success");
+        //await _JsRuntime.InvokeVoidAsync("ShowToastr", "success", "Success");       // ShowToastr javascript 함수는 commmon.js 정의되어 있음
+    }
+
+    private async Task ToastrFailure()
+    {
+        await _JsRuntime.ToastrFailure("Operation Error");
+        //await _JsRuntime.InvokeVoidAsync("ShowToastr", "error", "Error");
+    }
+
+    private async Task ToastrWarning()
+    {
+        await _JsRuntime.ToastrWarning();
+        //await _JsRuntime.InvokeVoidAsync("ShowToastr", "warning");
+    }
+
+
+    private async Task SweetAlertSuccess()
+    {
+        await _JsRuntime.InvokeVoidAsync("ShowSweetAlert", "success", "Task completed Success");       // ShowToastr javascript 함수는 commmon.js 정의되어 있음
+    }
+    private async Task SweetAlertFailure()
+    {
+        await _JsRuntime.InvokeVoidAsync("ShowSweetAlert", "error", "Task completed Error");       // ShowToastr javascript 함수는 commmon.js 정의되어 있음
+    }
+
+
+}

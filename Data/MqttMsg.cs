@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace HawkAI.Data
 {
-    public class RxMqttMsg
+    public class MqttMsg
     {        
         public string? time { get; set; }
         public string? addr { get; set; }

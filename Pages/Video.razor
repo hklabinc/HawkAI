@@ -1,322 +1,40 @@
 ﻿@page "/video"
+@attribute [Authorize]
 
-@inject ICameraService _cameraRepository
+@*자바스크립트 사용을 위한 injection*@
+@inject IJSRuntime _JsRuntime
 
-@using MQTTnet;
-@using MQTTnet.Client;
-@using System.Text;
-@using Newtonsoft.Json.Linq;
-@using System.Net;
-@using System.Text.Json;
-
-<PageTitle>Video</PageTitle> 
-
-<style>
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: Arial, Helvetica, sans-serif;
-    }
-</style>
+<h3>Video</h3>
 
 <div class="form-group">
     <label>
-        Server Address:        
-        <input @bind="servAddr" placeholder="ictrobot.hknu.ac.kr"/>
-    </label>    
-    <label>
-        Server Port:
-        <input @bind="servPort" placeholder="8085"/>
+        Name:
+        <input id="cam_name" size="10" placeholder="HK_ComCam01"/>
     </label>
-    <label>
-        Subscribe Topic:
-        <input @bind="topicSub" placeholder="aicms/fromCam"/>
-    </label>
-    <label>
-        Publish Topic:
-        <input @bind="topicPub" placeholder="aicms/toCam"/>
-    </label>
+    <button class="btn btn-primary" id="send_video" @onclick="SendVideo">Send Video</button>
+    <button class="btn btn-danger" id="stop_video" @onclick="StopVideo">Stop Video</button>
 </div>
-<button @onclick="Subscribe">Connect</button>
-<button @onclick="Disconnect">Disconnect</button>
-<ul id="messagesList0">
-    @foreach (var message in messages0)
-    {
-        <li style="font-size:3px">@message</li>
-    }
+
+<div class="row">
+    <div class="col-6">
+        <video id="canvas_video" width="320" height="240" autoplay></video>
+    </div>
+    <div class="col-6">
+        <canvas hidden id="canvas_image" width="320" height="240"></canvas>
+    </div>
+</div>
+<ul id="rx_msg">      
 </ul>
 
-<hr />
-<div class="form-group">
-    <label>
-        Control Parameter:
-        <input @bind="messageInput" size="30" placeholder="interval=1 or scale=0.5"/>
-    </label>
-    <button @onclick="Send">Send</button>
-</div>
-<button @onclick="ImageTxStart">Image Tx Start</button>
-<button @onclick="ImageTxStop" style="background-color:yellow">Image Tx Stop</button>
-<button @onclick="EventTxStart">Event On</button>
-<button @onclick="EventTxStop" style="background-color:yellow">Event Off</button>
-
-<br />
-
-<hr />
-<div class="col-12">
-    @if (Cameras.Any())
-    {
-        <div class="container px-4 py-1" id="custom-cards">
-            <div class="row row-cols-1 row-cols-lg-2 align-items-stretch g-4">
-
-                @foreach (var objMsg in rxMqttMsgArray)
-                {
-                    @if (objMsg.image?.Length > 0)
-                    {
-                        <div class="col">
-                            <div class="card card-cover h-100 overflow-hidden text-bg-light rounded-3 shadow-lg">
-                                <div class="d-flex flex-column h-100 p-4 pb-3 text-black text-shadow-1">
-                                    @*<h3 class="pt-5 mt-5 mb-4 display-6 lh-1 fw-bold">@objMsg.addr</h3>*@
-                                    <h6><b>@objMsg.addr</b></h6> 
-                                    <h6>@objMsg.time (@objMsg.image?.Length B)</h6> 
-                                    <img src="data:image/jpeg;base64,@objMsg.image" />
-                                    @if (objMsg.type == "event")
-                                    {
-                                        <font color="red"><b>@objMsg.label</b></font>
-                                    }
-                                    else
-                                    {
-                                        <h6>@objMsg.label</h6>
-                                    }
-                                </div>
-                            </div>
-                        </div>
-                    }
-                }
-            </div>
-        </div>
-    }
-    else
-    {
-    if (IsLoading)
-        {
-            <div class="text-center">
-                <img src="/images/loading.gif">
-            </div>
-        }
-        else
-        {
-            <p>No records found.</p>
-        }
-    }
-</div>
-
-
-
 @code {
-    private IEnumerable<Camera> Cameras { get; set; } = new List<Camera>();
-    public bool IsLoading { get; set; }
-
-    private int numOfCameras = 0;
-    private List<RxMqttMsg> rxMqttMsgList = new List<RxMqttMsg>();
-    private List<string> camIdList = new List<string>();
-    private RxMqttMsg[] rxMqttMsgArray;    
-
-    // Create a new MQTT client.
-    private static MqttFactory factory = new MqttFactory();
-    private static IMqttClient mqttClient = factory.CreateMqttClient();
-
-    private List<string> messages0 = new List<string>();
-    private List<string> messages1 = new List<string>();    
-    private string? servAddr = "ictrobot.hknu.ac.kr";
-    private int? servPort = 8085;
-    private string? topicSub = "aicms/fromCam";
-    private string? topicPub = "aicms/toCam";
-    private string? messageInput;
-
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)      // DB 내용이 많은 경우에는 이렇게 처리하는 것이 좋음
+    private async Task SendVideo()
     {
-        if (firstRender)
-        {
-            await Disconnect();
-            await Subscribe();
-            await LoadCameras();            
-        }        
+        await _JsRuntime.InvokeVoidAsync("SendVideo");      // 자바스크립트 함수 ShowVideo을 호출
     }
-
-    private async Task LoadCameras()
+}
+@code {
+    private async Task StopVideo()
     {
-        IsLoading = true;
-        StateHasChanged(); 
-        Cameras = await _cameraRepository.GetAllCameras();
-
-        Console.WriteLine("[hhchoi] number of cameras=" + Enumerable.Count<Camera>(Cameras));
-        numOfCameras = Enumerable.Count<Camera>(Cameras);
-        foreach(var objMsg in Cameras)
-        {
-            rxMqttMsgList.Add(new RxMqttMsg());
-            camIdList.Add(objMsg.Name.ToString());                        
-        }
-        Console.WriteLine("[hhchoi] " + string.Join(",", camIdList));
-        //Console.WriteLine("[hhchoi] rxMqttMsgList.Count" + rxMqttMsgList.Count);         
-        rxMqttMsgArray = rxMqttMsgList.ToArray();      // list를 array로
-        //Console.WriteLine("[hhchoi] rxMqttMsgArray.Length" + rxMqttMsgArray.Length);         
-
-        IsLoading = false;
-        StateHasChanged();      //OnAfterRenderAsync 사용할 때 StateHasChanged 있어야
-    }
-
-    // 페이지 나갈때 MQTT close 해줘야!!
-    private async Task Disconnect()
-    {
-        if (mqttClient is not null)
-        {
-            await mqttClient.DisconnectAsync();
-            messages0.Add("MQTT Diconnection");
-        }
-    }
-
-    private async Task Subscribe()
-    {
-        if (mqttClient is not null)
-        {
-            var clientId = Guid.NewGuid().ToString();       // 전역 고유 식별자
-            messages0.Add($"clientId: {clientId}");
-
-            // Use WebSocket connection.
-            var options = new MqttClientOptionsBuilder()
-                .WithClientId(clientId)     
-                .WithTcpServer(servAddr, servPort)
-                .WithCleanSession()
-                .Build();
-
-            await mqttClient.ConnectAsync(options, CancellationToken.None); // Since 3.0.5 with CancellationToken      
-
-            // Subscribe to a topic
-            await mqttClient.SubscribeAsync(new MqttTopicFilterBuilder().WithTopic(topicSub).Build());
-            messages0.Add("MQTT Subscribed");
-
-            mqttClient.DisconnectedAsync += async e =>
-            {
-                Console.WriteLine("MQTT Disconnected");
-                await Task.CompletedTask;
-            };
-
-            // 메시지 수신시 실행 
-            mqttClient.ApplicationMessageReceivedAsync += async e =>
-            {
-            // JSON 메시지 분석
-            var jsonUtf8Bytes = e.ApplicationMessage.Payload;
-                if (jsonUtf8Bytes is not null)
-                {                    
-                    RxMqttMsg? mqttmsg = JsonSerializer.Deserialize<RxMqttMsg>(jsonUtf8Bytes);
-                    if (mqttmsg is not null)
-                    {
-                        string? addr = mqttmsg.addr;
-                        string? type = mqttmsg.type;
-                        string? time = mqttmsg.time;
-                        string? label = mqttmsg.label;
-                        string? image = mqttmsg.image;
-                        
-                        int camIdx = camIdList.IndexOf(addr?? "n/a");
-                        Console.WriteLine("[hhchoi] RxCam: " + addr + ", Index: " + camIdx);  
-
-                        rxMqttMsgArray[camIdx].addr = addr;
-                        rxMqttMsgArray[camIdx].type = type;
-                        rxMqttMsgArray[camIdx].time = time;
-                        rxMqttMsgArray[camIdx].label = label;
-                        rxMqttMsgArray[camIdx].image = image;
-                        
-                        //if (type == "event")
-                        //{
-                        //    messages1.Add($"Event : {label1} {time1}");
-                        //}                                            
-                    }
-                }
-                //await Task.CompletedTask;
-                await InvokeAsync(StateHasChanged);
-            };
-        }
-        else
-        {
-            messages0.Add("mqttClient is null !!!");
-        }
-    }
-
-    private async Task Send()
-    {
-        if (mqttClient is not null)
-        {
-            var message = new MqttApplicationMessageBuilder()
-                .WithTopic(topicPub)
-                .WithPayload(messageInput)
-                .WithQualityOfServiceLevel(MQTTnet.Protocol.MqttQualityOfServiceLevel.ExactlyOnce)
-                .WithRetainFlag()
-                .Build();
-
-            await mqttClient.PublishAsync(message, CancellationToken.None); // Since 3.0.5 with CancellationToken
-        }
-    }
-    
-    private async Task ImageTxStart()
-    {
-        if (mqttClient is not null)
-        {
-            var message = new MqttApplicationMessageBuilder()
-                .WithTopic(topicPub)
-                .WithPayload("isImage=True")
-                .WithQualityOfServiceLevel(MQTTnet.Protocol.MqttQualityOfServiceLevel.ExactlyOnce)
-                .WithRetainFlag()
-                .Build();
-
-            await mqttClient.PublishAsync(message, CancellationToken.None); // Since 3.0.5 with CancellationToken            
-        }
-    }
-
-    private async Task ImageTxStop()
-    {
-        if (mqttClient is not null)
-        {
-            var message = new MqttApplicationMessageBuilder()
-                .WithTopic(topicPub)
-                .WithPayload("isImage=False")
-                .WithQualityOfServiceLevel(MQTTnet.Protocol.MqttQualityOfServiceLevel.ExactlyOnce)
-                .WithRetainFlag()
-                .Build();
-
-            await mqttClient.PublishAsync(message, CancellationToken.None); // Since 3.0.5 with CancellationToken            
-        }
-    }
-
-    private async Task EventTxStart()
-    {
-        if (mqttClient is not null)
-        {
-            var message = new MqttApplicationMessageBuilder()
-                .WithTopic(topicPub)
-                .WithPayload("isEvent=True")
-                .WithQualityOfServiceLevel(MQTTnet.Protocol.MqttQualityOfServiceLevel.ExactlyOnce)
-                .WithRetainFlag()
-                .Build();
-
-            await mqttClient.PublishAsync(message, CancellationToken.None); // Since 3.0.5 with CancellationToken            
-        }
-    }
-
-    private async Task EventTxStop()
-    {
-        if (mqttClient is not null)
-        {
-            var message = new MqttApplicationMessageBuilder()
-                .WithTopic(topicPub)
-                .WithPayload("isEvent=False")
-                .WithQualityOfServiceLevel(MQTTnet.Protocol.MqttQualityOfServiceLevel.ExactlyOnce)
-                .WithRetainFlag()
-                .Build();
-
-            await mqttClient.PublishAsync(message, CancellationToken.None); // Since 3.0.5 with CancellationToken            
-        }
+        await _JsRuntime.InvokeVoidAsync("StopVideo");      // 자바스크립트 함수 ShowVideo을 호출
     }
 }

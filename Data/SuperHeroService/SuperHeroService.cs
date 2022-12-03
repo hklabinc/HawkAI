@@ -21,7 +21,7 @@ namespace HawkAI.Data.SuperHeroService
         {
             _context.SuperHeroes.Add(hero);
             await _context.SaveChangesAsync();
-            _navigationManager.NavigateTo("superheroes");
+            _navigationManager.NavigateTo("example/superheroes");
         }
         public async Task DeleteHero(int id)
         {
@@ -31,7 +31,7 @@ namespace HawkAI.Data.SuperHeroService
 
             _context.SuperHeroes.Remove(dbSuperHero);
             await _context.SaveChangesAsync();
-            _navigationManager.NavigateTo("superheroes");
+            _navigationManager.NavigateTo("example/superheroes");
         }
 
         public async Task GetComics()
@@ -65,7 +65,7 @@ namespace HawkAI.Data.SuperHeroService
             dbSuperHero.ComicId = hero.ComicId;
 
             await _context.SaveChangesAsync();
-            _navigationManager.NavigateTo("superheroes");
+            _navigationManager.NavigateTo("example/superheroes");
         }
     }
 }

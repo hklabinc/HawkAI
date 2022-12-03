@@ -21,7 +21,7 @@ namespace HawkAI.Data.GameService
         {
             _context.Games.Add(game);
             await _context.SaveChangesAsync();
-            _navigationManager.NavigateTo("videogames");
+            _navigationManager.NavigateTo("example/videogames");
         }
 
         public async Task DeleteGame(int id)
@@ -32,7 +32,7 @@ namespace HawkAI.Data.GameService
 
             _context.Games.Remove(dbGame);
             await _context.SaveChangesAsync();
-            _navigationManager.NavigateTo("videogames");
+            _navigationManager.NavigateTo("example/videogames");
         }
 
         public async Task<Game> GetSingleGame(int id)
@@ -59,7 +59,7 @@ namespace HawkAI.Data.GameService
             dbGame.Release = game.Release;
 
             await _context.SaveChangesAsync();
-            _navigationManager.NavigateTo("videogames");
+            _navigationManager.NavigateTo("example/videogames");
         }
 
     }

@@ -1,4 +1,4 @@
-﻿@page "/superheroes"
+﻿@page "/example/superheroes"
 @attribute [Authorize]
 @inject ISuperHeroService SuperHeroService
 @inject NavigationManager NavigationManager
@@ -42,11 +42,11 @@
 
     void ShowHero(int id)
     {
-        NavigationManager.NavigateTo($"hero/{id}");
+        NavigationManager.NavigateTo($"example/hero/{id}");
     }
 
     void CreateNewHero()
     {
-        NavigationManager.NavigateTo("/hero");
+        NavigationManager.NavigateTo("example/hero");
     }
 }
