@@ -1,10 +1,6 @@
 ﻿/* Gobally 사용을 위하여 아래 window.를 붙임 */
 
-///* Video Play */
-window.StopVideo = () => {
-    
-}
-
+/* Video Play */
 window.SendVideo = () => {
 
     /* Paramter 설정 */
@@ -159,4 +155,9 @@ window.SendVideo = () => {
         //    elem.style.visibility = (elem.style.visibility == 'hidden' ? '' : 'hidden');
         //}, 500);
     }
+}
+
+
+window.StopVideo = () => {
+
 }

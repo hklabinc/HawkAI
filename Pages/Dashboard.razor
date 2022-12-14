@@ -224,19 +224,26 @@
                         string? label = mqttmsg.label;
                         string? image = mqttmsg.image;
                         
-                        int camIdx = camIdList.IndexOf(addr?? "n/a");
+                        int camIdx = camIdList.IndexOf(addr);
+                        //int camIdx = camIdList.IndexOf(addr?? "n/a");
+                        //if (addr == "asdf")
+                        //    camIdx = 7;
+
                         Console.WriteLine("[hhchoi] RxCam: " + addr + ", Index: " + camIdx);  
 
-                        rxMqttMsgArray[camIdx].addr = addr;
-                        rxMqttMsgArray[camIdx].type = type;
-                        rxMqttMsgArray[camIdx].time = time;
-                        rxMqttMsgArray[camIdx].label = label;
-                        rxMqttMsgArray[camIdx].image = image;
+                        if (camIdx >= 0)
+                        {
+                            rxMqttMsgArray[camIdx].addr = addr;
+                            rxMqttMsgArray[camIdx].type = type;
+                            rxMqttMsgArray[camIdx].time = time;
+                            rxMqttMsgArray[camIdx].label = label;
+                            rxMqttMsgArray[camIdx].image = image;
                         
-                        //if (type == "event")
-                        //{
-                        //    messages1.Add($"Event : {label1} {time1}");
-                        //}                                            
+                            //if (type == "event")
+                            //{
+                            //    messages1.Add($"Event : {label1} {time1}");
+                            //}                                  
+                        }
                     }
                 }
                 //await Task.CompletedTask;
