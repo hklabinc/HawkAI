@@ -1,6 +1,6 @@
 {
   "Version": 1,
-  "Hash": "ojP0BJxvhTugvmIZwJl9k+2d/964TMgLwNlJYm8WHOU=",
+  "Hash": "5Wp7E6UigSrswiLp2KJDH/lcJDHjZ0WG8C9xhpl7Rp0=",
   "Source": "HawkAI",
   "BasePath": "_content/HawkAI",
   "Mode": "Default",
@@ -1069,6 +1069,23 @@
       "CopyToOutputDirectory": "Never",
       "CopyToPublishDirectory": "PreserveNewest",
       "OriginalItemSpec": "C:\\Users\\user\\source\\repos\\HawkAI\\obj\\Debug\\net6.0\\scopedcss\\projectbundle\\HawkAI.bundle.scp.css"
+    },
+    {
+      "Identity": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\cert\\ca.crt",
+      "SourceId": "HawkAI",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\",
+      "BasePath": "_content/HawkAI",
+      "RelativePath": "cert/ca.crt",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\cert\\ca.crt"
     },
     {
       "Identity": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\css\\bootstrap\\bootstrap.min.css",
