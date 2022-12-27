@@ -15,7 +15,7 @@
     <button class="btn btn-danger" @onclick="Disconnect">Disconnect</button>
     <label>
         Server:        
-        <input @bind="servAddr" size="15" placeholder="ictrobot.hknu.ac.kr"/>
+        <input @bind="servAddr" size="15" placeholder="hawkai.hknu.ac.kr"/>
     </label>    
     <label>
         Port:
@@ -66,7 +66,7 @@
         // Use WebSocket connection.
         var options = new MqttClientOptionsBuilder()
             .WithClientId(Guid.NewGuid().ToString())
-            //.WithWebSocketServer("ictrobot.hknu.ac.kr:8090/mqtt")     // 현재는 http에서만 동작!
+            //.WithWebSocketServer("hawkai.hknu.ac.kr:8090/mqtt")     // 현재는 http에서만 동작!
             .WithTcpServer(servAddr, servPort)
             //.WithTls()
             .WithCleanSession()
