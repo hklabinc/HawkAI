@@ -16,9 +16,9 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<AuthDbContext>(options =>
-    options.UseMySql(connectionString, new MySqlServerVersion(new Version(10, 3, 37))));    // capston 서버것
+    options.UseMySql(connectionString, new MySqlServerVersion(new Version(10, 3, 37))));    // hawkai 서버것
 builder.Services.AddDbContext<DataDbContext>(options =>
-    options.UseMySql(connectionString, new MySqlServerVersion(new Version(10, 3, 37))));    // capston 서버것
+    options.UseMySql(connectionString, new MySqlServerVersion(new Version(10, 3, 37))));    // hawkai 서버것
 //builder.Services.AddDbContext<ApplicationDbContext>(options =>
 //    options.UseSqlServer(connectionString));
 

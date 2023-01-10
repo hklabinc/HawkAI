@@ -16,7 +16,7 @@ window.SendVideo = () => {
     /* MQTT 설정 */
     var client_id = Math.random().toString(36).substring(2, 12);        // random client id
     console.log("client id: " + client_id);
-    const client = new Paho.MQTT.Client("hawkai.hknu.ac.kr", Number(8090), client_id);    // Create a client instance
+    const client = new Paho.MQTT.Client("ictrobot.hknu.ac.kr", Number(8090), client_id);    // Create a client instance
     client.onConnectionLost = onConnectionLost; // set callback handlers
     client.onMessageArrived = onMessageArrived;
     //client.connect({ onSuccess: onConnect });   // connect the client
