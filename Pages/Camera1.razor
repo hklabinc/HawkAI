@@ -2,7 +2,6 @@
 @page "/camera/{id:int}"
 @attribute [Authorize]
 @inject ICameraService CameraService
-@inject IGameService GameService
 
 @if (Id == null)
 {
@@ -19,15 +18,15 @@ else
         <InputText id="name" @bind-Value="camera.Name" class="form-control"></InputText>
     </div>
     <div>
-        <label for="developer">User</label>
+        <label for="user">User</label>
         <InputText id="user" @bind-Value="camera.User" class="form-control"></InputText>
     </div>
     <div>
-        <label for="developer">Location</label>
+        <label for="location">Location</label>
         <InputText id="location" @bind-Value="camera.Location" class="form-control"></InputText>
     </div>
     <div>
-        <label for="release">Parameter</label>
+        <label for="parameter">Parameter</label>
         <InputText id="parameter" @bind-Value="camera.Parameter" class="form-control"></InputText>
     </div>
     <br />

@@ -1,8 +1,9 @@
 using HawkAI.Areas.Identity;
 using HawkAI.Data;
 using HawkAI.Data.SuperHeroService;
-using HawkAI.Data.CameraService;
 using HawkAI.Data.GameService;
+using HawkAI.Data.CameraService;
+using HawkAI.Data.EventService;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
@@ -12,6 +13,7 @@ using Microsoft.EntityFrameworkCore;
 using MQTTnet;
 using HawkAI.Hubs;
 using Microsoft.AspNetCore.Http.Connections;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,7 +38,8 @@ builder.Services.AddSingleton<WeatherForecastService>();
 
 builder.Services.AddProgressiveWebApp();    // for PWA
 
-builder.Services.AddScoped<ICameraService, CameraService>(); 
+builder.Services.AddScoped<ICameraService, CameraService>();
+builder.Services.AddScoped<IEventService, EventService>(); 
 builder.Services.AddScoped<IGameService, GameService>();
 builder.Services.AddScoped<ISuperHeroService, SuperHeroService>();
 
@@ -71,7 +74,8 @@ builder.Services.AddSignalR(hubOptions =>
 
 /************ MQTT 관련 ************/
 builder.Services.AddSingleton<MqttFactory>();
-
+builder.Services.AddScoped<IMqttHub, MqttHub>();
+builder.Services.AddHostedService<HostedMqttHub>();
 
 
 /************ 포트 번호 변경 관련 ************/

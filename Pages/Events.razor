@@ -1,0 +1,114 @@
+﻿@page "/events"
+@attribute [Authorize]
+@inject IEventService EventService
+@inject IJSRuntime _jsRuntime
+@*@inject NavigationManager NavigationManager*@
+
+
+<_DeleteConfirmation IsParentComponentProcessing="IsLoading" OnConfirmationDelete="ConfirmDelete_Click"></_DeleteConfirmation>
+<div class="row mt-4">
+    <div class="col-4">
+        <h3>Events List</h3>
+    </div>
+    <div class="col-6">
+        <button class="btn btn-danger" @onclick="()=>HandleDeleteAll()">Delete All</button>
+    </div>
+</div>
+
+@if (objEvents.Any())
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>Addr</th>
+                <th>Image</th>
+                <th>Label</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var objEvent in EventService.Events)
+            {
+                <tr>
+                    <td>@objEvent.Time</td>
+                    <td>@objEvent.Addr</td>
+                    <td><img src="@($"data:image/jpeg;base64,{objEvent.Image}")"></td>
+                    <td>@objEvent.Label</td>
+                    <td>
+                        <button class="btn btn-danger" @onclick="()=>HandleDelete(objEvent.Id)">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+else
+{
+    if (IsLoading)
+    {
+        //loading gif
+        <div class="text-center">
+        <img src="/img/loading.gif">
+            </div>
+    }
+    else
+    {
+        //no records
+        <p>No recrods found.</p>
+    }
+}
+
+
+@code {
+    private IEnumerable<Event> objEvents { get; set; } = new List<Event>();
+    public bool IsLoading { get; set; }
+    private int DeleteEventId { get; set; } = 0;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadEvents();
+        }
+    }
+
+    private async Task LoadEvents()
+    {
+        IsLoading=true;
+        StateHasChanged();
+        objEvents = await EventService.GetAllEvents();
+        IsLoading=false;
+        StateHasChanged();
+    }
+
+    private void HandleDelete(int id)
+    {        
+        DeleteEventId = id;
+        _jsRuntime.InvokeVoidAsync("ShowDeleteConfirmationModal");
+    }
+    private void HandleDeleteAll()
+    {       
+        DeleteEventId = 0;
+        _jsRuntime.InvokeVoidAsync("ShowDeleteConfirmationModal");
+    }
+
+    public async Task ConfirmDelete_Click(bool isConfirmed)
+    {
+        IsLoading=true;
+        if(isConfirmed)
+        {
+            if (DeleteEventId != 0)
+            {                
+                await EventService.DeleteEvent(DeleteEventId);        // Delete
+            }
+            else 
+            {
+                await EventService.DeleteAllEvents();                  // Delete All
+            }
+        }     
+        await LoadEvents();
+        await _jsRuntime.InvokeVoidAsync("HideDeleteConfirmationModal");
+        IsLoading=false;
+    }
+}

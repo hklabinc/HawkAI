@@ -2,6 +2,7 @@
 using HawkAI.Data.SuperHeroService;
 using HawkAI.Data.GameService;
 using HawkAI.Data.CameraService;
+using HawkAI.Data.EventService;
 
 namespace HawkAI.Data
 {
@@ -111,6 +112,8 @@ namespace HawkAI.Data
         public DbSet<Game> Games => Set<Game>();
 
         public DbSet<Camera> Cameras => Set<Camera>();
+
+        public DbSet<Event> Events => Set<Event>();
 
         public DbSet<SuperHero> SuperHeroes { get; set; }
 

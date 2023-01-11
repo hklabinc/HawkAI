@@ -36,7 +36,7 @@
     private List<string> messages = new List<string>();
     private string? title;
     private string? messageInput;
-    private string projectPath = AppDomain.CurrentDomain.BaseDirectory.Split(new String[] { @"bin\" }, StringSplitOptions.None)[0];
+    private string projectPath = AppDomain.CurrentDomain.BaseDirectory.Split(new string[] { @"bin\" }, StringSplitOptions.None)[0];
     string CurrTime = DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss");
 
     private async Task Send()
@@ -80,7 +80,7 @@
         // Send a message to the device corresponding to the provided registration token.
         //string response = await fcm.SendAsync(message).Result;
         //Console.WriteLine("Successfully sent message: " + response);
-        String result = await fcm.SendAsync(message);
+        string result = await fcm.SendAsync(message);
         Console.WriteLine("[HHCHOI] Successfully sent message via FCM: " + result);
         messages.Add("Successfully sent message via FCM: " + result);
     }
