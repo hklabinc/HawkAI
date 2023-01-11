@@ -109,3 +109,4 @@ C:\Users\user\source\repos\HawkAI\bin\Debug\net6.0\Microsoft.AspNetCore.SignalR.
 C:\Users\user\source\repos\HawkAI\bin\Debug\net6.0\Microsoft.Extensions.Features.dll
 C:\Users\user\source\repos\HawkAI\bin\Debug\net6.0\Microsoft.Extensions.Logging.Abstractions.dll
 C:\Users\user\source\repos\HawkAI\bin\Debug\net6.0\System.IO.Pipelines.dll
+C:\Users\user\source\repos\HawkAI\bin\Debug\net6.0\Auth.json
