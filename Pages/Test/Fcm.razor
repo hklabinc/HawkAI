@@ -1,0 +1,89 @@
+﻿@page "/test/fcm"
+@attribute [Authorize]
+
+@using FirebaseAdmin;
+@using FirebaseAdmin.Messaging;
+@using Google.Apis.Auth.OAuth2;
+@using System.Text;
+
+<PageTitle>FCM 메시지 전송</PageTitle>
+
+<div class="form-group">
+    <label>
+        Title:
+        <input @bind="title" />
+    </label>
+</div>
+<div class="form-group">
+    <label>
+        Message:
+        <input @bind="messageInput" size="50" />
+    </label>
+</div>
+<button @onclick="Send">Send</button>
+
+<hr>
+
+<ul id="messagesList">
+    @foreach (var message in messages)
+    {
+        <li>@message</li>
+    }
+</ul>
+
+@code {
+
+    private List<string> messages = new List<string>();
+    private string? title;
+    private string? messageInput;
+    private string projectPath = AppDomain.CurrentDomain.BaseDirectory.Split(new String[] { @"bin\" }, StringSplitOptions.None)[0];
+    string CurrTime = DateTime.Now.ToString("yyyy-MM-dd-HH-mm-ss");
+
+    private async Task Send()
+    {
+        /** FCM으로 MQTT 값 알람 **/
+        FirebaseApp app = null;
+        Console.WriteLine("[HHCHOI] projectPath: " + projectPath);
+        try
+        {
+            app = FirebaseApp.Create(new AppOptions()
+                {
+                    Credential = GoogleCredential.FromFile(projectPath + "Auth.json")       // projectPath 안쓰고 절대경로로 하면 publish 했을 경우 동작 안함!
+                }, "myApp"); ;
+        }
+        catch (Exception)
+        {
+            app = FirebaseApp.GetInstance("myApp");
+        }
+
+        var fcm = FirebaseAdmin.Messaging.FirebaseMessaging.GetMessaging(app);
+        // This resgistration token comes from the client FCM SDKs.
+        //var registrationToken = "ekJh5yUcSSi3u59xViOyJx:APA91bGPs6XNCYK6nOIh9_obajTE1XLEzWwg7uAdRyaADkEslBvTFxdFNSnVvbhJcIfWAkLun4lfXggXBo2VGlHLrbs6qke2tOQ3th4CKokmQDlZLW_Tpr_-Fzcuzut-B7Bj13uXDPxT";
+        var registrationToken = "ddEJzTQCRV2tr9ycx2rfKe:APA91bFSGMEMLWgDilIb5LqUE9pmWIQMj2C1co8QjlCzA4sDK_72kSaSxBVIROsAqFnd8ANLr82RHt4Fq-4maN3lbVyc3TG_MjLBY35cbb-Pzzd3f4lHX7ooHnG393CCGabarhtIB0tp";
+
+
+        // Defining a message payload
+        Message message = new Message()     // 여러개의 Token에게 메시지를 보내려면 MulticcastMessage()로 변경해야
+            {
+                Data = new Dictionary<string, string>()
+            {
+                { "hhData", "1234" },
+            },
+                Token = registrationToken,
+                Notification = new Notification()
+                {
+                    Title = title,
+                    Body = messageInput + " at " + CurrTime
+                }
+            };
+
+        // Send a message to the device corresponding to the provided registration token.
+        //string response = await fcm.SendAsync(message).Result;
+        //Console.WriteLine("Successfully sent message: " + response);
+        String result = await fcm.SendAsync(message);
+        Console.WriteLine("[HHCHOI] Successfully sent message via FCM: " + result);
+        messages.Add("Successfully sent message via FCM: " + result);
+    }
+}
+
+

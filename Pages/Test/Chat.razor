@@ -1,0 +1,89 @@
+﻿@page "/test/chat"
+@attribute [Authorize]
+
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager NavigationManager
+@implements IAsyncDisposable
+
+<PageTitle>Chat with SignalR</PageTitle>
+
+<div class="form-group">
+    <label>
+        User:
+        <input @bind="userInput" />
+    </label>
+</div>
+<div class="form-group">
+    <label>
+        Message:
+        <input @bind="messageInput" size="50" />
+    </label>
+</div>
+<button @onclick="Send" disabled="@(!IsConnected)">Send</button>
+
+<hr>
+
+<ul id="messagesList">
+    @foreach (var message in messages)
+    {
+        <li>@message</li>
+    }
+</ul>
+
+@code {
+    private HubConnection? hubConnection;
+    private List<string> messages = new List<string>();
+    private string? userInput;
+    private string? messageInput;
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri("/chathub"), options =>
+            {          // Client에서 메시지 사이즈 관련 옵션 추가
+                options.ApplicationMaxBufferSize = 100000000;
+                options.TransportMaxBufferSize = 100000000;
+            })
+            .AddJsonProtocol(options =>
+            {
+                options.PayloadSerializerOptions.PropertyNamingPolicy = null;           // JSON serialization options 추가 (전송 패킷 사이즈와 관련이 있는건가?)
+            })
+            .Build();
+
+        // Client에서 메시지 사이즈 관련 옵션 추가 (관련성이 있나? 일단 큰 값으로 함 -> 추후 조정 필요)
+        //hubConnection.ServerTimeout = TimeSpan.FromMinutes(10);
+        //hubConnection.HandshakeTimeout = TimeSpan.FromMinutes(5);
+        //hubConnection.KeepAliveInterval = TimeSpan.FromMinutes(5);
+
+        hubConnection.On<string, string>("ReceiveMessage", (user, message) =>
+        {
+            var encodedMsg = $"{user}: ({message.Length} bytes) {message}";
+
+            //Console.WriteLine($"[Received Message]: ({message.Length} bytes) {encodedMsg}");
+
+            messages.Add(encodedMsg);
+            InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+    private async Task Send()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.SendAsync("SendMessage", userInput, messageInput);
+        }
+    }
+
+    public bool IsConnected =>
+        hubConnection?.State == HubConnectionState.Connected;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}

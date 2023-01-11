@@ -1,14 +1,11 @@
 ﻿@page "/test/mqtt"
 @attribute [Authorize]
 
-<PageTitle>Chat with MQTT</PageTitle> 
-
 @using MQTTnet;
 @using MQTTnet.Client;
 @using System.Text;
 
-<PageTitle>Index</PageTitle>
-
+<PageTitle>Chat with MQTT</PageTitle>
 
 <div class="form-group">
     <button class="btn btn-success" @onclick="Subscribe">Connect</button>

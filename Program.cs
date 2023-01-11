@@ -10,10 +10,14 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI;
 using Microsoft.EntityFrameworkCore;
 using MQTTnet;
+using HawkAI.Hubs;
+using Microsoft.AspNetCore.Http.Connections;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+/************ DB 관련 ************/
+/* To use mariadb */
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<AuthDbContext>(options =>
     options.UseMySql(connectionString, new MySqlServerVersion(new Version(10, 3, 37))));    // hawkai 서버것
@@ -37,22 +41,47 @@ builder.Services.AddScoped<IGameService, GameService>();
 builder.Services.AddScoped<ISuperHeroService, SuperHeroService>();
 
 
+/************ 인증, 구글인증 관련 ************/
 builder.Services.AddAuthentication()
     .AddGoogle(googleOptions =>
     {
         googleOptions.ClientId = builder.Configuration["Authentication:Google:ClientId"];
         googleOptions.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
     });
+
+
+/************ SignalR 관련 ************/
+// SignalR - JSON serialization options 추가 (전송 패킷 사이즈와 관련이 있는건가?) 
+builder.Services.AddSignalR()
+    .AddJsonProtocol(options => {
+        options.PayloadSerializerOptions.PropertyNamingPolicy = null;
+    });
+
+// Server에서 메시지 사이즈 관련 옵션 변경 
+builder.Services.AddSignalR(hubOptions =>
+{
+    hubOptions.EnableDetailedErrors = true;
+    //hubOptions.KeepAliveInterval = TimeSpan.FromMinutes(5);         // 관련성이 있나? 
+    //hubOptions.ClientTimeoutInterval = TimeSpan.FromMinutes(10);    // ClientTimeoutInterval은 KeepAliveInterval의 두배가 되어야
+    hubOptions.StreamBufferCapacity = 1000000;
+    hubOptions.MaximumReceiveMessageSize = 100000000;       // 제한 풀려면 null로 셋팅?
+});
+
+
+
 /************ MQTT 관련 ************/
 builder.Services.AddSingleton<MqttFactory>();
 
-var app = builder.Build();
 
 
+/************ 포트 번호 변경 관련 ************/
 // Add for external access
 builder.WebHost.UseUrls("http://*:8080;https://*:8081");
 //builder.WebHost.UseUrls("http://*:8080");  // Only for http
 
+
+
+var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -75,8 +104,22 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapControllers();
+
+/************ SignalR 관련 ************/
 app.MapBlazorHub();
+//app.MapHub<ChatHub>("/chathub");
+app.MapHub<ChatHub>("/chathub", options =>      // Server에서 메시지 사이즈 관련 옵션 추가 
+{
+    options.Transports =
+        HttpTransportType.WebSockets |
+        HttpTransportType.LongPolling;
+    options.ApplicationMaxBufferSize = 100000000;   // 제한 풀려면 0으로 셋팅?
+    options.TransportMaxBufferSize = 100000000;
+});
+
+
+app.MapControllers();
+
 app.MapFallbackToPage("/_Host");
 
 app.Run();

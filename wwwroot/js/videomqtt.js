@@ -63,7 +63,7 @@ window.SendVideo = () => {
             console.log("jsonData:" + jsonData.substring(0,100));
 
             message = new Paho.MQTT.Message(jsonData);
-            message.destinationName = "aicms/fromCam";
+            message.destinationName = "hawkai/fromCam";
             client.send(message);       // image MQTT 메시지 전송            
         }
         setTimeout(clock, para_interval * 1000);
@@ -98,7 +98,7 @@ window.SendVideo = () => {
     //    console.log("jsonData:" + jsonData);
 
     //    message = new Paho.MQTT.Message(jsonData);
-    //    message.destinationName = "aicms/fromCam";
+    //    message.destinationName = "hawkai/fromCam";
     //    client.send(message);
     //});
     
@@ -107,12 +107,12 @@ window.SendVideo = () => {
     function onConnect() {
         // Once a connection has been made, make a subscription and send a message.
         console.log("MQTT onConnect !!");
-        client.subscribe("aicms/toCam");
+        client.subscribe("hawkai/toCam");
 
         //메시지 전송
         message = new Paho.MQTT.Message("Hello");
         //message.destinationName = "test_pub";
-        message.destinationName = "aicms/fromCam";
+        message.destinationName = "hawkai/fromCam";
         client.send(message);
     }
 
