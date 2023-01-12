@@ -1,0 +1,62 @@
+﻿@page "/webrtc"
+@attribute [Authorize(Roles ="Admin")]
+@using SocketIOClient
+@using System.Reflection
+
+@inject IJSRuntime _jsRuntime
+@inject ILogger<WebRTC> _logger
+
+<section>
+	<div>
+		<h1>Web RTC</h1>
+        <font size=5 color="red">Set roomName to <b>"test"</b> in the camera</font>
+	</div>
+</section>
+
+<main>
+	<section>
+		<div>
+            <video id="myRtcpStream" autoplay width="400" height="400"></video>
+            <select id="cameras"></select>
+		</div>
+	</section>
+</main>
+
+@code {
+    SocketIO? client = null;
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // await CreateDotNetObject();
+
+            // Signaling to web socket server
+            // wwwroot/js/webrtc.js
+            await _jsRuntime.InvokeVoidAsync("ConnectClient");
+        }
+    }
+
+    //// Call C# method from java scrpit
+    //private async Task CreateDotNetObject()
+    //{
+    //    await _jsRuntime.InvokeVoidAsync("OnCreateClient", DotNetObjectReference.Create(this));
+    //}
+
+    
+    //[JSInvokable]
+    //public async Task<SocketIO> CreateClient()
+    //{
+    //    client = new SocketIO("http://localhost:5005/");
+
+    //    client.OnConnected += async (sender, e) =>
+    //    {
+    //        await client.EmitAsync("join_room", "Test");
+    //    };
+
+    //    await client.ConnectAsync();
+
+    //    return await Task<SocketIO>.FromResult(client);
+    //}
+}

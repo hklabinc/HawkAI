@@ -1,6 +1,6 @@
 ﻿@page "/camera"
 @page "/camera/{id:int}"
-@attribute [Authorize]
+@attribute [Authorize(Roles = "Admin,Normal")]
 @inject ICameraService CameraService
 
 @if (Id == null)

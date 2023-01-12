@@ -30,6 +30,7 @@ builder.Services.AddDbContext<DataDbContext>(options =>
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = true)
+    .AddRoles<IdentityRole>()       // for Role-based Authorization
     .AddEntityFrameworkStores<AuthDbContext>();
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();

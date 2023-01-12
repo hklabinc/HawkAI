@@ -1,6 +1,6 @@
 {
   "Version": 1,
-  "Hash": "A0cqOs7TvzLQukY/5iN85wnYRMCJLoPKsNAmu7mLRPw=",
+  "Hash": "ZXnMcstGwnhUnrBIMuPt4Fnh/ShHzXz0/c4Tw5mZzy8=",
   "Source": "HawkAI",
   "BasePath": "_content/HawkAI",
   "Mode": "Default",
@@ -1511,6 +1511,23 @@
       "CopyToOutputDirectory": "Never",
       "CopyToPublishDirectory": "PreserveNewest",
       "OriginalItemSpec": "wwwroot\\js\\webcam.js"
+    },
+    {
+      "Identity": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\js\\webrtc.js",
+      "SourceId": "HawkAI",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\",
+      "BasePath": "_content/HawkAI",
+      "RelativePath": "js/webrtc.js",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\js\\webrtc.js"
     },
     {
       "Identity": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\manifest.json",

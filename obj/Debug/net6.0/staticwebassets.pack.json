@@ -109,6 +109,10 @@
       "PackagePath": "staticwebassets\\js\\webcam.js"
     },
     {
+      "Id": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\js\\webrtc.js",
+      "PackagePath": "staticwebassets\\js\\webrtc.js"
+    },
+    {
       "Id": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\manifest.json",
       "PackagePath": "staticwebassets\\manifest.json"
     },

@@ -1,5 +1,5 @@
 ﻿@page "/video"
-@attribute [Authorize]
+@attribute [Authorize(Roles = "Admin,Normal")]
 
 @*자바스크립트 사용을 위한 injection*@
 @inject IJSRuntime _JsRuntime
