@@ -134,11 +134,11 @@ namespace HawkAI.Hubs
                     .Build();
                 await mqttClient.SubscribeAsync(mqttSubscribeOptions, CancellationToken.None);
 
-                //// Subscribe (두번째 토픽 가입)
-                //var mqttSubscribeOptions2 = _mqttFactory.CreateSubscribeOptionsBuilder()
-                //    .WithTopicFilter(f => { f.WithTopic("hawkai/from"); })
-                //    .Build();
-                //await mqttClient.SubscribeAsync(mqttSubscribeOptions2, CancellationToken.None);
+                // Subscribe (두번째 토픽 가입)
+                var mqttSubscribeOptions2 = _mqttFactory.CreateSubscribeOptionsBuilder()
+                    .WithTopicFilter(f => { f.WithTopic("hawkai/from"); })      // 이것도 있어야 함! 없으면 공용 캠으로부터는 안받아짐
+                    .Build();
+                await mqttClient.SubscribeAsync(mqttSubscribeOptions2, CancellationToken.None);
 
                 SpinWait.SpinUntil(() => !((mqttClient is not null) && (mqttClient.IsConnected)));
 

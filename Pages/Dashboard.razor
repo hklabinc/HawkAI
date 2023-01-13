@@ -21,7 +21,7 @@
     }
 </style>
 
-<div class="form-group">
+<div class="form-group" style="display:none;">
     <button class="btn btn-success" @onclick="Subscribe">Connect</button>
     <button class="btn btn-danger" @onclick="Disconnect">Disconnect</button>
     <label>
@@ -42,7 +42,7 @@
     </label>
 </div>
 
-<ul id="messagesList0">
+<ul id="messagesList0" style="width: 300px; height: 70px; overflow: auto">
     @foreach (var message in messages0)
     {
         <li style="font-size:3px">@message</li>
@@ -219,11 +219,11 @@
 
             // Subscribe to a topic 1
             await mqttClient.SubscribeAsync(new MqttTopicFilterBuilder().WithTopic(topicSubUser).Build());
-            messages0.Add("MQTT Subscribed with " + topicSubUser);
+            messages0.Add("MQTT Subscribed with topicSubUser");
 
             // Subscribe to a topic 2
             await mqttClient.SubscribeAsync(new MqttTopicFilterBuilder().WithTopic(TOPIC_SUB).Build());
-            messages0.Add("MQTT Subscribed with " + TOPIC_SUB);
+            messages0.Add("MQTT Subscribed with TOPIC_SUB");
 
 
             mqttClient.DisconnectedAsync += async e =>
@@ -299,6 +299,7 @@
         {            
             await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, messageInput), CancellationToken.None); // Since 3.0.5 with CancellationToken
             await mqttClient.PublishAsync(makeMqttMessage(TOPIC_PUB, messageInput), CancellationToken.None);
+            messages0.Add("Set control parameter with " + messageInput);
         }
     }
 
@@ -309,6 +310,7 @@
             string msgControl = "isImage=True";
             await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None); 
             await mqttClient.PublishAsync(makeMqttMessage(TOPIC_PUB, msgControl), CancellationToken.None);
+            messages0.Add("Set isImage=True");
         }
     }
 
@@ -319,6 +321,7 @@
             string msgControl = "isImage=False";
             await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None); 
             await mqttClient.PublishAsync(makeMqttMessage(TOPIC_PUB, msgControl), CancellationToken.None);     
+            messages0.Add("Set isImage=False");
         }
     }
 
@@ -329,6 +332,7 @@
             string msgControl = "isEvent=True";
             await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None); 
             await mqttClient.PublishAsync(makeMqttMessage(TOPIC_PUB, msgControl), CancellationToken.None);                
+            messages0.Add("Set isEvent=True");
         }
     }
 
@@ -339,6 +343,7 @@
             string msgControl = "isEvent=False";
             await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None);
             await mqttClient.PublishAsync(makeMqttMessage(TOPIC_PUB, msgControl), CancellationToken.None);
+            messages0.Add("Set isEvent=False");
         }
     }
 }

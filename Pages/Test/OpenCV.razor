@@ -1,0 +1,28 @@
+﻿@page "/test/opencv"
+@attribute [Authorize(Roles = "Admin,Normal")]
+@inject IJSRuntime _JsRuntime
+
+
+<h3>OpenCV</h3>
+
+<p id="opencv_status">OpenCV.js is loading...</p>
+
+<div>
+    <div class="inputoutput">
+        <img id="imageSrc" alt="No Image" />
+        <div class="caption">imageSrc <input type="file" id="fileInput" name="file" @onchange="OpenCVSelectFile" /></div>
+    </div>
+    <div class="inputoutput">
+        <canvas id="canvasOutput"></canvas>
+        <div class="caption">canvasOutput</div>
+    </div>
+</div>
+
+
+
+@code {
+    private async Task OpenCVSelectFile()
+    {
+        await _JsRuntime.InvokeVoidAsync("OpenCVSelectFile");      // 자바스크립트 함수 ShowVideo을 호출
+    }
+}

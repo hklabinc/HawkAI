@@ -35,6 +35,7 @@ window.SendVideo = (userId) => {
             video.play();            
         });
     }
+    
 
     // 주기적으로 이미지 전송
     //let timer;
