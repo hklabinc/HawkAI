@@ -1,6 +1,6 @@
 {
   "Version": 1,
-  "Hash": "sesng0TbSoZxMwsjDe+YgkzP1oIwJZ0nKdtvlkez2As=",
+  "Hash": "KHkRGIX5bDEukNGyo9bwXax61b0Ivu7NZ1PApGhswjc=",
   "Source": "HawkAI",
   "BasePath": "_content/HawkAI",
   "Mode": "Default",
@@ -1479,6 +1479,23 @@
       "OriginalItemSpec": "wwwroot\\js\\common.js"
     },
     {
+      "Identity": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\js\\diff-cam-engine.js",
+      "SourceId": "HawkAI",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\",
+      "BasePath": "_content/HawkAI",
+      "RelativePath": "js/diff-cam-engine.js",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\js\\diff-cam-engine.js"
+    },
+    {
       "Identity": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\js\\opencv_4_7.js",
       "SourceId": "HawkAI",
       "SourceType": "Discovered",
@@ -1496,6 +1513,23 @@
       "OriginalItemSpec": "wwwroot\\js\\opencv_4_7.js"
     },
     {
+      "Identity": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\js\\opencv_use - 복사.js",
+      "SourceId": "HawkAI",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\",
+      "BasePath": "_content/HawkAI",
+      "RelativePath": "js/opencv_use - 복사.js",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\js\\opencv_use - 복사.js"
+    },
+    {
       "Identity": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\js\\opencv_use.js",
       "SourceId": "HawkAI",
       "SourceType": "Discovered",
@@ -1511,6 +1545,23 @@
       "CopyToOutputDirectory": "Never",
       "CopyToPublishDirectory": "PreserveNewest",
       "OriginalItemSpec": "wwwroot\\js\\opencv_use.js"
+    },
+    {
+      "Identity": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\js\\site.js",
+      "SourceId": "HawkAI",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\",
+      "BasePath": "_content/HawkAI",
+      "RelativePath": "js/site.js",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\js\\site.js"
     },
     {
       "Identity": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\js\\videomqtt.js",

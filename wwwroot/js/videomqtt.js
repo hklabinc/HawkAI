@@ -14,6 +14,7 @@ window.SendVideo = (userId) => {
     var para_scale = 1.0;
     const WIDTH = 320;
     const HEIGHT = 240;
+    const THRESHOLD_MOTION_DETECTION = 50;  // TBD
     const camName = document.getElementById('cam_name').value;
     console.log("camName: " + camName);
 
@@ -27,17 +28,45 @@ window.SendVideo = (userId) => {
     client.connect({ useSSL: true, onSuccess: onConnect });   // connect the client using SSL 
 
 
-    // Video 화면 보여주기
-    var video = document.querySelector("#canvas_video");
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
-            video.srcObject = stream;
-            video.play();            
-        });
+    /* Video 화면 보여주기 */
+    //var video = document.querySelector("#canvas_video");
+    //if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    //    navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
+    //        video.srcObject = stream;
+    //        video.play();            
+    //    });
+    //}
+
+    
+    /* Motion Detection */
+    var video = document.getElementById('canvas_video');
+    var canvas_motion = document.getElementById('canvas_motion');
+    var score_motion = document.getElementById('score_motion');
+
+    function initSuccess() {
+        DiffCamEngine.start();
     }
+
+    function initError() {
+        alert('Something went wrong.');
+    }
+
+    function capture(payload) {
+        score_motion.textContent = payload.score;
+    }
+
+    DiffCamEngine.init({
+        video: video,
+        motionCanvas: canvas_motion,
+        initSuccessCallback: initSuccess,
+        initErrorCallback: initError,
+        captureCallback: capture
+    });
+
     
 
-    // 주기적으로 이미지 전송
+
+    /* 주기적으로 이미지 전송 */
     //let timer;
     //timer = setInterval(clock, para_interval*1000);   // 1초마다 clock() 함수를 실행시킨다.
 
@@ -47,7 +76,9 @@ window.SendVideo = (userId) => {
         //const div = document.getElementById('result');
         //div.innerText = new Date();
 
-        if (isImage) {
+        //console.log("payload.score:" + score_motion.textContent);  // Threshold of Motion detected 값
+
+        if (isImage || isEvent) {
             var canvas = document.getElementById('canvas_image');            
             canvas.width = WIDTH * para_scale;
             canvas.height = HEIGHT * para_scale;
@@ -59,17 +90,54 @@ window.SendVideo = (userId) => {
             var data = new Object();
             data.addr = camName;
             data.time = new Date().toLocaleString();
-            data.type = "image";
-            data.label = "none";
-            data.image = resultb64;
-            //console.log("data:" + data);
 
-            var jsonData = JSON.stringify(data);
-            console.log("jsonData:" + jsonData.substring(0,100));
+            if (isImage && isEvent == false) {      // image만 전송하는 경우
+                data.type = "image";
+                data.label = "none";
+                data.image = resultb64;
+                //console.log("data:" + data);
 
-            message = new Paho.MQTT.Message(jsonData);
-            message.destinationName = TOPIC_SUB;
-            client.send(message);       // image MQTT 메시지 전송            
+                var jsonData = JSON.stringify(data);
+                console.log("jsonData:" + jsonData.substring(0, 100));
+
+                message = new Paho.MQTT.Message(jsonData);
+                message.destinationName = TOPIC_SUB;
+                client.send(message);       // image MQTT 메시지 전송   
+            }      
+            
+            if (isEvent && score_motion.textContent > THRESHOLD_MOTION_DETECTION) {     // event만 전송하는 경우 (단 threshold가 넘었을때만) -> isImage 여부에 상관 없이 event만 전송
+                console.log("Sending EVENT !! - payload.score:" + score_motion.textContent);  // Threshold of Motion detected 값
+                data.type = "event";
+                data.label = "motion";
+                data.image = resultb64;
+                //console.log("data:" + data);
+
+                var jsonData = JSON.stringify(data);
+                console.log("jsonData:" + jsonData.substring(0, 100));
+
+                message = new Paho.MQTT.Message(jsonData);
+                message.destinationName = TOPIC_SUB;
+                client.send(message);       // image MQTT 메시지 전송 
+            }
+
+            if (isImage == true && isEvent && score_motion.textContent <= THRESHOLD_MOTION_DETECTION) {     // image는 전송해야 하고 event 발생 조건이 안되었을때 -> image 전송
+                data.type = "image";
+                data.label = "none";
+                data.image = resultb64;
+                //console.log("data:" + data);
+
+                var jsonData = JSON.stringify(data);
+                console.log("jsonData:" + jsonData.substring(0, 100));
+
+                message = new Paho.MQTT.Message(jsonData);
+                message.destinationName = TOPIC_SUB;
+                client.send(message);       // image MQTT 메시지 전송 
+            }
+            if (isImage == false && isEvent && score_motion.textContent <= THRESHOLD_MOTION_DETECTION) {     // image는 전송안 하고 event 발생 조건이 안되었을때
+                // Nothing to do
+            }
+
+                           
         }
         setTimeout(clock, para_interval * 1000);
     }     

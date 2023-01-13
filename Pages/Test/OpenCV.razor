@@ -18,11 +18,20 @@
     </div>
 </div>
 
+<div>
+    <button class="btn btn-primary" id="opencv_motion_detection" @onclick="OpenCVMotionDetection">OpenCV Motion Detection</button>
+</div>
+
 
 
 @code {
     private async Task OpenCVSelectFile()
     {
         await _JsRuntime.InvokeVoidAsync("OpenCVSelectFile");      // 자바스크립트 함수 ShowVideo을 호출
+    }
+
+    private async Task OpenCVMotionDetection()
+    {
+        await _JsRuntime.InvokeVoidAsync("OpenCVMotionDetection");      // 자바스크립트 함수 ShowVideo을 호출
     }
 }

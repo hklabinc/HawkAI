@@ -1,0 +1,71 @@
+﻿@page "/test/motion_detection"
+@attribute [Authorize(Roles = "Admin,Normal")]
+@inject IJSRuntime _JsRuntime
+
+<style>	
+	figure {
+		display: inline-block;
+		margin: 10px;
+		vertical-align: top;
+	}
+
+	figcaption {
+		text-align: left;
+		font-weight: bold;
+	}
+
+	video, canvas {
+		width: 320px;
+		height: 240px;
+		background-color: #999;
+	}
+
+	canvas {
+		image-rendering: pixelated;
+	}
+
+	marquee {
+		text-shadow: 0 0 3px #00ff21;
+	}
+</style>
+
+
+<h3>Motion Detection</h3>
+
+<div>
+    <button class="btn btn-primary" id="motion_detection" @onclick="funcMotionDetection">Motion Detection</button>
+</div>
+
+
+<figure>
+	<video id="video"></video>
+	<figcaption>Live Video</figcaption>
+</figure>
+
+<figure>
+	<canvas id="motion"></canvas>
+	<figcaption>
+		Motion Detector<br>
+		Threshold of Motion detected: <span id="score">?</span>
+	</figcaption>
+</figure>
+
+
+@*<figure>
+	<figcaption>
+		Code Explained in this video
+	</figcaption>
+	<iframe width="560" height="315" src="https://www.youtube.com/embed/_so4_-dTZJ8" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</figure>*@
+@*<marquee behavior="scroll" direction="left">🌟🌟SubScribe the YouTube Channel for Complete code access & Early access of Code explanation video🌟🌟</marquee>*@
+		
+
+
+
+@code {
+	private async Task funcMotionDetection()
+    {
+		await _JsRuntime.InvokeVoidAsync("MotionDetection");      // 자바스크립트 함수 ShowVideo을 호출
+    }
+
+}

@@ -13,18 +13,17 @@ window.OpenCVSelectFile = () => {
 
     const status = document.getElementById('opencv_status');
     status.innerHTML = 'OpenCV.js is ready.';
+
+    
+    // 아래 코드는 동작 안함!
+    //var Module = {
+    //    // https://emscripten.org/docs/api_reference/module.html#Module.onRuntimeInitialized
+    //    onRuntimeInitialized() {
+    //        document.getElementById('opencv_status').innerHTML = 'OpenCV.js is ready.';
+    //    }
+    //};
 }
 
-
-window.OpenCVMotionDetection = () => {
-    //var camera = new cv.VideoCapture(0); //open camera
-
-    ////set the video size to 512x288
-    //camera.setWidth(512);
-    //camera.setHeight(288);
-    //var window = new cv.NamedWindow('Camera');
-    //var firstFrame, frameDelta, gray, thresh;
-}
 
 
 //function ShowDeleteConfirmationModal() {
