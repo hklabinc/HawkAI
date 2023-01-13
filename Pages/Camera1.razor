@@ -2,6 +2,7 @@
 @page "/camera/{id:int}"
 @attribute [Authorize(Roles = "Admin,Normal")]
 @inject ICameraService CameraService
+@using Microsoft.AspNetCore.Identity
 
 @if (Id == null)
 {
@@ -17,10 +18,10 @@ else
         <label for="name">Name</label>
         <InputText id="name" @bind-Value="camera.Name" class="form-control"></InputText>
     </div>
-    <div>
+    @*<div>
         <label for="user">User</label>
         <InputText id="user" @bind-Value="camera.User" class="form-control"></InputText>
-    </div>
+    </div>*@
     <div>
         <label for="location">Location</label>
         <InputText id="location" @bind-Value="camera.Location" class="form-control"></InputText>
@@ -37,19 +38,42 @@ else
     }
 </EditForm>
 
+
 @code {
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; }
+
+    [Inject]
+    UserManager<IdentityUser> userManager { get; set; }
+
     [Parameter]
     public int? Id { get; set; }
 
     string btnText = string.Empty;
+    string userName = string.Empty;
 
     Camera camera = new Camera();
 
-    protected override void OnInitialized()
+    protected override async void OnInitialized()
     {
         btnText = Id == null ? "Save New Camera" : "Update Camera";
-    }
 
+        var user = (await authenticationStateTask).User;
+        if (user.Identity.IsAuthenticated)
+        {
+            var currentUser = await userManager.GetUserAsync(user);
+            string currentUserId = currentUser.Id;
+            string currentUserEmail = currentUser.Email;
+            //var currentUserPhone = currentUser.PhoneNumber;
+            //var currentUserEmailConfirmed = currentUser.EmailConfirmed;
+
+            userName = currentUserEmail;
+        }
+        else
+        {
+            // User is not logged in
+        }
+    }    
 
     protected override async Task OnParametersSetAsync()
     {
@@ -58,12 +82,13 @@ else
             camera = await CameraService.GetSingleCamera((int)Id);
         }
     }
-   
+
 
     async Task HandleSubmit()
     {
+        camera.User = userName;
         if (Id == null)
-        {
+        {            
             await CameraService.CreateCamera(camera);
         }
         else

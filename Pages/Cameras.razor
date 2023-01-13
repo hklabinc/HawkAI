@@ -2,6 +2,7 @@
 @attribute [Authorize(Roles = "Admin,Normal")]
 @inject ICameraService CameraService
 @inject NavigationManager NavigationManager
+@using Microsoft.AspNetCore.Identity
 
 <h3>Registered Cameras</h3>
 
@@ -9,18 +10,23 @@
     <thead>
         <tr>
             <th>Camera</th>
-            <th>User</th>
+            <AuthorizeView Roles="Admin">
+                <th>User</th>
+            </AuthorizeView>            
             <th>Location</th>
             <th>Parameter</th>
             <th></th>
         </tr>
     </thead>
+    
     <tbody>
         @foreach (var camera in CameraService.Cameras)
         {
             <tr>
                 <td>@camera.Name</td>
-                <td>@camera.User</td>
+                <AuthorizeView Roles="Admin">   
+                    <td>@camera.User</td>
+                </AuthorizeView>
                 <td>@camera.Location</td>
                 <td>@camera.Parameter</td>
                 <td>
@@ -31,14 +37,36 @@
                 </td>
             </tr>
         }
-    </tbody>
+    </tbody>    
 </table>
 <button class="btn btn-primary" @onclick="CreateNewCamera">Create New Camera</button>
 
 @code {
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; }
+
+    [Inject]
+    UserManager<IdentityUser> userManager { get; set; }
+
+
     protected override async Task OnInitializedAsync()
     {
-        await CameraService.LoadCameras();
+        var user = (await authenticationStateTask).User;
+        var currentUser = await userManager.GetUserAsync(user);
+        string currentUserId = currentUser.Id;
+        string currentUserEmail = currentUser.Email;
+
+        var roleNames = await userManager.GetRolesAsync(currentUser);       // Get roleName from user
+        string roleName = roleNames[0].ToString();
+
+        if (roleName == "Admin")
+        {
+            await CameraService.LoadCameras();
+        }
+        else
+        {
+            await CameraService.LoadMyCameras(currentUserEmail);
+        }        
     }
 
     void ShowCamera(int id)

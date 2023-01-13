@@ -52,77 +52,75 @@ namespace HawkAI.Hubs
                         string topic = e.ApplicationMessage.Topic;
                         //_logger.LogInformation($"[HHCHOI] Topic: {topic}");
                         Console.WriteLine($"[HHCHOI] Rx MqttMsg with Topic: {topic}");
+                                                
+                        MqttMsg? mqttmsg = JsonSerializer.Deserialize<MqttMsg>(jsonUtf8Bytes);
+                        if (mqttmsg is not null)
+                        {                                
+                            Console.WriteLine($"[HHCHOI] Rx Event: {mqttmsg.type}, {mqttmsg.time}, {mqttmsg.addr}, {mqttmsg.label}, {mqttmsg.image.Substring(0, Math.Min(60, mqttmsg.image.Length))}");
 
-                        if (topic == "hawkai/fromCam")
-                        {
-                            MqttMsg? mqttmsg = JsonSerializer.Deserialize<MqttMsg>(jsonUtf8Bytes);
-                            if (mqttmsg is not null)
-                            {                                
-                                Console.WriteLine($"[HHCHOI] Rx Event: {mqttmsg.type}, {mqttmsg.time}, {mqttmsg.addr}, {mqttmsg.label}, {mqttmsg.image.Substring(0, Math.Min(60, mqttmsg.image.Length))}");
-
-                                if (mqttmsg.type == "event")
+                            if (mqttmsg.type == "event")
+                            {
+                                bool isFCM = false;     // TBD!
+                                // FCM 전송 
+                                if (isFCM)
                                 {
-                                    bool isFCM = false;     // TBD!
-                                    // FCM 전송 
-                                    if (isFCM)
+                                    string projectPath = AppDomain.CurrentDomain.BaseDirectory.Split(new string[] { @"bin\" }, StringSplitOptions.None)[0];
+                                    FirebaseApp app = null;
+                                    Console.WriteLine("[HHCHOI] projectPath: " + projectPath);
+                                    try
                                     {
-                                        string projectPath = AppDomain.CurrentDomain.BaseDirectory.Split(new string[] { @"bin\" }, StringSplitOptions.None)[0];
-                                        FirebaseApp app = null;
-                                        Console.WriteLine("[HHCHOI] projectPath: " + projectPath);
-                                        try
+                                        app = FirebaseApp.Create(new AppOptions()
                                         {
-                                            app = FirebaseApp.Create(new AppOptions()
-                                            {
-                                                Credential = GoogleCredential.FromFile(projectPath + "Auth.json")       // projectPath 안쓰고 절대경로로 하면 publish 했을 경우 동작 안함!
-                                            }, "myApp"); ;
-                                        }
-                                        catch (Exception)
-                                        {
-                                            app = FirebaseApp.GetInstance("myApp");
-                                        }
-
-                                        var fcm = FirebaseAdmin.Messaging.FirebaseMessaging.GetMessaging(app);
-                                        // This resgistration token comes from the client FCM SDKs.
-                                        //var registrationToken = "ekJh5yUcSSi3u59xViOyJx:APA91bGPs6XNCYK6nOIh9_obajTE1XLEzWwg7uAdRyaADkEslBvTFxdFNSnVvbhJcIfWAkLun4lfXggXBo2VGlHLrbs6qke2tOQ3th4CKokmQDlZLW_Tpr_-Fzcuzut-B7Bj13uXDPxT";
-                                        var registrationToken = "ddEJzTQCRV2tr9ycx2rfKe:APA91bFSGMEMLWgDilIb5LqUE9pmWIQMj2C1co8QjlCzA4sDK_72kSaSxBVIROsAqFnd8ANLr82RHt4Fq-4maN3lbVyc3TG_MjLBY35cbb-Pzzd3f4lHX7ooHnG393CCGabarhtIB0tp";
-
-
-                                        // Defining a message payload
-                                        Message message = new Message()     // 여러개의 Token에게 메시지를 보내려면 MulticcastMessage()로 변경해야 
-                                        {
-                                            Data = new Dictionary<string, string>()
-                                        {
-                                            { "hhData", "1234" },
-                                        },
-                                            Token = registrationToken,
-                                            Notification = new Notification()
-                                            {
-                                                Title = mqttmsg.label,
-                                                Body = mqttmsg.addr + " at " + mqttmsg.time
-                                            }
-                                        };
-
-                                        // Send a message to the device corresponding to the provided registration token.
-                                        //string response = await fcm.SendAsync(message).Result;
-                                        //Console.WriteLine("Successfully sent message: " + response);
-                                        string result = await fcm.SendAsync(message);
-                                        Console.WriteLine("[HHCHOI] Successfully sent message via FCM: " + result);
+                                            Credential = GoogleCredential.FromFile(projectPath + "Auth.json")       // projectPath 안쓰고 절대경로로 하면 publish 했을 경우 동작 안함!
+                                        }, "myApp"); ;
                                     }
+                                    catch (Exception)
+                                    {
+                                        app = FirebaseApp.GetInstance("myApp");
+                                    }
+
+                                    var fcm = FirebaseAdmin.Messaging.FirebaseMessaging.GetMessaging(app);
+                                    // This resgistration token comes from the client FCM SDKs.
+                                    //var registrationToken = "ekJh5yUcSSi3u59xViOyJx:APA91bGPs6XNCYK6nOIh9_obajTE1XLEzWwg7uAdRyaADkEslBvTFxdFNSnVvbhJcIfWAkLun4lfXggXBo2VGlHLrbs6qke2tOQ3th4CKokmQDlZLW_Tpr_-Fzcuzut-B7Bj13uXDPxT";
+                                    var registrationToken = "ddEJzTQCRV2tr9ycx2rfKe:APA91bFSGMEMLWgDilIb5LqUE9pmWIQMj2C1co8QjlCzA4sDK_72kSaSxBVIROsAqFnd8ANLr82RHt4Fq-4maN3lbVyc3TG_MjLBY35cbb-Pzzd3f4lHX7ooHnG393CCGabarhtIB0tp";
+
+
+                                    // Defining a message payload
+                                    Message message = new Message()     // 여러개의 Token에게 메시지를 보내려면 MulticcastMessage()로 변경해야 
+                                    {
+                                        Data = new Dictionary<string, string>()
+                                    {
+                                        { "hhData", "1234" },
+                                    },
+                                        Token = registrationToken,
+                                        Notification = new Notification()
+                                        {
+                                            Title = mqttmsg.label,
+                                            Body = mqttmsg.addr + " at " + mqttmsg.time
+                                        }
+                                    };
+
+                                    // Send a message to the device corresponding to the provided registration token.
+                                    //string response = await fcm.SendAsync(message).Result;
+                                    //Console.WriteLine("Successfully sent message: " + response);
+                                    string result = await fcm.SendAsync(message);
+                                    Console.WriteLine("[HHCHOI] Successfully sent message via FCM: " + result);
+                                }
                                     
 
-                                    // DB Create (DB에 저장) - FCM보다 뒤에 있어야!! - DB 저장하고 되돌아 오지 않음!!
-                                    Event savedEvent = new Event
-                                    {
-                                        Addr = mqttmsg.addr,
-                                        Time = mqttmsg.time,
-                                        Label = mqttmsg.label,
-                                        Image = mqttmsg.image
-                                    };
-                                    await _event.CreateEvent(savedEvent);
-                                    Console.WriteLine("[HHCHOI] SAVE MqttMsg to DB");
-                                }
+                                // DB Create (DB에 저장) - FCM보다 뒤에 있어야!! - DB 저장하고 되돌아 오지 않음!!
+                                Event savedEvent = new Event
+                                {
+                                    Addr = mqttmsg.addr,
+                                    Time = mqttmsg.time,
+                                    Label = mqttmsg.label,
+                                    Image = mqttmsg.image
+                                };
+                                await _event.CreateEvent(savedEvent);
+                                Console.WriteLine("[HHCHOI] SAVE MqttMsg to DB");
                             }
-                        }                        
+                        }
+                                               
                     }
                     await Task.CompletedTask;
                 };
@@ -132,13 +130,13 @@ namespace HawkAI.Hubs
 
                 // Subscribe
                 var mqttSubscribeOptions = _mqttFactory.CreateSubscribeOptionsBuilder()
-                    .WithTopicFilter(f => { f.WithTopic("hawkai/fromCam"); })
+                    .WithTopicFilter(f => { f.WithTopic("hawkai/from/#"); })
                     .Build();
                 await mqttClient.SubscribeAsync(mqttSubscribeOptions, CancellationToken.None);
 
-                // Subscribe (두번째 토픽 가입)
+                //// Subscribe (두번째 토픽 가입)
                 //var mqttSubscribeOptions2 = _mqttFactory.CreateSubscribeOptionsBuilder()
-                //    .WithTopicFilter(f => { f.WithTopic("hawkai/fromCam"); })
+                //    .WithTopicFilter(f => { f.WithTopic("hawkai/from"); })
                 //    .Build();
                 //await mqttClient.SubscribeAsync(mqttSubscribeOptions2, CancellationToken.None);
 

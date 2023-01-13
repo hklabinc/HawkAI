@@ -1,9 +1,13 @@
 ﻿/* Gobally 사용을 위하여 아래 window.를 붙임 */
 
 /* Video Play */
-window.SendVideo = () => {
+window.SendVideo = (userId) => {
 
     /* Paramter 설정 */
+    const SERV_ADDR = "hawkai.hknu.ac.kr";
+    const SERV_PORT = 8090;
+    const TOPIC_SUB = "hawkai/from/" + userId;
+    const TOPIC_PUB = "hawkai/to/" + userId;
     var isImage = false;
     var isEvent = false;
     var para_interval = 0.5;
@@ -16,7 +20,7 @@ window.SendVideo = () => {
     /* MQTT 설정 */
     var client_id = Math.random().toString(36).substring(2, 12);        // random client id
     console.log("client id: " + client_id);
-    const client = new Paho.MQTT.Client("hawkai.hknu.ac.kr", Number(8090), client_id);    // Create a client instance
+    const client = new Paho.MQTT.Client(SERV_ADDR, Number(SERV_PORT), client_id);    // Create a client instance
     client.onConnectionLost = onConnectionLost; // set callback handlers
     client.onMessageArrived = onMessageArrived;
     //client.connect({ onSuccess: onConnect });   // connect the client
@@ -63,7 +67,7 @@ window.SendVideo = () => {
             console.log("jsonData:" + jsonData.substring(0,100));
 
             message = new Paho.MQTT.Message(jsonData);
-            message.destinationName = "hawkai/fromCam";
+            message.destinationName = TOPIC_SUB;
             client.send(message);       // image MQTT 메시지 전송            
         }
         setTimeout(clock, para_interval * 1000);
@@ -75,7 +79,7 @@ window.SendVideo = () => {
         video.pause();
     });
 
-    // Send Snapshot 버튼 누를 때 - Snapshot 찍고 MQTT로 전송    
+    // Send Snapshot 버튼 누를 때 - Snapshot 찍고 MQTT로 전송
     //var video = document.querySelector("#canvas_video");
     //var canvas = document.getElementById('canvas_image');
     //canvas.width = 320;
@@ -98,7 +102,7 @@ window.SendVideo = () => {
     //    console.log("jsonData:" + jsonData);
 
     //    message = new Paho.MQTT.Message(jsonData);
-    //    message.destinationName = "hawkai/fromCam";
+    //    message.destinationName = TOPIC_SUB;
     //    client.send(message);
     //});
     
@@ -107,12 +111,11 @@ window.SendVideo = () => {
     function onConnect() {
         // Once a connection has been made, make a subscription and send a message.
         console.log("MQTT onConnect !!");
-        client.subscribe("hawkai/toCam");
+        client.subscribe(TOPIC_PUB);
 
         //메시지 전송
-        message = new Paho.MQTT.Message("Hello");
-        //message.destinationName = "test_pub";
-        message.destinationName = "hawkai/fromCam";
+        message = new Paho.MQTT.Message("Hello");        
+        message.destinationName = TOPIC_SUB;
         client.send(message);
     }
 

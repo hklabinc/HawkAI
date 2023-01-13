@@ -48,6 +48,11 @@ namespace HawkAI.Data.CameraService
             Cameras = await _context.Cameras.ToListAsync();
         }
 
+        public async Task LoadMyCameras(string userName)
+        {
+            Cameras = await _context.Cameras.Where(x => x.User == userName).ToListAsync();
+        }
+
         public async Task UpdateCamera(Camera camera, int id)
         {
             var dbCamera = await _context.Cameras.FindAsync(id);
@@ -66,6 +71,12 @@ namespace HawkAI.Data.CameraService
         public async Task<IEnumerable<Camera>> GetAllCameras()
         {
             Cameras = await _context.Cameras.ToListAsync();
+            return Cameras;
+        }
+
+        public async Task<IEnumerable<Camera>> GetMyCameras(string userName)
+        {
+            Cameras = await _context.Cameras.Where(x => x.User == userName).ToListAsync();
             return Cameras;
         }
     }

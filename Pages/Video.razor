@@ -1,8 +1,9 @@
 ﻿@page "/video"
 @attribute [Authorize(Roles = "Admin,Normal")]
 
-@*자바스크립트 사용을 위한 injection*@
 @inject IJSRuntime _JsRuntime
+@inject AuthenticationStateProvider _authenticationStateProvider
+
 
 <h3>Video</h3>
 
@@ -26,13 +27,21 @@
 <ul id="rx_msg">      
 </ul>
 
+
 @code {
-    private async Task SendVideo()
+    async Task<string> getUserId()
     {
-        await _JsRuntime.InvokeVoidAsync("SendVideo");      // 자바스크립트 함수 ShowVideo을 호출
+        var user = (await _authenticationStateProvider.GetAuthenticationStateAsync()).User;
+        var UserId = user.FindFirst(u => u.Type.Contains("nameidentifier"))?.Value;
+        return UserId;
     }
-}
-@code {
+
+    private async Task SendVideo()
+    {        
+        string userId = await getUserId();
+        await _JsRuntime.InvokeVoidAsync("SendVideo", userId);      // 자바스크립트 함수 ShowVideo을 호출
+    }
+
     private async Task StopVideo()
     {
         await _JsRuntime.InvokeVoidAsync("StopVideo");      // 자바스크립트 함수 ShowVideo을 호출
