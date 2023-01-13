@@ -28,7 +28,7 @@ window.SendVideo = (userId) => {
     client.connect({ useSSL: true, onSuccess: onConnect });   // connect the client using SSL 
 
 
-    /* Video 화면 보여주기 */
+    /* Video 화면 보여주기 */  // <- 아래 Motion Detection에서 겹쳐서 주석 처리함!
     //var video = document.querySelector("#canvas_video");
     //if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
     //    navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
