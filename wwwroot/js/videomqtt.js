@@ -8,8 +8,10 @@ window.SendVideo = (userId) => {
     const SERV_PORT = 8090;
     const TOPIC_SUB = "hawkai/from/" + userId;
     const TOPIC_PUB = "hawkai/to/" + userId;
+    const TOPIC_QUERY = "hawkai/query";
     var isImage = false;
     var isEvent = false;
+    var isQuery = true;     // TBD
     var para_interval = 0.5;
     var para_scale = 1.0;
     const WIDTH = 320;
@@ -78,7 +80,7 @@ window.SendVideo = (userId) => {
 
         //console.log("payload.score:" + score_motion.textContent);  // Threshold of Motion detected 값
 
-        if (isImage || isEvent) {
+        if (isImage || isEvent || isQuery) {
             var canvas = document.getElementById('canvas_image');            
             canvas.width = WIDTH * para_scale;
             canvas.height = HEIGHT * para_scale;
@@ -135,6 +137,22 @@ window.SendVideo = (userId) => {
             }
             if (isImage == false && isEvent && score_motion.textContent <= THRESHOLD_MOTION_DETECTION) {     // image는 전송안 하고 event 발생 조건이 안되었을때
                 // Nothing to do
+            }
+
+
+            // 이벤트 추가 쿼리! - 조건 및 위치 수정 필요!! TBD
+            if (isQuery && score_motion.textContent > THRESHOLD_MOTION_DETECTION) {     
+                data.type = userId;         // 임시방편으로 type에 사용자ID를 넣어줌
+                data.label = "motion";
+                data.image = resultb64;
+                //console.log("data:" + data);
+
+                var jsonData = JSON.stringify(data);
+                console.log("jsonData:" + jsonData.substring(0, 100));
+
+                message = new Paho.MQTT.Message(jsonData);
+                message.destinationName = TOPIC_QUERY;
+                client.send(message);       // query MQTT 메시지 전송 
             }
 
                            

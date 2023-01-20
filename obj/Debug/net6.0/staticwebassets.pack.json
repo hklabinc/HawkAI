@@ -105,6 +105,10 @@
       "PackagePath": "staticwebassets\\js\\diff-cam-engine.js"
     },
     {
+      "Id": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\js\\motion_detection.js",
+      "PackagePath": "staticwebassets\\js\\motion_detection.js"
+    },
+    {
       "Id": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\js\\opencv_4_7.js",
       "PackagePath": "staticwebassets\\js\\opencv_4_7.js"
     },
@@ -115,10 +119,6 @@
     {
       "Id": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\js\\opencv_use.js",
       "PackagePath": "staticwebassets\\js\\opencv_use.js"
-    },
-    {
-      "Id": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\js\\site.js",
-      "PackagePath": "staticwebassets\\js\\site.js"
     },
     {
       "Id": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\js\\videomqtt.js",

@@ -1,6 +1,6 @@
 {
   "Version": 1,
-  "Hash": "KHkRGIX5bDEukNGyo9bwXax61b0Ivu7NZ1PApGhswjc=",
+  "Hash": "uu/ED+OhLycP/v7CfV2Wye4caIDXgR3bJqgpG9PdyiE=",
   "Source": "HawkAI",
   "BasePath": "_content/HawkAI",
   "Mode": "Default",
@@ -1496,6 +1496,23 @@
       "OriginalItemSpec": "wwwroot\\js\\diff-cam-engine.js"
     },
     {
+      "Identity": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\js\\motion_detection.js",
+      "SourceId": "HawkAI",
+      "SourceType": "Discovered",
+      "ContentRoot": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\",
+      "BasePath": "_content/HawkAI",
+      "RelativePath": "js/motion_detection.js",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\js\\motion_detection.js"
+    },
+    {
       "Identity": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\js\\opencv_4_7.js",
       "SourceId": "HawkAI",
       "SourceType": "Discovered",
@@ -1545,23 +1562,6 @@
       "CopyToOutputDirectory": "Never",
       "CopyToPublishDirectory": "PreserveNewest",
       "OriginalItemSpec": "wwwroot\\js\\opencv_use.js"
-    },
-    {
-      "Identity": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\js\\site.js",
-      "SourceId": "HawkAI",
-      "SourceType": "Discovered",
-      "ContentRoot": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\",
-      "BasePath": "_content/HawkAI",
-      "RelativePath": "js/site.js",
-      "AssetKind": "All",
-      "AssetMode": "All",
-      "AssetRole": "Primary",
-      "RelatedAsset": "",
-      "AssetTraitName": "",
-      "AssetTraitValue": "",
-      "CopyToOutputDirectory": "Never",
-      "CopyToPublishDirectory": "PreserveNewest",
-      "OriginalItemSpec": "wwwroot\\js\\site.js"
     },
     {
       "Identity": "C:\\Users\\user\\source\\repos\\HawkAI\\wwwroot\\js\\videomqtt.js",

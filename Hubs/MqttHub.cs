@@ -58,9 +58,9 @@ namespace HawkAI.Hubs
                         {                                
                             Console.WriteLine($"[HHCHOI] Rx Event: {mqttmsg.type}, {mqttmsg.time}, {mqttmsg.addr}, {mqttmsg.label}, {mqttmsg.image.Substring(0, Math.Min(60, mqttmsg.image.Length))}");
 
-                            if (mqttmsg.type == "event")
+                            if (mqttmsg.type == "event" && mqttmsg.label == "fire")     // fire인 경우만 저장하고 FCM으로 전송 (TBD!)
                             {
-                                bool isFCM = false;     // TBD!
+                                bool isFCM = true;     // TBD!
                                 // FCM 전송 
                                 if (isFCM)
                                 {
