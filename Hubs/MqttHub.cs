@@ -19,7 +19,7 @@ namespace HawkAI.Hubs
         private readonly ILogger<MqttHub> _logger;
         private readonly MqttFactory _mqttFactory;
 
-        public MqttHub(ILogger<MqttHub> logger, IEventService eventService, MqttFactory mqttFactory            )
+        public MqttHub(ILogger<MqttHub> logger, IEventService eventService, MqttFactory mqttFactory)
         {
             _logger = logger;
             _event = eventService;
@@ -49,16 +49,18 @@ namespace HawkAI.Hubs
                         //string jsonMessage = e.ApplicationMessage.ConvertPayloadToString(); // by hhchoi
                         //_logger.LogInformation($"Received json message: {jsonMessage}");
                         //Console.WriteLine("[HHCHOI] RxMqttMsg: " + e.ApplicationMessage.ConvertPayloadToString().Substring(0, 110));
-                        string topic = e.ApplicationMessage.Topic;
-                        //_logger.LogInformation($"[HHCHOI] Topic: {topic}");
-                        Console.WriteLine($"[HHCHOI] Rx MqttMsg with Topic: {topic}");
-                                                
+                        string topic = e.ApplicationMessage.Topic;                        
+                        //string[] words = topic.Split("/");                        
+                        //string user = words[2];
+                        string user = topic.Split("/")[2];
+                        Console.WriteLine($"[HHCHOI] Rx MqttMsg with Topic: {topic} and User: {user}");
+
                         MqttMsg? mqttmsg = JsonSerializer.Deserialize<MqttMsg>(jsonUtf8Bytes);
                         if (mqttmsg is not null)
                         {                                
                             Console.WriteLine($"[HHCHOI] Rx Event: {mqttmsg.type}, {mqttmsg.time}, {mqttmsg.addr}, {mqttmsg.label}, {mqttmsg.image.Substring(0, Math.Min(60, mqttmsg.image.Length))}");
 
-                            if (mqttmsg.type == "event" && mqttmsg.label == "fire")     // fire인 경우만 저장하고 FCM으로 전송 (TBD!)
+                            if (mqttmsg.type == "event")     // fire인 경우만 저장하고 FCM으로 전송 (TBD!)
                             {
                                 bool isFCM = true;     // TBD!
                                 // FCM 전송 
@@ -106,7 +108,7 @@ namespace HawkAI.Hubs
                                     string result = await fcm.SendAsync(message);
                                     Console.WriteLine("[HHCHOI] Successfully sent message via FCM: " + result);
                                 }
-                                    
+
 
                                 // DB Create (DB에 저장) - FCM보다 뒤에 있어야!! - DB 저장하고 되돌아 오지 않음!!
                                 Event savedEvent = new Event
@@ -114,7 +116,8 @@ namespace HawkAI.Hubs
                                     Addr = mqttmsg.addr,
                                     Time = mqttmsg.time,
                                     Label = mqttmsg.label,
-                                    Image = mqttmsg.image
+                                    Image = mqttmsg.image,
+                                    User = user
                                 };
                                 await _event.CreateEvent(savedEvent);
                                 Console.WriteLine("[HHCHOI] SAVE MqttMsg to DB");
@@ -134,11 +137,11 @@ namespace HawkAI.Hubs
                     .Build();
                 await mqttClient.SubscribeAsync(mqttSubscribeOptions, CancellationToken.None);
 
-                // Subscribe (두번째 토픽 가입)
-                var mqttSubscribeOptions2 = _mqttFactory.CreateSubscribeOptionsBuilder()
-                    .WithTopicFilter(f => { f.WithTopic("hawkai/from"); })      // 이것도 있어야 함! 없으면 공용 캠으로부터는 안받아짐
-                    .Build();
-                await mqttClient.SubscribeAsync(mqttSubscribeOptions2, CancellationToken.None);
+                //// Subscribe (두번째 토픽 가입)
+                //var mqttSubscribeOptions2 = _mqttFactory.CreateSubscribeOptionsBuilder()
+                //    .WithTopicFilter(f => { f.WithTopic("hawkai/from"); })      // 이것도 있어야 함! 없으면 공용 캠으로부터는 안받아짐
+                //    .Build();
+                //await mqttClient.SubscribeAsync(mqttSubscribeOptions2, CancellationToken.None);
 
                 SpinWait.SpinUntil(() => !((mqttClient is not null) && (mqttClient.IsConnected)));
 

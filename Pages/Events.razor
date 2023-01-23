@@ -3,6 +3,7 @@
 @inject IEventService EventService
 @inject IJSRuntime _jsRuntime
 @*@inject NavigationManager NavigationManager*@
+@using Microsoft.AspNetCore.Identity
 
 
 <_DeleteConfirmation IsParentComponentProcessing="IsLoading" OnConfirmationDelete="ConfirmDelete_Click"></_DeleteConfirmation>
@@ -21,6 +22,9 @@
         <thead>
             <tr>
                 <th>Time</th>
+                <AuthorizeView Roles="Admin">
+                    <th>User</th>
+                </AuthorizeView>                
                 <th>Addr</th>
                 <th>Image</th>
                 <th>Label</th>
@@ -32,6 +36,9 @@
             {
                 <tr>
                     <td>@objEvent.Time</td>
+                    <AuthorizeView Roles="Admin">
+                        <td>@objEvent.User</td>
+                    </AuthorizeView>                    
                     <td>@objEvent.Addr</td>
                     <td><img src="@($"data:image/jpeg;base64,{objEvent.Image}")"></td>
                     <td>@objEvent.Label</td>
@@ -61,6 +68,12 @@ else
 
 
 @code {
+    [CascadingParameter]
+    private Task<AuthenticationState> authenticationStateTask { get; set; }
+
+    [Inject]
+    UserManager<IdentityUser> userManager { get; set; }
+    
     private IEnumerable<Event> objEvents { get; set; } = new List<Event>();
     public bool IsLoading { get; set; }
     private int DeleteEventId { get; set; } = 0;
@@ -77,7 +90,25 @@ else
     {
         IsLoading=true;
         StateHasChanged();
-        objEvents = await EventService.GetAllEvents();
+
+        var user = (await authenticationStateTask).User;
+        var currentUser = await userManager.GetUserAsync(user);
+        string currentUserId = currentUser.Id;
+        string currentUserEmail = currentUser.Email;
+
+        var roleNames = await userManager.GetRolesAsync(currentUser);       // Get roleName from user
+        string roleName = roleNames[0].ToString();
+
+        if (roleName == "Admin")
+        {
+            objEvents = await EventService.GetAllEvents();
+        }
+        else
+        {
+            objEvents = await EventService.GetMyEvents(currentUserId);
+        }
+
+        //objEvents = await EventService.GetAllEvents();
         IsLoading=false;
         StateHasChanged();
     }

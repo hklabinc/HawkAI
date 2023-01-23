@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Components;
+﻿using HawkAI.Data.CameraService;
+using HawkAI.Pages;
+using Microsoft.AspNetCore.Components;
 using Microsoft.EntityFrameworkCore;
 
 namespace HawkAI.Data.EventService
@@ -64,6 +66,7 @@ namespace HawkAI.Data.EventService
             dbEvent.Addr = objEvent.Addr;            
             dbEvent.Image = objEvent.Image;
             dbEvent.Label = objEvent.Label;
+            dbEvent.User = objEvent.User;
 
             await _context.SaveChangesAsync();
             _navigationManager.NavigateTo("events");
@@ -74,6 +77,12 @@ namespace HawkAI.Data.EventService
             //Events = await _context.Events.ToListAsync();
             Events = await _context.Events.OrderByDescending(s => s.Id).ToListAsync();    // 역순으로 출력
             return Events;            
+        }
+
+        public async Task<IEnumerable<Event>> GetMyEvents(string userName)
+        {            
+            Events = await _context.Events.Where(x => x.User==userName || x.User=="ffffffff").OrderByDescending(s => s.Id).ToListAsync();    // 역순으로 출력
+            return Events;
         }
 
     }

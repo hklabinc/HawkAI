@@ -139,6 +139,8 @@
     private int servPort = 8085;
     private string TOPIC_SUB = "hawkai/from";
     private string TOPIC_PUB = "hawkai/to";
+    private string topicSubAll = string.Empty;    
+    private string topicPubAll = string.Empty;
     private string topicSubUser = string.Empty;    
     private string topicPubUser = string.Empty;
     private string messageInput = string.Empty;
@@ -153,6 +155,8 @@
         userId = currentUser.Id;
         userEmail = currentUser.Email;
 
+        topicSubAll = TOPIC_SUB + "/" + "ffffffff";
+        topicPubAll = TOPIC_PUB + "/" + "ffffffff";
         topicSubUser = TOPIC_SUB + "/" + userId;
         topicPubUser = TOPIC_PUB + "/" + userId;
     }
@@ -220,8 +224,8 @@
             messages0.Add("MQTT Subscribed with topicSubUser");
 
             // Subscribe to a topic 2
-            await mqttClient.SubscribeAsync(new MqttTopicFilterBuilder().WithTopic(TOPIC_SUB).Build());
-            messages0.Add("MQTT Subscribed with TOPIC_SUB");
+            await mqttClient.SubscribeAsync(new MqttTopicFilterBuilder().WithTopic(topicSubAll).Build());
+            messages0.Add("MQTT Subscribed with topicSubAll");
 
 
             mqttClient.DisconnectedAsync += async e =>
@@ -296,7 +300,7 @@
         if (mqttClient is not null)
         {            
             await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, messageInput), CancellationToken.None); // Since 3.0.5 with CancellationToken
-            await mqttClient.PublishAsync(makeMqttMessage(TOPIC_PUB, messageInput), CancellationToken.None);
+            await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, messageInput), CancellationToken.None);
             messages0.Add("Set control parameter with " + messageInput);
         }
     }
@@ -307,7 +311,7 @@
         {
             string msgControl = "isImage=True";
             await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None); 
-            await mqttClient.PublishAsync(makeMqttMessage(TOPIC_PUB, msgControl), CancellationToken.None);
+            await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, msgControl), CancellationToken.None);
             messages0.Add("Set isImage=True");
         }
     }
@@ -318,7 +322,7 @@
         {
             string msgControl = "isImage=False";
             await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None); 
-            await mqttClient.PublishAsync(makeMqttMessage(TOPIC_PUB, msgControl), CancellationToken.None);     
+            await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, msgControl), CancellationToken.None);
             messages0.Add("Set isImage=False");
         }
     }
@@ -329,7 +333,7 @@
         {
             string msgControl = "isEvent=True";
             await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None); 
-            await mqttClient.PublishAsync(makeMqttMessage(TOPIC_PUB, msgControl), CancellationToken.None);                
+            await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, msgControl), CancellationToken.None);
             messages0.Add("Set isEvent=True");
         }
     }
@@ -340,7 +344,7 @@
         {
             string msgControl = "isEvent=False";
             await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None);
-            await mqttClient.PublishAsync(makeMqttMessage(TOPIC_PUB, msgControl), CancellationToken.None);
+            await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, msgControl), CancellationToken.None);
             messages0.Add("Set isEvent=False");
         }
     }

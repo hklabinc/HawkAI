@@ -10,5 +10,6 @@ namespace HawkAI.Data.EventService
         Task DeleteEvent(int id);
         Task<int> DeleteAllEvents();
         Task<IEnumerable<Event>> GetAllEvents();
+        Task<IEnumerable<Event>> GetMyEvents(string userName);
     }
 }
