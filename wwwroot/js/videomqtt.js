@@ -1,29 +1,83 @@
 ﻿/* Gobally 사용을 위하여 아래 window.를 붙임 */
 
-/* Video Play */
-window.SendVideo = (userId) => {
+/*'use strict';*/
+let isImage = false;
+let isEvent = false;
+let isQuery = true;
+let para_scale = 1;
+let para_interval = 0.5;
+let para_threshold = 50;
 
+window.InitVideo = () => {    
+    isImage = $('#check-image').is(':checked');
+    isEvent = $('#check-event').is(':checked');
+    isQuery = $('#check-query').is(':checked');
+    para_scale = $("#select-scale").val();
+    para_interval = $("#select-interval").val();
+    para_threshold = $("#select-threshold").val();
+    
+    $("#check-image").click(function () {
+        isImage = document.getElementById('check-image').checked;
+        document.getElementById("valImage").textContent = isImage ? "On" : "Off";               
+    });
+    $("#check-event").click(function () {
+        isEvent = document.getElementById('check-event').checked;
+        document.getElementById("valEvent").textContent = isEvent ? "On" : "Off";        
+    });
+    $("#check-query").click(function () {
+        isQuery = document.getElementById('check-query').checked;
+        document.getElementById("valQuery").textContent = isQuery ? "On" : "Off";        
+    });
+    $("#select-scale").click(function () {
+        para_scale = $("#select-scale").val();
+    });  
+    $("#select-interval").click(function () {
+        para_interval = $("#select-interval").val();
+    });
+    $("#select-threshold").click(function () {
+        para_threshold = $("#select-threshold").val();
+    });
+
+    console.log('InitVideo() - para: %s, %s, %s, %f, %f, %f', isImage, isEvent, isQuery, para_scale, para_interval, para_threshold);
+}
+
+window.DefaultParameter = () => {   
+    isImage = false;
+    document.getElementById('check-image').checked = isImage;    
+    document.getElementById("valImage").textContent = isImage ? "On" : "Off";
+    isEvent = false;
+    document.getElementById('check-event').checked = isEvent;
+    document.getElementById("valEvent").textContent = isEvent ? "On" : "Off";
+    isQuery = true;
+    document.getElementById('check-query').checked = isQuery;
+    document.getElementById("valQuery").textContent = isQuery ? "On" : "Off";
+    para_scale = 1;
+    document.getElementById('select-scale').value = para_scale;
+    para_interval = 0.5;
+    document.getElementById('select-interval').value = para_interval;
+    para_threshold = 50;
+    document.getElementById('select-threshold').value = para_threshold;
+
+    console.log('DefaultParameter() - para: %s, %s, %s, %f, %f, %f', isImage, isEvent, isQuery, para_scale, para_interval, para_threshold);
+}
+
+
+/* Video Play */
+window.SendVideo = (userId) => {   
     /* Paramter 설정 */
     const SERV_ADDR = "hawkai.hknu.ac.kr";
     const SERV_PORT = 8090;
-    const TOPIC_SUB = "hawkai/from/" + userId;
-    const TOPIC_PUB = "hawkai/to/" + userId;
-    const TOPIC_QUERY = "hawkai/query";
-    var isImage = false;
-    var isEvent = false;
-    var isQuery = true;     // TBD
-    var para_interval = 0.5;
-    var para_scale = 1.0;
+    const TOPIC_PUB = "hawkai/from/" + userId;
+    const TOPIC_SUB = "hawkai/to/" + userId;
+    const TOPIC_QUERY = "hawkai/query";    
     const WIDTH = 320;
-    const HEIGHT = 240;
-    const THRESHOLD_MOTION_DETECTION = 50;  // TBD
-    const camName = document.getElementById('cam_name').value;
-    console.log("camName: " + camName);
+    const HEIGHT = 240;    
+    const CAM_NAME = document.getElementById('cam_name').value;    
 
     /* MQTT 설정 */
-    var client_id = Math.random().toString(36).substring(2, 12);        // random client id
-    console.log("client id: " + client_id);
-    const client = new Paho.MQTT.Client(SERV_ADDR, Number(SERV_PORT), client_id);    // Create a client instance
+    var client_id = Math.random().toString(36).substring(2, 12);                    // Random client id
+    //console.log("client id: " + client_id);
+    const client = new Paho.MQTT.Client(SERV_ADDR, Number(SERV_PORT), client_id);   // Create a client instance
     client.onConnectionLost = onConnectionLost; // set callback handlers
     client.onMessageArrived = onMessageArrived;
     //client.connect({ onSuccess: onConnect });   // connect the client
@@ -66,144 +120,36 @@ window.SendVideo = (userId) => {
     });
 
     
-
-
     /* 주기적으로 이미지 전송 */
     //let timer;
     //timer = setInterval(clock, para_interval*1000);   // 1초마다 clock() 함수를 실행시킨다.
 
     setTimeout(clock, para_interval * 1000);
-    function clock() {
-        //console.log("This is executed every 1 second");
+    function clock() {        
         //const div = document.getElementById('result');
         //div.innerText = new Date();
-
-        //console.log("payload.score:" + score_motion.textContent);  // Threshold of Motion detected 값
-
-        if (isImage || isEvent || isQuery) {
-            var canvas = document.getElementById('canvas_image');            
-            canvas.width = WIDTH * para_scale;
-            canvas.height = HEIGHT * para_scale;
-            canvas.getContext('2d').drawImage(video, 0, 0, WIDTH * para_scale, HEIGHT * para_scale);       // 원래 기본값은 640, 480
-            resultb64 = canvas.toDataURL("image/jpeg", 0.5).replace("data:image/jpeg;base64,", "");       // data:image/jpeg;base64, 문구 제거를 위해
-            //resultb64 = canvas.toDataURL();       // default는 png로 저장됨
-            //console.log("resultb64:" + resultb64);
-
-            var data = new Object();
-            data.addr = camName;
-            data.time = new Date().toLocaleString();
-
-            if (isImage && isEvent == false) {      // image만 전송하는 경우
-                data.type = "image";
-                data.label = "none";
-                data.image = resultb64;
-                //console.log("data:" + data);
-
-                var jsonData = JSON.stringify(data);
-                console.log("jsonData:" + jsonData.substring(0, 100));
-
-                message = new Paho.MQTT.Message(jsonData);
-                message.destinationName = TOPIC_SUB;
-                client.send(message);       // image MQTT 메시지 전송   
-            }      
-            
-            if (isEvent && score_motion.textContent > THRESHOLD_MOTION_DETECTION) {     // event만 전송하는 경우 (단 threshold가 넘었을때만) -> isImage 여부에 상관 없이 event만 전송
-                console.log("Sending EVENT !! - payload.score:" + score_motion.textContent);  // Threshold of Motion detected 값
-                data.type = "event";
-                data.label = "motion";
-                data.image = resultb64;
-                //console.log("data:" + data);
-
-                var jsonData = JSON.stringify(data);
-                console.log("jsonData:" + jsonData.substring(0, 100));
-
-                message = new Paho.MQTT.Message(jsonData);
-                message.destinationName = TOPIC_SUB;
-                client.send(message);       // image MQTT 메시지 전송 
-            }
-
-            if (isImage == true && isEvent && score_motion.textContent <= THRESHOLD_MOTION_DETECTION) {     // image는 전송해야 하고 event 발생 조건이 안되었을때 -> image 전송
-                data.type = "image";
-                data.label = "none";
-                data.image = resultb64;
-                //console.log("data:" + data);
-
-                var jsonData = JSON.stringify(data);
-                console.log("jsonData:" + jsonData.substring(0, 100));
-
-                message = new Paho.MQTT.Message(jsonData);
-                message.destinationName = TOPIC_SUB;
-                client.send(message);       // image MQTT 메시지 전송 
-            }
-            if (isImage == false && isEvent && score_motion.textContent <= THRESHOLD_MOTION_DETECTION) {     // image는 전송안 하고 event 발생 조건이 안되었을때
-                // Nothing to do
-            }
-
-
-            // 이벤트 추가 쿼리! - 조건 및 위치 수정 필요!! TBD
-            if (isQuery && score_motion.textContent > THRESHOLD_MOTION_DETECTION) {     
-                data.type = userId;         // 임시방편으로 type에 사용자ID를 넣어줌
-                data.label = "motion";
-                data.image = resultb64;
-                //console.log("data:" + data);
-
-                var jsonData = JSON.stringify(data);
-                console.log("jsonData:" + jsonData.substring(0, 100));
-
-                message = new Paho.MQTT.Message(jsonData);
-                message.destinationName = TOPIC_QUERY;
-                client.send(message);       // query MQTT 메시지 전송 
-            }
-
-                           
-        }
+                
+        console.log('clock() - para: %s, %s, %s, %f, %f, %f', isImage, isEvent, isQuery, para_scale, para_interval, para_threshold);        
+        var curr_threshold = Number(score_motion.textContent);
+                
+        if (isEvent && curr_threshold > para_threshold) {     // isEvent=true이면서 이벤트 발생시    
+            SendMqttMessage("event", "motion");               
+        } else if (isImage) {                       // 이벤트 발생 안했지만 isImage=true인 경우
+            SendMqttMessage("image", "none");            
+        } else { }        
+        
+        // TOPIC_QUERY로 Query 전송
+        if (isQuery && curr_threshold > para_threshold) {     
+            SendMqttMessage("query", "motion");
+        }                           
+        
         setTimeout(clock, para_interval * 1000);
     }     
 
-    /* Stop 버튼 누르면 */
-    document.getElementById("stop_video").addEventListener("click", () => {
-        clearInterval(timer);   // timer의 반복실행을 종료
-        video.pause();
-    });
-
-    // Send Snapshot 버튼 누를 때 - Snapshot 찍고 MQTT로 전송
-    //var video = document.querySelector("#canvas_video");
-    //var canvas = document.getElementById('canvas_image');
-    //canvas.width = 320;
-    //canvas.height = 240;
-    //document.getElementById("stop_video").addEventListener("click", () => {
-    //    canvas.getContext('2d').drawImage(video, 0, 0, 320, 240);       // 원래 기본값은 640, 480
-    //    resultb64 = canvas.toDataURL("image/jpeg", 1).replace("data:image/jpeg;base64,", "");       // data:image/jpeg;base64, 문구 제거를 위해
-    //    //resultb64 = canvas.toDataURL();       // default는 png로 저장됨
-    //    //console.log("resultb64:" + resultb64);
-
-    //    var data = new Object();
-    //    data.time = new Date().toJSON();
-    //    data.addr = "HK_ComCam01";
-    //    data.type = "image";
-    //    data.label = "none";
-    //    data.image = resultb64;
-    //    console.log("data:" + data);
-
-    //    var jsonData = JSON.stringify(data);
-    //    console.log("jsonData:" + jsonData);
-
-    //    message = new Paho.MQTT.Message(jsonData);
-    //    message.destinationName = TOPIC_SUB;
-    //    client.send(message);
-    //});
-    
-
-    // called when the client connects
-    function onConnect() {
-        // Once a connection has been made, make a subscription and send a message.
-        console.log("MQTT onConnect !!");
-        client.subscribe(TOPIC_PUB);
-
-        //메시지 전송
-        message = new Paho.MQTT.Message("Hello");        
-        message.destinationName = TOPIC_SUB;
-        client.send(message);
+    // called when the client connects - make a subscription
+    function onConnect() {        
+        console.log("MQTT connected!");
+        client.subscribe(TOPIC_SUB);
     }
 
     // called when the client loses its connection
@@ -223,32 +169,47 @@ window.SendVideo = (userId) => {
         const para = words[0];
         const value = words[1];
 
-        if (para === "isImage") {
+        if (para === "isImage") {            
             isImage = JSON.parse(value.toLowerCase());
+            document.getElementById('check-image').checked = isImage;
+            document.getElementById("valImage").textContent = isImage ? "On" : "Off";            
         } else if (para === "isEvent") {
             isEvent = JSON.parse(value.toLowerCase());
+            document.getElementById('check-event').checked = isEvent;
+            document.getElementById("valEvent").textContent = isEvent ? "On" : "Off";  
+        } else if (para === "isQuery") {
+            isEvent = JSON.parse(value.toLowerCase());
+            document.getElementById('check-query').checked = isQuery;
+            document.getElementById("valQuery").textContent = isQuery ? "On" : "Off";  
         } else if (para === "interval") {
             para_interval = value;            
         } else if (para === "scale") {
             para_scale = value;
+        } else if (para === "ping") {
+            // Make the control parameters
+            SendMqttMessage("pong", "control parameters");      // Send pong
         } else {
             console.error("Rx message format error!")
-        }
+        }        
+    }
 
-        //var rxMsg = message.payloadString;
-        //var contact = JSON.parse(rxMsg);
-        //var cameraId = contact.src;
-        ////console.log("onMessage cameraId:" + cameraId);
-
-        //var elem = document.getElementById(cameraId);
-        //elem.style.color = "Red";
-        //var t = setInterval(function () {
-        //    elem.style.visibility = (elem.style.visibility == 'hidden' ? '' : 'hidden');
-        //}, 500);
+    function SendMqttMessage(type, label) {        
+        var canvas = document.getElementById('canvas_image');
+        canvas.getContext('2d').drawImage(video, 0, 0, WIDTH * para_scale, HEIGHT * para_scale);       // 원래 기본값은 640, 480            
+        
+        var data = {
+            addr: CAM_NAME,
+            time: new Date().toLocaleString(),
+            type: (type == "query") ? userId : type,
+            label: label,
+            image: canvas.toDataURL("image/jpeg", 0.5).replace("data:image/jpeg;base64,", "")   // data:image/jpeg;base64, 문구 제거를 위해
+        };
+        
+        var jsonData = JSON.stringify(data);
+        var mqttMsg = new Paho.MQTT.Message(jsonData);
+        mqttMsg.destinationName = (type == "query") ? TOPIC_QUERY : TOPIC_PUB;
+        client.send(mqttMsg);       // image MQTT 메시지 전송                     
+        console.log("Tx Mqtt Msg:" + jsonData.substring(0, 100));
     }
 }
 
-
-window.StopVideo = () => {
-
-}

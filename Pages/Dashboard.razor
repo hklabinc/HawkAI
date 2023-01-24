@@ -139,8 +139,8 @@
     private int servPort = 8085;
     private string TOPIC_SUB = "hawkai/from";
     private string TOPIC_PUB = "hawkai/to";
-    private string topicSubAll = string.Empty;    
-    private string topicPubAll = string.Empty;
+    private string topicSubAll = "hawkai/from/ffffffff";
+    private string topicPubAll = "hawkai/to/ffffffff";
     private string topicSubUser = string.Empty;    
     private string topicPubUser = string.Empty;
     private string messageInput = string.Empty;
@@ -150,24 +150,24 @@
 
     protected override async void OnInitialized()
     {        
-        var user = (await authenticationStateTask).User;
-        var currentUser = await userManager.GetUserAsync(user);
-        userId = currentUser.Id;
-        userEmail = currentUser.Email;
-
-        topicSubAll = TOPIC_SUB + "/" + "ffffffff";
-        topicPubAll = TOPIC_PUB + "/" + "ffffffff";
-        topicSubUser = TOPIC_SUB + "/" + userId;
-        topicPubUser = TOPIC_PUB + "/" + userId;
+        
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)      // DB 내용이 많은 경우에는 이렇게 처리하는 것이 좋음
     {
         if (firstRender)
         {
+            var user = (await authenticationStateTask).User;
+            var currentUser = await userManager.GetUserAsync(user);
+            userId = currentUser.Id;
+            userEmail = currentUser.Email;
+            topicSubUser = TOPIC_SUB + "/" + userId;
+            topicPubUser = TOPIC_PUB + "/" + userId;
+            
             await Disconnect();
             await Subscribe();
-            await LoadCameras();            
+            await LoadCameras();
+            await SendPing();
         }        
     }
 
@@ -295,6 +295,8 @@
         return mqttMsg;
     }
 
+    
+    
     private async Task Send()
     {
         if (mqttClient is not null)
@@ -302,6 +304,16 @@
             await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, messageInput), CancellationToken.None); // Since 3.0.5 with CancellationToken
             await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, messageInput), CancellationToken.None);
             messages0.Add("Set control parameter with " + messageInput);
+        }
+    }
+
+    private async Task SendPing()
+    {
+        if (mqttClient is not null)
+        {
+            await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, "ping=all"), CancellationToken.None); // Since 3.0.5 with CancellationToken
+            await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, "ping=all"), CancellationToken.None);
+            messages0.Add("Send " + "ping=all");
         }
     }
 

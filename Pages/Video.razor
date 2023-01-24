@@ -7,32 +7,101 @@
 
 <h3>Video</h3>
 
-<div class="form-group">
-    <label>
-        Name:
-        <input id="cam_name" size="10" placeholder="HK_ComCam01"/>
-    </label>
-    <button class="btn btn-primary" id="send_video" @onclick="SendVideo">Send Video</button>
-    <button class="btn btn-danger" id="stop_video" @onclick="StopVideo">Stop Video</button>
+<div class="container border p-2" style="float: left;">
+    <div class="row p-1">
+        <div class="col-md-auto">
+            <label>Image:</label> <label class="switch"> <input type="checkbox" id="check-image" /> <span class="slider round"></span></label> <span id="valImage">Off</span>
+        </div>
+        <div class="col-md-auto">
+            <label>Event:</label> <label class="switch"> <input type="checkbox" id="check-event" /> <span class="slider round"></span></label> <span id="valEvent">Off</span>
+        </div>
+        <div class="col-md-auto">
+            <label>Query:</label> <label class="switch"> <input type="checkbox" id="check-query" checked /> <span class="slider round"></span></label> <span id="valQuery">On</span>
+        </div>
+        <div class="col-md-auto">
+            <label for="select-scale">Scale:</label>
+            <select name="scales" id="select-scale">  
+                <option value="0.25">Smallest</option>
+                <option value="0.5">Small</option>
+                <option value="1" selected>Normal</option>
+                <option value="2">Large</option>
+                <option value="4">Largest</option>
+            </select>
+        </div>
+        <div class="col-md-auto">
+            <label for="select-interval">Interval:</label>
+            <select name="intervals" id="select-interval">
+                <option value="0">ASAP</option>
+                <option value="0.25">0.25 second</option>
+                <option value="0.5" selected>0.5 second</option>
+                <option value="1">1 second</option>
+                <option value="2">2 second</option>
+            </select>            
+        </div>
+        <div class="col-md-auto">
+            <label for="select-threshold">Threshold:</label>
+            <select name="thresholds" id="select-threshold">
+                <option value="50" selected>50</option>
+                <option value="100">100</option>
+                <option value="150">150</option>
+                <option value="200">200</option>
+            </select>            
+        </div>
+    </div>
+    <div class="row p-1">
+        <div class="col-md-auto">
+            <label>Name:</label> <input id="cam_name" size="15" placeholder="HK_ComCam01" />
+        </div>
+        <div class="col-md-auto">
+            <button class="btn btn-primary" id="send_video" @onclick="SendVideo">Send Video</button>
+        </div>        
+        <div class="col-md-auto">
+            <button class="btn btn-danger" id="set_video" @onclick="DefaultParameter">Default Parameter</button>
+        </div>
+        <div class="col-md-auto">
+            <button class="btn btn-warning me-md-2" @onclick="ShowHideControl">@ShowOrHide</button>
+        </div>
+    </div>
 </div>
 
-<div class="row">
-    <div class="col-6">
-        <video id="canvas_video" width="320" height="240" autoplay></video>
-    </div>
-    <div class="col-6">
-        <canvas hidden id="canvas_image" width="320" height="240"></canvas>
-    </div>    
-    <div class="col-6">
-        <canvas id="canvas_motion" width="320" height="240"></canvas>
-        Threshold of Motion detected: <span id="score_motion">?</span>
+<div class="container p-2" style="float: left;">
+    <div class="row">
+        <div class="col-md-auto">
+            <video id="canvas_video" style="width: 320px; height: 240px;" autoplay></video>
+        </div>
+        <div class="col-md-auto">            
+            <canvas hidden id="canvas_image" width="320" height="240"></canvas>     @*style="width: 320px; height: 240px;"로 하면 화면 짤림*@
+        </div>
+        <div class="col-md-auto" style="visibility: @(IsShow ? "visible" : "hidden")">            
+            <canvas id="canvas_motion" style="width: 320px; height: 240px;"></canvas>           
+        </div>
+        <div class="col-md-auto" style="visibility: @(IsShow ? "visible" : "hidden")">
+            <label for="threshold-md">Threshold of Motion detected: </label><span id="score_motion">?</span> <br />
+            <ul id="rx_msg" style="height: 240px; overflow: auto;">                
+            </ul>
+        </div>
     </div>
 </div>
-<ul id="rx_msg">      
-</ul>
+
 
 
 @code {
+    private bool IsShow = true;
+    private string ShowOrHide = "Hide";
+
+    protected override async void OnInitialized()
+    {        
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)      // DB 내용이 많은 경우에는 이렇게 처리하는 것이 좋음
+    {
+        if (firstRender)
+        {            
+            await InitVideo();
+        }
+    }
+
+
     async Task<string> getUserId()
     {
         var user = (await _authenticationStateProvider.GetAuthenticationStateAsync()).User;
@@ -43,11 +112,22 @@
     private async Task SendVideo()
     {        
         string userId = await getUserId();
-        await _JsRuntime.InvokeVoidAsync("SendVideo", userId);      // 자바스크립트 함수 ShowVideo을 호출
+        await _JsRuntime.InvokeVoidAsync("SendVideo", userId);      // 자바스크립트 함수 SendVideo을 호출
     }
 
-    private async Task StopVideo()
+    private async Task ShowHideControl()
     {
-        await _JsRuntime.InvokeVoidAsync("StopVideo");      // 자바스크립트 함수 ShowVideo을 호출
+        IsShow = !IsShow;
+        ShowOrHide = IsShow ? "Hide" : "Show";        
+    }
+
+    private async Task DefaultParameter()
+    {
+        await _JsRuntime.InvokeVoidAsync("DefaultParameter");
+    }
+
+    private async Task InitVideo()
+    {
+        await _JsRuntime.InvokeVoidAsync("InitVideo");
     }
 }
