@@ -178,13 +178,18 @@ window.SendVideo = (userId) => {
             document.getElementById('check-event').checked = isEvent;
             document.getElementById("valEvent").textContent = isEvent ? "On" : "Off";  
         } else if (para === "isQuery") {
-            isEvent = JSON.parse(value.toLowerCase());
+            isQuery = JSON.parse(value.toLowerCase());
             document.getElementById('check-query').checked = isQuery;
             document.getElementById("valQuery").textContent = isQuery ? "On" : "Off";  
-        } else if (para === "interval") {
-            para_interval = value;            
         } else if (para === "scale") {
             para_scale = value;
+            document.getElementById('select-scale').value = para_scale;
+        } else if (para === "interval") {
+            para_interval = value;          
+            document.getElementById('select-interval').value = para_interval;
+        } else if (para === "threshold") {
+            para_threshold = value;
+            document.getElementById('select-threshold').value = para_threshold;
         } else if (para === "ping") {
             // Make the control parameters
             SendMqttMessage("pong", "control parameters");      // Send pong

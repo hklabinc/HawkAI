@@ -1,6 +1,6 @@
 ﻿@page "/dashboard"
 @attribute [Authorize(Roles ="Admin,Normal")]
-@inject ICameraService _cameraRepository
+@inject ICameraService CameraService
 @using Microsoft.AspNetCore.Identity
 @using MQTTnet;
 @using MQTTnet.Client;
@@ -18,6 +18,18 @@
       font-family: Arial, Helvetica, sans-serif;
     }
 </style>
+
+
+
+<div class="form-group">
+    <label style="font-weight: bold;">My Cameras:&nbsp</label>
+    @foreach (var camera in CameraService.Cameras)
+    {
+        <span>@camera.Name, </span>
+    }    
+</div>
+
+
 
 <div class="form-group" style="display:none;">
     <button class="btn btn-success" @onclick="Subscribe">Connect</button>
@@ -40,15 +52,63 @@
     </label>
 </div>
 
-<ul id="messagesList0" style="width: 300px; height: 70px; overflow: auto">
-    @foreach (var message in messages0)
-    {
-        <li style="font-size:3px">@message</li>
-    }
-</ul>
+<div class="border p-1">
+    <ul id="messagesList0" style="width: 400px; height: 70px; overflow: auto">
+        @foreach (var message in messages0)
+        {
+            <li style="font-size:3px">@message</li>
+        }
+    </ul>
+</div>
 
-<hr />
-<div class="form-group">
+
+<div class="container border p-2" style="float: left;">
+    <div class="row p-1">
+        <div class="col-md-auto">
+            <label>Image:</label> <label class="switch"> <input type="checkbox" @onclick="ControlImage" @bind-value="@IsImage" checked="@(IsImage ? "checked" : null)" /> <span class="slider round"></span></label> <span id="valImage">@(IsImage ? "On" : "Off")</span>
+        </div>
+        <div class="col-md-auto">
+            <label>Event:</label> <label class="switch"> <input type="checkbox" @onclick="ControlEvent" @bind-value="@IsEvent" checked="@(IsEvent ? "checked" : null)" /> <span class="slider round"></span></label> <span id="valEvent">@(IsEvent ? "On" : "Off")</span>
+        </div>
+        <div class="col-md-auto">
+            <label>Query:</label> <label class="switch"> <input type="checkbox" @onclick="ControlQuery" @bind-value="@IsQuery" checked="@(IsQuery ? "checked" : null)" /> <span class="slider round"></span></label> <span id="valQuery">@(IsQuery ? "On" : "Off")</span>
+        </div>
+        <div class="col-md-auto">
+            <label for="select-scale">Scale:</label>
+            <select @bind="SelectScale">
+                @foreach (var prop in ScaleProp)
+                {
+                    <option value="@prop.Value">@prop.Key </option>
+                }
+            </select>
+        </div>
+        <div class="col-md-auto">
+            <label for="select-interval">Interval:</label>
+            <select @bind="SelectInterval">
+                @foreach (var prop in IntervalProp)
+                {
+                    <option value="@prop.Value">@prop.Key </option>
+                }
+            </select>
+        </div>
+        <div class="col-md-auto">
+            <label for="select-threshold">Threshold:</label>
+            <select @bind="SelectThreshold">
+                @foreach (var prop in ThresholdProp)
+                {
+                    <option value="@prop.Value">@prop.Key </option>
+                }
+            </select>
+        </div>
+        <div class="col-md-auto">
+            <button class="btn btn-warning" @onclick="SendDefaultParameter">Default</button>
+        </div>
+    </div>
+</div>
+
+
+
+@*<div class="form-group">
     <button class="btn btn-success" @onclick="ImageOn">Image On</button>
     <button class="btn btn-danger" @onclick="ImageOff">Image Off</button>
     <button class="btn btn-success" @onclick="EventOn">Event On</button>
@@ -59,57 +119,56 @@
     </label>
     <button class="btn btn-warning" @onclick="Send">Send</button>
 </div>
+<hr />*@
 
+<div class="container p-2" style="float: left;">
+    <div class="col-8">
+        @if (Cameras.Any())
+        {
+            <div class="container px-4 py-1" id="custom-cards">
+                <div class="row row-cols-1 row-cols-lg-2 align-items-stretch g-4">
 
-<br />
-
-<hr />
-<div class="col-12">
-    @if (Cameras.Any())
-    {
-        <div class="container px-4 py-1" id="custom-cards">
-            <div class="row row-cols-1 row-cols-lg-2 align-items-stretch g-4">
-
-                @foreach (var objMsg in rxMqttMsgArray)
-                {
-                    @if (objMsg.image?.Length > 0)
+                    @foreach (var objMsg in rxMqttMsgArray)
                     {
-                        <div class="col">
-                            <div class="card card-cover h-100 overflow-hidden text-bg-light rounded-3 shadow-lg">
-                                <div class="d-flex flex-column h-100 p-4 pb-3 text-black text-shadow-1">
-                                    @*<h3 class="pt-5 mt-5 mb-4 display-6 lh-1 fw-bold">@objMsg.addr</h3>*@
-                                    <h6><b>@objMsg.addr</b></h6> 
-                                    <h6>@objMsg.time (@objMsg.image?.Length B)</h6> 
-                                    <img src="data:image/jpeg;base64,@objMsg.image" />
-                                    @if (objMsg.type == "event")
-                                    {
-                                        <font color="red"><b>@objMsg.label</b></font>
-                                    }
-                                    else
-                                    {
-                                        <h6>@objMsg.label</h6>
-                                    }
+                        @if (objMsg.image?.Length > 0)
+                        {
+                            <div class="col">
+                                <div class="card card-cover h-100 overflow-hidden text-bg-light rounded-3 shadow-lg">
+                                    <div class="d-flex flex-column h-100 p-4 pb-3 text-black text-shadow-1">
+                                        @*<h3 class="pt-5 mt-5 mb-4 display-6 lh-1 fw-bold">@objMsg.addr</h3>*@
+                                        <h6><b>@objMsg.addr</b></h6>
+                                        <h6>@objMsg.time (@objMsg.image?.Length B)</h6>
+                                        <img src="data:image/jpeg;base64,@objMsg.image" />
+                                        @if (objMsg.type == "event")
+                                        {
+                                            <font color="red"><b>@objMsg.label</b></font>
+                                        }
+                                        else
+                                        {
+                                            <h6>@objMsg.label</h6>
+                                        }
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        }
                     }
-                }
-            </div>
-        </div>
-    }
-    else
-    {
-    if (IsLoading)
-        {
-            <div class="text-center">
-                <img src="/img/loading.gif">
+                </div>
             </div>
         }
         else
         {
-            <p>No records found.</p>
+            if (IsLoading)
+            {
+                <div class="text-center">
+                    <img src="/img/loading.gif">
+                </div>
+            }
+            else
+            {
+                <p>No records found.</p>
+            }
         }
-    }
+    </div>
 </div>
 
 
@@ -119,7 +178,7 @@
 
     [Inject]
     UserManager<IdentityUser> userManager { get; set; }
-
+    
     private IEnumerable<Camera> Cameras { get; set; } = new List<Camera>();
     public bool IsLoading { get; set; }
 
@@ -148,9 +207,78 @@
     string userId = string.Empty;   
     string userEmail = string.Empty;
 
+    private bool IsImage = false;
+    private bool IsEvent = false;
+    private bool IsQuery = true;
+
+    public class SelectProperty
+    {
+        public int Id { get; set; }
+        public string Key { get; set; }
+        public string Value { get; set; }
+    }
+    //public List<SelectProperty> ScaleProp { get; set; }
+
+    public List<SelectProperty> ScaleProp = new List<SelectProperty>()
+    {
+        new SelectProperty { Id = 1, Key = "Smallest", Value = "0.25"},
+        new SelectProperty { Id = 2, Key = "Small", Value = "0.5"},
+        new SelectProperty { Id = 3, Key = "Normal", Value = "1" },
+        new SelectProperty { Id = 4, Key = "Large", Value = "2" },
+        new SelectProperty { Id = 5, Key = "Largest", Value = "4" },
+    };
+    private string scaleValue = "1";
+    public string SelectScale
+    {
+        get { return scaleValue; }
+        set
+        {
+            scaleValue = value;
+            ControlScale(scaleValue);
+        }
+    }
+
+    public List<SelectProperty> IntervalProp = new List<SelectProperty>()
+    {
+        new SelectProperty { Id = 1, Key = "ASAP", Value = "0"},
+        new SelectProperty { Id = 2, Key = "0.25 second", Value = "0.25"},
+        new SelectProperty { Id = 3, Key = "0.5 second", Value = "0.5" },
+        new SelectProperty { Id = 4, Key = "1 second", Value = "1" },
+        new SelectProperty { Id = 5, Key = "2 second", Value = "2" },
+    };
+    private string intervalValue = "0.5";
+    public string SelectInterval
+    {
+        get { return intervalValue; }
+        set
+        {
+            intervalValue = value;
+            ControlInterval(intervalValue);
+        }
+    }
+
+    public List<SelectProperty> ThresholdProp = new List<SelectProperty>()
+    {
+        new SelectProperty { Id = 1, Key = "50", Value = "50"},
+        new SelectProperty { Id = 2, Key = "100", Value = "100"},
+        new SelectProperty { Id = 3, Key = "150", Value = "150" },
+        new SelectProperty { Id = 4, Key = "200", Value = "200" }
+    };
+    private string thresholdValue = "50";
+    public string SelectThreshold
+    {
+        get { return thresholdValue; }
+        set
+        {
+            thresholdValue = value;
+            ControlThreshold(thresholdValue);
+        }
+    }
+
+
     protected override async void OnInitialized()
     {        
-        
+
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)      // DB 내용이 많은 경우에는 이렇게 처리하는 것이 좋음
@@ -163,7 +291,7 @@
             userEmail = currentUser.Email;
             topicSubUser = TOPIC_SUB + "/" + userId;
             topicPubUser = TOPIC_PUB + "/" + userId;
-            
+
             await Disconnect();
             await Subscribe();
             await LoadCameras();
@@ -171,11 +299,12 @@
         }        
     }
 
+
     private async Task LoadCameras()
     {
         IsLoading = true;
         StateHasChanged(); 
-        Cameras = await _cameraRepository.GetMyCameras(userEmail);
+        Cameras = await CameraService.GetMyCameras(userEmail);
 
         Console.WriteLine("[hhchoi] number of cameras=" + Enumerable.Count<Camera>(Cameras));
         numOfCameras = Enumerable.Count<Camera>(Cameras);
@@ -296,14 +425,64 @@
     }
 
     
-    
-    private async Task Send()
+    private async Task ControlImage()
     {
+        IsImage = !IsImage;       
+        string msgControl = IsImage ? "isImage=True" : "isImage=False";            
+        await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None);
+        await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, msgControl), CancellationToken.None);
+        messages0.Add("Set " + msgControl);
+    }
+    private async Task ControlEvent()
+    {
+        IsEvent = !IsEvent;
+        string msgControl = IsEvent ? "isEvent=True" : "isEvent=False";
+        await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None);
+        await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, msgControl), CancellationToken.None);
+        messages0.Add("Set " + msgControl);
+    }
+    private async Task ControlQuery()
+    {
+        IsQuery = !IsQuery;       
+        string msgControl = IsQuery ? "isQuery=True" : "isQuery=False";            
+        await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None);
+        await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, msgControl), CancellationToken.None);
+        messages0.Add("Set " + msgControl);
+    }
+    
+    private async Task ControlScale(string scaleValue)
+    {
+        Console.WriteLine("Value: " + scaleValue);
+        //Console.WriteLine("Value: " + ScaleProp.FirstOrDefault(u => u.Key == SelectScale).Value);
+
         if (mqttClient is not null)
-        {            
-            await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, messageInput), CancellationToken.None); // Since 3.0.5 with CancellationToken
-            await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, messageInput), CancellationToken.None);
-            messages0.Add("Set control parameter with " + messageInput);
+        {
+            string msgControl = "scale=" + scaleValue;
+            await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None); // Since 3.0.5 with CancellationToken
+            await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, msgControl), CancellationToken.None);
+            messages0.Add("Set control parameter with " + msgControl);
+        }
+    }
+    private async Task ControlInterval(string intervalValue)
+    {
+        Console.WriteLine("Value: " + intervalValue);
+        if (mqttClient is not null)
+        {
+            string msgControl = "interval=" + intervalValue;
+            await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None); // Since 3.0.5 with CancellationToken
+            await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, msgControl), CancellationToken.None);
+            messages0.Add("Set control parameter with " + msgControl);
+        }
+    }
+    private async Task ControlThreshold(string thresholdValue)
+    {
+        Console.WriteLine("Value: " + thresholdValue);
+        if (mqttClient is not null)
+        {
+            string msgControl = "threshold=" + thresholdValue;
+            await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None); // Since 3.0.5 with CancellationToken
+            await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, msgControl), CancellationToken.None);
+            messages0.Add("Set control parameter with " + msgControl);
         }
     }
 
@@ -317,47 +496,68 @@
         }
     }
 
-    private async Task ImageOn()
+    private async Task SendDefaultParameter()
     {
-        if (mqttClient is not null)
-        {
-            string msgControl = "isImage=True";
-            await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None); 
-            await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, msgControl), CancellationToken.None);
-            messages0.Add("Set isImage=True");
-        }
+        //if (mqttClient is not null)
+        //{
+        //    await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, "ping=all"), CancellationToken.None); // Since 3.0.5 with CancellationToken
+        //    await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, "ping=all"), CancellationToken.None);
+        //    messages0.Add("Send " + "ping=all");
+        //}
     }
 
-    private async Task ImageOff()
-    {
-        if (mqttClient is not null)
-        {
-            string msgControl = "isImage=False";
-            await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None); 
-            await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, msgControl), CancellationToken.None);
-            messages0.Add("Set isImage=False");
-        }
-    }
+    
+    //private async Task Send()
+    //{
+    //    if (mqttClient is not null)
+    //    {            
+    //        await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, messageInput), CancellationToken.None); // Since 3.0.5 with CancellationToken
+    //        await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, messageInput), CancellationToken.None);
+    //        messages0.Add("Set control parameter with " + messageInput);
+    //    }
+    //}    
 
-    private async Task EventOn()
-    {
-        if (mqttClient is not null)
-        {
-            string msgControl = "isEvent=True";
-            await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None); 
-            await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, msgControl), CancellationToken.None);
-            messages0.Add("Set isEvent=True");
-        }
-    }
+    //private async Task ImageOn()
+    //{
+    //    if (mqttClient is not null)
+    //    {
+    //        string msgControl = "isImage=True";
+    //        await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None); 
+    //        await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, msgControl), CancellationToken.None);
+    //        messages0.Add("Set isImage=True");
+    //    }
+    //}
 
-    private async Task EventOff()
-    {
-        if (mqttClient is not null)
-        {
-            string msgControl = "isEvent=False";
-            await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None);
-            await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, msgControl), CancellationToken.None);
-            messages0.Add("Set isEvent=False");
-        }
-    }
+    //private async Task ImageOff()
+    //{
+    //    if (mqttClient is not null)
+    //    {
+    //        string msgControl = "isImage=False";
+    //        await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None); 
+    //        await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, msgControl), CancellationToken.None);
+    //        messages0.Add("Set isImage=False");
+    //    }
+    //}
+
+    //private async Task EventOn()
+    //{
+    //    if (mqttClient is not null)
+    //    {
+    //        string msgControl = "isEvent=True";
+    //        await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None); 
+    //        await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, msgControl), CancellationToken.None);
+    //        messages0.Add("Set isEvent=True");
+    //    }
+    //}
+
+    //private async Task EventOff()
+    //{
+    //    if (mqttClient is not null)
+    //    {
+    //        string msgControl = "isEvent=False";
+    //        await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None);
+    //        await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, msgControl), CancellationToken.None);
+    //        messages0.Add("Set isEvent=False");
+    //    }
+    //}
 }
