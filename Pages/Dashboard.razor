@@ -30,8 +30,7 @@
 </div>
 
 
-
-<div class="form-group" style="display:none;">
+@*<div class="form-group" style="display:none;">
     <button class="btn btn-success" @onclick="Subscribe">Connect</button>
     <button class="btn btn-danger" @onclick="Disconnect">Disconnect</button>
     <label>
@@ -50,9 +49,9 @@
         PubTopic:
         <input @bind="topicPubUser" size="10"/>
     </label>
-</div>
+</div>*@
 
-<div class="border p-1">
+<div class="container border p-1" style="float: left;">
     <ul id="messagesList0" style="width: 400px; height: 70px; overflow: auto">
         @foreach (var message in messages0)
         {
@@ -62,7 +61,7 @@
 </div>
 
 
-<div class="container border p-2" style="float: left;">
+<div class="container border p-1" style="float: left;">
     <div class="row p-1">
         <div class="col-md-auto">
             <label>Image:</label> <label class="switch"> <input type="checkbox" @onclick="ControlImage" @bind-value="@IsImage" checked="@(IsImage ? "checked" : null)" /> <span class="slider round"></span></label> <span id="valImage">@(IsImage ? "On" : "Off")</span>
@@ -101,7 +100,10 @@
             </select>
         </div>
         <div class="col-md-auto">
-            <button class="btn btn-warning" @onclick="SendDefaultParameter">Default</button>
+            <button class="btn btn-warning" @onclick="SendDefaultParameter">Set Default</button>
+        </div>
+        <div class="col-md-auto">
+            <button class="btn btn-danger" id="send_video" @onclick="SendPing">Ping</button>
         </div>
     </div>
 </div>
@@ -121,8 +123,8 @@
 </div>
 <hr />*@
 
-<div class="container p-2" style="float: left;">
-    <div class="col-8">
+<div class="container p-1" style="float: left;">
+    <div class="col-10">
         @if (Cameras.Any())
         {
             <div class="container px-4 py-1" id="custom-cards">
@@ -178,7 +180,7 @@
 
     [Inject]
     UserManager<IdentityUser> userManager { get; set; }
-    
+
     private IEnumerable<Camera> Cameras { get; set; } = new List<Camera>();
     public bool IsLoading { get; set; }
 
@@ -424,11 +426,11 @@
         return mqttMsg;
     }
 
-    
+
     private async Task ControlImage()
     {
-        IsImage = !IsImage;       
-        string msgControl = IsImage ? "isImage=True" : "isImage=False";            
+        IsImage = !IsImage;               
+        string msgControl = "{ \"isImage\" : " + IsImage + "}";
         await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None);
         await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, msgControl), CancellationToken.None);
         messages0.Add("Set " + msgControl);
@@ -436,28 +438,28 @@
     private async Task ControlEvent()
     {
         IsEvent = !IsEvent;
-        string msgControl = IsEvent ? "isEvent=True" : "isEvent=False";
+        string msgControl = "{ \"isEvent\" : " + IsEvent + "}";
         await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None);
         await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, msgControl), CancellationToken.None);
         messages0.Add("Set " + msgControl);
     }
     private async Task ControlQuery()
     {
-        IsQuery = !IsQuery;       
-        string msgControl = IsQuery ? "isQuery=True" : "isQuery=False";            
+        IsQuery = !IsQuery;
+        string msgControl = "{ \"isQuery\" : " + IsQuery + "}";
         await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None);
         await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, msgControl), CancellationToken.None);
         messages0.Add("Set " + msgControl);
     }
-    
+
     private async Task ControlScale(string scaleValue)
     {
         Console.WriteLine("Value: " + scaleValue);
         //Console.WriteLine("Value: " + ScaleProp.FirstOrDefault(u => u.Key == SelectScale).Value);
 
         if (mqttClient is not null)
-        {
-            string msgControl = "scale=" + scaleValue;
+        {            
+            string msgControl = "{ \"scale\" : " + scaleValue + "}";
             await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None); // Since 3.0.5 with CancellationToken
             await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, msgControl), CancellationToken.None);
             messages0.Add("Set control parameter with " + msgControl);
@@ -468,7 +470,7 @@
         Console.WriteLine("Value: " + intervalValue);
         if (mqttClient is not null)
         {
-            string msgControl = "interval=" + intervalValue;
+            string msgControl = "{ \"interval\" : " + intervalValue + "}"; 
             await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None); // Since 3.0.5 with CancellationToken
             await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, msgControl), CancellationToken.None);
             messages0.Add("Set control parameter with " + msgControl);
@@ -479,7 +481,7 @@
         Console.WriteLine("Value: " + thresholdValue);
         if (mqttClient is not null)
         {
-            string msgControl = "threshold=" + thresholdValue;
+            string msgControl = "{ \"threshold\" : " + thresholdValue + "}";
             await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None); // Since 3.0.5 with CancellationToken
             await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, msgControl), CancellationToken.None);
             messages0.Add("Set control parameter with " + msgControl);
@@ -490,20 +492,58 @@
     {
         if (mqttClient is not null)
         {
-            await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, "ping=all"), CancellationToken.None); // Since 3.0.5 with CancellationToken
-            await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, "ping=all"), CancellationToken.None);
-            messages0.Add("Send " + "ping=all");
+            string msgControl = "{ \"isPing\": true}";
+            await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, msgControl), CancellationToken.None); // Since 3.0.5 with CancellationToken
+            await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, msgControl), CancellationToken.None);
+            messages0.Add("Send " + msgControl);
         }
     }
 
     private async Task SendDefaultParameter()
     {
-        //if (mqttClient is not null)
-        //{
-        //    await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, "ping=all"), CancellationToken.None); // Since 3.0.5 with CancellationToken
-        //    await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, "ping=all"), CancellationToken.None);
-        //    messages0.Add("Send " + "ping=all");
-        //}
+        IsImage = false;
+        IsEvent = false;
+        IsQuery = true;
+        scaleValue = "1";
+        intervalValue = "0.5";
+        thresholdValue = "50";
+
+
+        var myData = new
+        {            
+            isImage = IsImage,
+            isEvent = IsEvent,
+            isQuery = IsQuery,
+            scale = scaleValue,
+            interval = intervalValue,
+            threshold = thresholdValue
+        };
+
+        string jsonData = Newtonsoft.Json.JsonConvert.SerializeObject(myData);
+
+        //Print the Json object
+        Console.WriteLine(jsonData);
+
+        // Make JSON object
+        //var json = new JObject();
+        //json["isImage"] = IsImage;
+        //json["isEvent"] = IsEvent;
+        //json["isQuery"] = IsQuery;
+        //json["scale"] = scaleValue;
+        //json["interval"] = intervalValue;
+        //json["threshold"] = thresholdValue;
+        
+        // Convert JSON to string
+        
+
+
+        
+        if (mqttClient is not null)
+        {
+            await mqttClient.PublishAsync(makeMqttMessage(topicPubUser, jsonData), CancellationToken.None); // Since 3.0.5 with CancellationToken
+            await mqttClient.PublishAsync(makeMqttMessage(topicPubAll, jsonData), CancellationToken.None);
+            messages0.Add("Send " + "ping");
+        }
     }
 
     

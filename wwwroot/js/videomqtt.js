@@ -41,7 +41,7 @@ window.InitVideo = () => {
     console.log('InitVideo() - para: %s, %s, %s, %f, %f, %f', isImage, isEvent, isQuery, para_scale, para_interval, para_threshold);
 }
 
-window.DefaultParameter = () => {   
+window.DefaultParameter = () => {
     isImage = false;
     document.getElementById('check-image').checked = isImage;    
     document.getElementById("valImage").textContent = isImage ? "On" : "Off";
@@ -161,41 +161,56 @@ window.SendVideo = (userId) => {
 
     // called when a message arrives
     function onMessageArrived(message) {
-        console.log("onMessageArrived:" + message.payloadString);
+        var rxMsg = message.payloadString.replace(/True/gi, 'true').replace(/False/gi, 'false');    // C#에서는 bool을 대문자 True/False로 처리하고, js에서는 true/false로 처리하기 때문에 대소문자 변경해야!
+        console.log("onMessageArrived:" + rxMsg);
         const div = document.getElementById('rx_msg');
-        div.innerHTML += "<li>" + message.payloadString + "</li>";
-
-        const words = message.payloadString.split('=');
-        const para = words[0];
-        const value = words[1];
-
-        if (para === "isImage") {            
-            isImage = JSON.parse(value.toLowerCase());
+        div.innerHTML += "<li>" + rxMsg + "</li>";
+        
+        const jsonRxMsg = JSON.parse(rxMsg);        
+        if ("isPing" in jsonRxMsg) {
+            var objPong = `{
+                "isImage": ${isImage},
+                "isEvent": ${isEvent},
+                "isQuery": ${isQuery},
+                "scale": ${para_scale},
+                "interval": ${para_interval},
+                "threshold": ${para_threshold}
+            }`;
+            SendMqttMessage("pong", objPong);      // Send pong      
+        }
+        if ("isImage" in jsonRxMsg && isImage != jsonRxMsg.isImage) {
+            console.log(`isImage = ${isImage}, jsonRxMsg.isImage = ${jsonRxMsg.isImage}`);
+            isImage = jsonRxMsg.isImage;    
             document.getElementById('check-image').checked = isImage;
             document.getElementById("valImage").textContent = isImage ? "On" : "Off";            
-        } else if (para === "isEvent") {
-            isEvent = JSON.parse(value.toLowerCase());
+        }
+        if ("isEvent" in jsonRxMsg && isEvent != jsonRxMsg.isEvent) {
+            console.log(`isEvent = ${isEvent}, jsonRxMsg.isEvent = ${jsonRxMsg.isEvent}`);
+            isEvent = jsonRxMsg.isEvent;
             document.getElementById('check-event').checked = isEvent;
             document.getElementById("valEvent").textContent = isEvent ? "On" : "Off";  
-        } else if (para === "isQuery") {
-            isQuery = JSON.parse(value.toLowerCase());
+        }
+        if ("isQuery" in jsonRxMsg && isQuery != jsonRxMsg.isQuery) {
+            console.log(`isQuery = ${isQuery}, jsonRxMsg.isQuery = ${jsonRxMsg.isQuery}`);
+            isQuery = jsonRxMsg.isQuery;
             document.getElementById('check-query').checked = isQuery;
             document.getElementById("valQuery").textContent = isQuery ? "On" : "Off";  
-        } else if (para === "scale") {
-            para_scale = value;
+        }
+        if ("scale" in jsonRxMsg && para_scale != jsonRxMsg.scale) {
+            console.log(`para_scale = ${para_scale}, jsonRxMsg.scale = ${jsonRxMsg.scale}`);
+            para_scale = jsonRxMsg.scale;
             document.getElementById('select-scale').value = para_scale;
-        } else if (para === "interval") {
-            para_interval = value;          
+        }
+        if ("interval" in jsonRxMsg && para_interval != jsonRxMsg.interval) {
+            console.log(`para_interval = ${para_interval}, jsonRxMsg.interval = ${jsonRxMsg.interval}`);
+            para_interval = jsonRxMsg.interval;
             document.getElementById('select-interval').value = para_interval;
-        } else if (para === "threshold") {
-            para_threshold = value;
+        }
+        if ("threshold" in jsonRxMsg && para_threshold != jsonRxMsg.threshold) {
+            console.log(`para_threshold = ${para_threshold}, jsonRxMsg.threshold = ${jsonRxMsg.threshold}`);
+            para_threshold = jsonRxMsg.threshold;
             document.getElementById('select-threshold').value = para_threshold;
-        } else if (para === "ping") {
-            // Make the control parameters
-            SendMqttMessage("pong", "control parameters");      // Send pong
-        } else {
-            console.error("Rx message format error!")
-        }        
+        }               
     }
 
     function SendMqttMessage(type, label) {        
