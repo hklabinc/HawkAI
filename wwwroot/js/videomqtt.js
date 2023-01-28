@@ -178,36 +178,30 @@ window.SendVideo = (userId) => {
             }`;
             SendMqttMessage("pong", objPong);      // Send pong      
         }
-        if ("isImage" in jsonRxMsg && isImage != jsonRxMsg.isImage) {
-            console.log(`isImage = ${isImage}, jsonRxMsg.isImage = ${jsonRxMsg.isImage}`);
+        if ("isImage" in jsonRxMsg && isImage != jsonRxMsg.isImage) {            
             isImage = jsonRxMsg.isImage;    
             document.getElementById('check-image').checked = isImage;
             document.getElementById("valImage").textContent = isImage ? "On" : "Off";            
         }
-        if ("isEvent" in jsonRxMsg && isEvent != jsonRxMsg.isEvent) {
-            console.log(`isEvent = ${isEvent}, jsonRxMsg.isEvent = ${jsonRxMsg.isEvent}`);
+        if ("isEvent" in jsonRxMsg && isEvent != jsonRxMsg.isEvent) {            
             isEvent = jsonRxMsg.isEvent;
             document.getElementById('check-event').checked = isEvent;
             document.getElementById("valEvent").textContent = isEvent ? "On" : "Off";  
         }
-        if ("isQuery" in jsonRxMsg && isQuery != jsonRxMsg.isQuery) {
-            console.log(`isQuery = ${isQuery}, jsonRxMsg.isQuery = ${jsonRxMsg.isQuery}`);
+        if ("isQuery" in jsonRxMsg && isQuery != jsonRxMsg.isQuery) {            
             isQuery = jsonRxMsg.isQuery;
             document.getElementById('check-query').checked = isQuery;
             document.getElementById("valQuery").textContent = isQuery ? "On" : "Off";  
         }
-        if ("scale" in jsonRxMsg && para_scale != jsonRxMsg.scale) {
-            console.log(`para_scale = ${para_scale}, jsonRxMsg.scale = ${jsonRxMsg.scale}`);
+        if ("scale" in jsonRxMsg && para_scale != jsonRxMsg.scale) {            
             para_scale = jsonRxMsg.scale;
             document.getElementById('select-scale').value = para_scale;
         }
-        if ("interval" in jsonRxMsg && para_interval != jsonRxMsg.interval) {
-            console.log(`para_interval = ${para_interval}, jsonRxMsg.interval = ${jsonRxMsg.interval}`);
+        if ("interval" in jsonRxMsg && para_interval != jsonRxMsg.interval) {            
             para_interval = jsonRxMsg.interval;
             document.getElementById('select-interval').value = para_interval;
         }
-        if ("threshold" in jsonRxMsg && para_threshold != jsonRxMsg.threshold) {
-            console.log(`para_threshold = ${para_threshold}, jsonRxMsg.threshold = ${jsonRxMsg.threshold}`);
+        if ("threshold" in jsonRxMsg && para_threshold != jsonRxMsg.threshold) {            
             para_threshold = jsonRxMsg.threshold;
             document.getElementById('select-threshold').value = para_threshold;
         }               
