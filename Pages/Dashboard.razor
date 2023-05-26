@@ -99,9 +99,7 @@
             </select>
         </div>
         <div class="col-md-auto">
-            <button class="btn btn-warning" @onclick="SendDefaultParameter">Set Default</button>
-        </div>
-        <div class="col-md-auto">
+            <button class="btn btn-warning" @onclick="SendDefaultParameter">Set Default</button>        
             <button class="btn btn-danger" id="send_video" @onclick="SendPing">Ping</button>
         </div>
     </div>
@@ -122,100 +120,105 @@
 </div>
 <hr />*@
 
-<div class="container p-1" style="float: left;">
-    <div class="col-10">
-        @if (Cameras.Any())
-        {
-            <div class="container px-4 py-1" id="custom-cards">
-                <div class="row row-cols-1 row-cols-lg-2 align-items-stretch g-4">
 
-                    @foreach (var objMsg in rxMqttMsgArray)
+    
+@if (Cameras.Any() && !IsLoading)
+{
+    <div class="container p-1" style="float: left;">
+        <div class="container px-0 py-2" id="custom-cards">
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 align-items-stretch g-3">
+
+                @foreach (var objMsg in rxMqttMsgArray)
+                {
+                    @if (objMsg.image?.Length > 0)
                     {
-                        @if (objMsg.image?.Length > 0)
-                        {
-                            <div class="col">
-                                <div class="card card-cover h-100 overflow-hidden text-bg-light rounded-3 shadow-lg">
-                                    <div class="d-flex flex-column h-100 p-4 pb-3 text-black text-shadow-1">
-                                        @*<h3 class="pt-5 mt-5 mb-4 display-6 lh-1 fw-bold">@objMsg.addr</h3>*@
-                                        <h6><b>@objMsg.addr</b></h6>
-                                        <h6>@objMsg.time (@objMsg.image?.Length B)</h6>
-                                        <img src="data:image/jpeg;base64,@objMsg.image" />
-                                        @if (objMsg.type == "event")
-                                        {
-                                            <font color="red"><b>@objMsg.label</b></font>
+                        <div class="col">
+                            <div class="card card-cover h-100 overflow-hidden text-bg-light rounded-3 shadow-lg" style="width: 100%;">
+                                <div class="card-header d-flex align-items-center">
+                                    <h6 class="m-0"><b>@objMsg.addr</b></h6>
+                                </div>
+                                <div class="d-flex flex-column h-100 p-2 text-black text-shadow-1">
+                                    <span>@objMsg.time (@(objMsg.image?.Length/1000) KB)</span>
+                                    <img src="data:image/jpeg;base64,@objMsg.image" />
+                                    @if (objMsg.type == "event")
+                                    {
+                                        <font color="red"><b>@objMsg.label</b></font>
+                                    }
+                                    else
+                                    {
+                                        string rxLabel = objMsg.label;
+                                        if (objMsg.type == "pong" || (rxLabel.StartsWith('{') && rxLabel.EndsWith('}')))
+                                        {                                                
+                                            ControlMsg? ctrlmsg = JsonSerializer.Deserialize<ControlMsg>(rxLabel);
+                                            if (ctrlmsg is not null)
+                                            {
+                                                bool _isImage = ctrlmsg.isImage;
+                                                bool _isEvent = ctrlmsg.isEvent;
+                                                bool _isQuery = ctrlmsg.isQuery;
+                                                float _scale = ctrlmsg.scale;
+                                                float _interval = ctrlmsg.interval;
+                                                int _threshold = ctrlmsg.threshold;
+                                                    
+                                                <p>
+                                                    @if (_isImage)
+                                                    {
+                                                        <span>On, </span>
+                                                    }           
+                                                    else
+                                                    {
+                                                        <span>Off, </span>
+                                                    }               
+                                                    @if (_isEvent)
+                                                    {
+                                                        <span>On, </span>
+                                                    }           
+                                                    else
+                                                    {
+                                                        <span>Off, </span>
+                                                    }
+                                                    @if (_isQuery)
+                                                    {
+                                                        <span>On, </span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span>Off, </span>
+                                                    }                                                        
+                                                    <span>@_scale, @_interval, @_threshold</span>
+                                                </p>                 
+                                            }
                                         }
                                         else
                                         {
-                                            string rxLabel = objMsg.label;
-                                            if (objMsg.type == "pong" || (rxLabel.StartsWith('{') && rxLabel.EndsWith('}')))
-                                            {                                                
-                                                ControlMsg? ctrlmsg = JsonSerializer.Deserialize<ControlMsg>(rxLabel);
-                                                if (ctrlmsg is not null)
-                                                {
-                                                    bool _isImage = ctrlmsg.isImage;
-                                                    bool _isEvent = ctrlmsg.isEvent;
-                                                    bool _isQuery = ctrlmsg.isQuery;
-                                                    float _scale = ctrlmsg.scale;
-                                                    float _interval = ctrlmsg.interval;
-                                                    int _threshold = ctrlmsg.threshold;
-                                                    
-                                                    <p>
-                                                        @if (_isImage)
-                                                        {
-                                                            <span>On, </span>
-                                                        }           
-                                                        else
-                                                        {
-                                                            <span>Off, </span>
-                                                        }               
-                                                        @if (_isEvent)
-                                                        {
-                                                            <span>On, </span>
-                                                        }           
-                                                        else
-                                                        {
-                                                            <span>Off, </span>
-                                                        }
-                                                        @if (_isQuery)
-                                                        {
-                                                            <span>On, </span>
-                                                        }
-                                                        else
-                                                        {
-                                                            <span>Off, </span>
-                                                        }                                                        
-                                                        <span>@_scale, @_interval, @_threshold</span>
-                                                    </p>                 
-                                                }
-                                            }
-                                            else
-                                            {
-                                                <h6>@rxLabel</h6>
-                                            }
+                                            <h6>@rxLabel</h6>
                                         }
-                                    </div>
+                                    }
                                 </div>
                             </div>
-                        }
+                        </div>
                     }
-                </div>
+                }
             </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="container p-1" style="float: left;">
+        @if (IsLoading)
+        {        
+                <div class="text-center">
+                    <img src="/img/loading.gif">
+                </div>        
         }
         else
         {
-            if (IsLoading)
-            {
-                <div class="text-center">
-                    <img src="/img/loading.gif">
-                </div>
-            }
-            else
-            {
-                <p>No records found.</p>
-            }
+            <p>No records found.</p>
         }
     </div>
-</div>
+}
+    
+
 
 
 @code {
@@ -334,9 +337,14 @@
             topicPubUser = TOPIC_PUB + "/" + userId;
 
             await Disconnect();
-            await Subscribe();
-            await LoadCameras();
+            await Subscribe();            
+            await LoadCameras();            
             await SendPing();
+
+            //Thread.Sleep(2000);
+             
+            //IsLoading = false;
+            //StateHasChanged();      //OnAfterRenderAsync 사용할 때 StateHasChanged 있어야
         }        
     }
 
