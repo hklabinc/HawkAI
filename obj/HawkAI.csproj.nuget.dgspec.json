@@ -1,23 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\user\\source\\repos\\HawkAI\\HawkAI.csproj": {}
+    "C:\\Users\\hhchoi\\Source\\Repos\\HawkAI\\HawkAI.csproj": {}
   },
   "projects": {
-    "C:\\Users\\user\\source\\repos\\HawkAI\\HawkAI.csproj": {
+    "C:\\Users\\hhchoi\\Source\\Repos\\HawkAI\\HawkAI.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\user\\source\\repos\\HawkAI\\HawkAI.csproj",
+        "projectUniqueName": "C:\\Users\\hhchoi\\Source\\Repos\\HawkAI\\HawkAI.csproj",
         "projectName": "HawkAI",
-        "projectPath": "C:\\Users\\user\\source\\repos\\HawkAI\\HawkAI.csproj",
-        "packagesPath": "C:\\Users\\user\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\user\\source\\repos\\HawkAI\\obj\\",
+        "projectPath": "C:\\Users\\hhchoi\\Source\\Repos\\HawkAI\\HawkAI.csproj",
+        "packagesPath": "C:\\Users\\hhchoi\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\hhchoi\\Source\\Repos\\HawkAI\\obj\\",
         "projectStyle": "PackageReference",
-        "fallbackFolders": [
-          "C:\\Program Files\\dotnet\\sdk\\NuGetFallbackFolder"
-        ],
         "configFilePaths": [
-          "C:\\Users\\user\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\hhchoi\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
@@ -25,8 +22,7 @@
         ],
         "sources": {
           "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
-          "https://api.nuget.org/v3/index.json": {},
-          "https://www.nuget.org/api/v2/": {}
+          "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
           "net6.0": {
@@ -112,7 +108,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\7.0.101\\RuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\7.0.401\\RuntimeIdentifierGraph.json"
         }
       }
     }

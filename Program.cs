@@ -13,7 +13,8 @@ using Microsoft.EntityFrameworkCore;
 using MQTTnet;
 using HawkAI.Hubs;
 using Microsoft.AspNetCore.Http.Connections;
-
+using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -102,7 +103,14 @@ else
 
 //app.UseHttpsRedirection();
 
-app.UseStaticFiles();
+var provider = new FileExtensionContentTypeProvider();
+//provider.Mappings[".obj"] = "text/plain";  // MIME 타입 설정 (text 형태로)
+provider.Mappings[".obj"] = "application/octet-stream";  // MIME 타입 설정 (binary 형태로) - .obj 파일 받아오기 위해 필요!
+app.UseStaticFiles(new StaticFileOptions
+{
+    ContentTypeProvider = provider
+});
+app.UseStaticFiles();  // 정적 파일 사용을 활성화 (이것도 있어야 WebGL 동작됨)
 
 app.UseRouting();
 

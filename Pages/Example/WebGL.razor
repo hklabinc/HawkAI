@@ -1,0 +1,17 @@
+﻿@page "/example/webgl"
+@inject IJSRuntime JSRuntime
+
+<h3>WebGL</h3>
+<canvas id="webglCanvas" width="500" height="400"></canvas>
+
+
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JSRuntime.InvokeVoidAsync("InitializeWebGL", "webglCanvas");
+        }
+    }
+}
