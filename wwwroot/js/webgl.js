@@ -2,12 +2,13 @@
     console.log("[HHCHOI] ==> " + THREE.OBJLoader); // 이 코드를 실행하여 브라우저 콘솔에서 확인
 
     var scene = new THREE.Scene();
-    var camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    var canvas = document.getElementById(canvasId);
+    var camera = new THREE.PerspectiveCamera(75, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
 
-    var renderer = new THREE.WebGLRenderer({ canvas: document.getElementById(canvasId) });
-    renderer.setSize(window.innerWidth * 0.5, window.innerHeight * 0.5);
+    var renderer = new THREE.WebGLRenderer({ canvas: canvas });
+    renderer.setSize(canvas.clientWidth, canvas.clientHeight);
 
-    var ambientLight = new THREE.AmbientLight(0x404040);
+    var ambientLight = new THREE.AmbientLight(0x404040); // 환경광 추가
     scene.add(ambientLight);
 
     var directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
@@ -34,14 +35,26 @@
 
     camera.position.z = 5;
 
+    //var animate = function () {
+    //    requestAnimationFrame(animate);
+    //    scene.traverse(function (object) {
+    //        if (object.isMesh) {
+    //            //object.rotation.x += 0.01;
+    //            object.rotation.y += 0.01;
+    //        }
+    //    });
+    //    renderer.render(scene, camera);
+    //};
+
+    // OrbitControls 추가
+    var controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true; // 관성 효과를 추가 (더 부드러운 컨트롤)
+    controls.dampingFactor = 0.5;
+    controls.rotateSpeed = 0.5; // 회전 속도 조절
+
     var animate = function () {
         requestAnimationFrame(animate);
-        scene.traverse(function (object) {
-            if (object.isMesh) {
-                //object.rotation.x += 0.01;
-                object.rotation.y += 0.01;
-            }
-        });
+        controls.update(); // 카메라 컨트롤 업데이트
         renderer.render(scene, camera);
     };
 
