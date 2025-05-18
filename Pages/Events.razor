@@ -6,77 +6,102 @@
 @using Microsoft.AspNetCore.Identity
 
 
-<_DeleteConfirmation IsParentComponentProcessing="IsLoading" OnConfirmationDelete="ConfirmDelete_Click"></_DeleteConfirmation>
 <div class="row mt-4">
-    <div class="col-4">
+    <div class="col-6">
         <h3>Events List</h3>
     </div>
-    <div class="col-6">
+    <div class="col-6 text-end">
+        @if (isTableView)
+        {
+            <button class="btn btn-primary me-2" @onclick="ToggleView">Card View</button>
+        }
+        else
+        {
+            <button class="btn btn-primary me-2" @onclick="ToggleView">Table View</button>
+        }
         <button class="btn btn-danger" @onclick="()=>HandleDeleteAll()">Delete All</button>
     </div>
 </div>
 
-@if (objEvents.Any())
+@if (IsLoading)
 {
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Time</th>
-                <AuthorizeView Roles="Admin">
-                    <th>User</th>
-                </AuthorizeView>                
-                <th>Addr</th>
-                <th>Image</th>
-                <th>Label</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var objEvent in EventService.Events)
-            {
-                <tr>
-                    <td>@objEvent.Time</td>
-                    <AuthorizeView Roles="Admin">
-                        <td>@objEvent.User</td>
-                    </AuthorizeView>                    
-                    <td>@objEvent.Addr</td>
-                    <td><img src="@($"data:image/jpeg;base64,{objEvent.Image}")"></td>
-                    <td>@objEvent.Label</td>
-                    <td>
-                        <button class="btn btn-danger" @onclick="()=>HandleDelete(objEvent.Id)">Delete</button>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    <div class="text-center">
+        <img src="/img/loading.gif" />
+    </div>
+}
+else if (!objEvents.Any())
+{
+    <p>No records found.</p>
 }
 else
 {
-    if (IsLoading)
+    @if (isTableView)
     {
-        //loading gif
-        <div class="text-center">
-        <img src="/img/loading.gif">
-            </div>
+        <!-- ✅ Table View -->
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <AuthorizeView Roles="Admin">
+                        <th>User</th>
+                    </AuthorizeView>
+                    <th>Addr</th>
+                    <th>Image</th>
+                    <th>Label</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var objEvent in objEvents)
+                {
+                    <tr>
+                        <td>@objEvent.Time</td>
+                        <AuthorizeView Roles="Admin">
+                            <td>@objEvent.User</td>
+                        </AuthorizeView>
+                        <td>@objEvent.Addr</td>
+                        <td><img src="@($"data:image/jpeg;base64,{objEvent.Image}")" width="100" /></td>
+                        <td>@objEvent.Label</td>
+                        <td>
+                            <button class="btn btn-danger" @onclick="() => HandleDelete(objEvent.Id)">Delete</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
     }
     else
     {
-        //no records
-        <p>No recrods found.</p>
+        <!-- ✅ Card View -->
+        <div class="row row-cols-1 row-cols-md-3 g-4">
+            @foreach (var objEvent in objEvents)
+            {
+                <div class="col">
+                    <div class="card shadow-sm h-100">
+                        <img src="@($"data:image/jpeg;base64,{objEvent.Image}")" class="card-img-top" alt="Event Image">
+                        <div class="card-body">
+                            <h6 class="card-title">@objEvent.Time</h6>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
     }
 }
 
+<_DeleteConfirmation IsParentComponentProcessing="IsLoading" OnConfirmationDelete="ConfirmDelete_Click"></_DeleteConfirmation>
 
 @code {
     [CascadingParameter]
     private Task<AuthenticationState> authenticationStateTask { get; set; }
 
-    [Inject]
-    UserManager<IdentityUser> userManager { get; set; }
-    
+    [Inject] private UserManager<IdentityUser> userManager { get; set; }
+
     private IEnumerable<Event> objEvents { get; set; } = new List<Event>();
     public bool IsLoading { get; set; }
     private int DeleteEventId { get; set; } = 0;
+
+    private bool isTableView = false; // ✅ 디폴트는 카드 뷰
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -88,58 +113,52 @@ else
 
     private async Task LoadEvents()
     {
-        IsLoading=true;
+        IsLoading = true;
         StateHasChanged();
 
         var user = (await authenticationStateTask).User;
         var currentUser = await userManager.GetUserAsync(user);
         string currentUserId = currentUser.Id;
-        string currentUserEmail = currentUser.Email;
+        var roles = await userManager.GetRolesAsync(currentUser);
+        string roleName = roles.FirstOrDefault();
 
-        var roleNames = await userManager.GetRolesAsync(currentUser);       // Get roleName from user
-        string roleName = roleNames[0].ToString();
+        objEvents = roleName == "Admin"
+            ? await EventService.GetAllEvents()
+            : await EventService.GetMyEvents(currentUserId);
 
-        if (roleName == "Admin")
-        {
-            objEvents = await EventService.GetAllEvents();
-        }
-        else
-        {
-            objEvents = await EventService.GetMyEvents(currentUserId);
-        }
-
-        //objEvents = await EventService.GetAllEvents();
-        IsLoading=false;
+        IsLoading = false;
         StateHasChanged();
     }
 
     private void HandleDelete(int id)
-    {        
+    {
         DeleteEventId = id;
         _jsRuntime.InvokeVoidAsync("ShowDeleteConfirmationModal");
     }
+
     private void HandleDeleteAll()
-    {       
+    {
         DeleteEventId = 0;
         _jsRuntime.InvokeVoidAsync("ShowDeleteConfirmationModal");
     }
 
+    private void ToggleView()
+    {
+        isTableView = !isTableView;
+    }
+
     public async Task ConfirmDelete_Click(bool isConfirmed)
     {
-        IsLoading=true;
-        if(isConfirmed)
+        IsLoading = true;
+        if (isConfirmed)
         {
             if (DeleteEventId != 0)
-            {                
-                await EventService.DeleteEvent(DeleteEventId);        // Delete
-            }
-            else 
-            {
-                await EventService.DeleteAllEvents();                  // Delete All
-            }
-        }     
+                await EventService.DeleteEvent(DeleteEventId);
+            else
+                await EventService.DeleteAllEvents();
+        }
         await LoadEvents();
         await _jsRuntime.InvokeVoidAsync("HideDeleteConfirmationModal");
-        IsLoading=false;
+        IsLoading = false;
     }
 }
