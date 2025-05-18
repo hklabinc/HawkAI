@@ -14,7 +14,6 @@ namespace HawkAI.Data.EventService
         {
             _context = context;
             _navigationManager = navigationManager;
-            _context.Database.EnsureCreated();
         }
 
         public List<Event> Events { get; set; } = new List<Event>();

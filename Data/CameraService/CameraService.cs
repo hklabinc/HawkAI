@@ -12,7 +12,6 @@ namespace HawkAI.Data.CameraService
         {
             _context = context;
             _navigationManager = navigationManager;
-            _context.Database.EnsureCreated();
         }
 
         public List<Camera> Cameras { get; set; } = new List<Camera>();
