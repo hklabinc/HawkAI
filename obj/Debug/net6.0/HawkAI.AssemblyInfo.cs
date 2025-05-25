@@ -16,7 +16,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("HawkAI")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+21f37364267252ff93e2af7cea15bc37b1ed71d2")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b279f2ae15fbf06f71ee510a54b81a8587ecfa35")]
 [assembly: System.Reflection.AssemblyProductAttribute("HawkAI")]
 [assembly: System.Reflection.AssemblyTitleAttribute("HawkAI")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
