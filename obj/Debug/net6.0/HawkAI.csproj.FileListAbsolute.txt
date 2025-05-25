@@ -107,7 +107,6 @@ C:\Users\user\source\repos\HawkAI\obj\Debug\net6.0\scopedcss\Shared\MainLayout.r
 C:\Users\user\source\repos\HawkAI\obj\Debug\net6.0\scopedcss\Shared\NavMenu.razor.rz.scp.css
 C:\Users\user\source\repos\HawkAI\obj\Debug\net6.0\scopedcss\bundle\HawkAI.styles.css
 C:\Users\user\source\repos\HawkAI\obj\Debug\net6.0\scopedcss\projectbundle\HawkAI.bundle.scp.css
-C:\Users\user\source\repos\HawkAI\obj\Debug\net6.0\HawkAI.csproj.CopyComplete
 C:\Users\user\source\repos\HawkAI\obj\Debug\net6.0\HawkAI.dll
 C:\Users\user\source\repos\HawkAI\obj\Debug\net6.0\refint\HawkAI.dll
 C:\Users\user\source\repos\HawkAI\obj\Debug\net6.0\HawkAI.pdb
@@ -344,3 +343,9 @@ C:\Users\hhcho\Source\Repos\HawkAI\obj\Debug\net6.0\HawkAI.genruntimeconfig.cach
 C:\Users\hhcho\Source\Repos\HawkAI\obj\Debug\net6.0\ref\HawkAI.dll
 C:\Users\hhcho\source\repos\HawkAI\bin\Debug\net6.0\appsettings.json
 C:\Users\hhcho\source\repos\HawkAI\bin\Debug\net6.0\Auth.json
+C:\Users\user\Source\Repos\HawkAI\bin\Debug\net6.0\HawkAI.staticwebassets.endpoints.json
+C:\Users\user\Source\Repos\HawkAI\obj\Debug\net6.0\HawkAI.sourcelink.json
+C:\Users\user\Source\Repos\HawkAI\obj\Debug\net6.0\staticwebassets.build.endpoints.json
+C:\Users\user\Source\Repos\HawkAI\obj\Debug\net6.0\staticwebassets\msbuild.HawkAI.Microsoft.AspNetCore.StaticWebAssetEndpoints.props
+C:\Users\user\Source\Repos\HawkAI\obj\Debug\net6.0\staticwebassets.upToDateCheck.txt
+C:\Users\user\Source\Repos\HawkAI\obj\Debug\net6.0\HawkAI.csproj.Up2Date

@@ -9,143 +9,145 @@ build_property.EnforceExtendedAnalyzerRules =
 build_property._SupportedPlatformList = Linux,macOS,Windows
 build_property.RootNamespace = HawkAI
 build_property.RootNamespace = HawkAI
-build_property.ProjectDir = C:\Users\hhcho\source\repos\HawkAI\
+build_property.ProjectDir = C:\Users\user\Source\Repos\HawkAI\
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 
 build_property.RazorLangVersion = 6.0
 build_property.SupportLocalizedComponentNames = 
 build_property.GenerateRazorMetadataSourceChecksumAttributes = 
-build_property.MSBuildProjectDirectory = C:\Users\hhcho\source\repos\HawkAI
+build_property.MSBuildProjectDirectory = C:\Users\user\Source\Repos\HawkAI
 build_property._RazorSourceGeneratorDebug = 
+build_property.EffectiveAnalysisLevelStyle = 6.0
+build_property.EnableCodeStyleSeverity = 
 
-[C:/Users/hhcho/source/repos/HawkAI/App.razor]
+[C:/Users/user/Source/Repos/HawkAI/App.razor]
 build_metadata.AdditionalFiles.TargetPath = QXBwLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Pages/Camera1.razor]
+[C:/Users/user/Source/Repos/HawkAI/Pages/Camera1.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQ2FtZXJhMS5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Pages/Cameras.razor]
+[C:/Users/user/Source/Repos/HawkAI/Pages/Cameras.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcQ2FtZXJhcy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Pages/Dashboard.razor]
+[C:/Users/user/Source/Repos/HawkAI/Pages/Dashboard.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRGFzaGJvYXJkLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Pages/Events.razor]
+[C:/Users/user/Source/Repos/HawkAI/Pages/Events.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRXZlbnRzLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Pages/Example/BlazorJs.razor]
+[C:/Users/user/Source/Repos/HawkAI/Pages/Example/BlazorJs.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRXhhbXBsZVxCbGF6b3JKcy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Pages/Example/Counter.razor]
+[C:/Users/user/Source/Repos/HawkAI/Pages/Example/Counter.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRXhhbXBsZVxDb3VudGVyLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Pages/Example/FetchData.razor]
+[C:/Users/user/Source/Repos/HawkAI/Pages/Example/FetchData.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRXhhbXBsZVxGZXRjaERhdGEucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Pages/Example/Hero.razor]
+[C:/Users/user/Source/Repos/HawkAI/Pages/Example/Hero.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRXhhbXBsZVxIZXJvLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Pages/Example/SuperHeroes.razor]
+[C:/Users/user/Source/Repos/HawkAI/Pages/Example/SuperHeroes.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRXhhbXBsZVxTdXBlckhlcm9lcy5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Pages/Example/VideoGame.razor]
+[C:/Users/user/Source/Repos/HawkAI/Pages/Example/VideoGame.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRXhhbXBsZVxWaWRlb0dhbWUucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Pages/Example/VideoGames.razor]
+[C:/Users/user/Source/Repos/HawkAI/Pages/Example/VideoGames.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRXhhbXBsZVxWaWRlb0dhbWVzLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Pages/Example/WebGL.razor]
+[C:/Users/user/Source/Repos/HawkAI/Pages/Example/WebGL.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRXhhbXBsZVxXZWJHTC5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Pages/Index.razor]
+[C:/Users/user/Source/Repos/HawkAI/Pages/Index.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcSW5kZXgucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Pages/Test/Chat.razor]
+[C:/Users/user/Source/Repos/HawkAI/Pages/Test/Chat.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcVGVzdFxDaGF0LnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Pages/Test/Fcm.razor]
+[C:/Users/user/Source/Repos/HawkAI/Pages/Test/Fcm.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcVGVzdFxGY20ucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Pages/Test/MotionDetection.razor]
+[C:/Users/user/Source/Repos/HawkAI/Pages/Test/MotionDetection.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcVGVzdFxNb3Rpb25EZXRlY3Rpb24ucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Pages/Test/Mqtt.razor]
+[C:/Users/user/Source/Repos/HawkAI/Pages/Test/Mqtt.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcVGVzdFxNcXR0LnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Pages/Test/OpenCV.razor]
+[C:/Users/user/Source/Repos/HawkAI/Pages/Test/OpenCV.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcVGVzdFxPcGVuQ1YucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Pages/Test/WebCam.razor]
+[C:/Users/user/Source/Repos/HawkAI/Pages/Test/WebCam.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcVGVzdFxXZWJDYW0ucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Pages/Video.razor]
+[C:/Users/user/Source/Repos/HawkAI/Pages/Video.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcVmlkZW8ucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Pages/WebRTC.razor]
+[C:/Users/user/Source/Repos/HawkAI/Pages/WebRTC.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcV2ViUlRDLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Shared/LoginDisplay.razor]
+[C:/Users/user/Source/Repos/HawkAI/Shared/LoginDisplay.razor]
 build_metadata.AdditionalFiles.TargetPath = U2hhcmVkXExvZ2luRGlzcGxheS5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Shared/SurveyPrompt.razor]
+[C:/Users/user/Source/Repos/HawkAI/Shared/SurveyPrompt.razor]
 build_metadata.AdditionalFiles.TargetPath = U2hhcmVkXFN1cnZleVByb21wdC5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Shared/_DeleteConfirmation.razor]
+[C:/Users/user/Source/Repos/HawkAI/Shared/_DeleteConfirmation.razor]
 build_metadata.AdditionalFiles.TargetPath = U2hhcmVkXF9EZWxldGVDb25maXJtYXRpb24ucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/_Imports.razor]
+[C:/Users/user/Source/Repos/HawkAI/_Imports.razor]
 build_metadata.AdditionalFiles.TargetPath = X0ltcG9ydHMucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Shared/MainLayout.razor]
+[C:/Users/user/Source/Repos/HawkAI/Shared/MainLayout.razor]
 build_metadata.AdditionalFiles.TargetPath = U2hhcmVkXE1haW5MYXlvdXQucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = b-tdrbwwf40e
 
-[C:/Users/hhcho/source/repos/HawkAI/Shared/NavMenu.razor]
+[C:/Users/user/Source/Repos/HawkAI/Shared/NavMenu.razor]
 build_metadata.AdditionalFiles.TargetPath = U2hhcmVkXE5hdk1lbnUucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = b-fyg3m3c6e5
 
-[C:/Users/hhcho/source/repos/HawkAI/Areas/Identity/Pages/Account/LogOut.cshtml]
+[C:/Users/user/Source/Repos/HawkAI/Areas/Identity/Pages/Account/LogOut.cshtml]
 build_metadata.AdditionalFiles.TargetPath = QXJlYXNcSWRlbnRpdHlcUGFnZXNcQWNjb3VudFxMb2dPdXQuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Areas/Identity/Pages/Shared/_LoginPartial.cshtml]
+[C:/Users/user/Source/Repos/HawkAI/Areas/Identity/Pages/Shared/_LoginPartial.cshtml]
 build_metadata.AdditionalFiles.TargetPath = QXJlYXNcSWRlbnRpdHlcUGFnZXNcU2hhcmVkXF9Mb2dpblBhcnRpYWwuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Pages/Error.cshtml]
+[C:/Users/user/Source/Repos/HawkAI/Pages/Error.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcRXJyb3IuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Pages/_Host.cshtml]
+[C:/Users/user/Source/Repos/HawkAI/Pages/_Host.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcX0hvc3QuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
-[C:/Users/hhcho/source/repos/HawkAI/Pages/_Layout.cshtml]
+[C:/Users/user/Source/Repos/HawkAI/Pages/_Layout.cshtml]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXNcX0xheW91dC5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 
