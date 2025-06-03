@@ -1,0 +1,231 @@
+﻿@page "/projects/{projectId:int}"
+@inject DataDbContext Db
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject IWebHostEnvironment Env
+@using Microsoft.EntityFrameworkCore
+@using System.IO;
+@using System.Text.Json;
+@using SixLabors.ImageSharp;
+@using SixLabors.ImageSharp.PixelFormats;
+@using SixLabors.ImageSharp.Processing;
+@using SixLabors.Fonts;
+@using SixLabors.ImageSharp.Drawing.Processing;
+@using SixLabors.ImageSharp.Drawing;
+
+@code {
+    [Parameter] public int projectId { get; set; }
+
+    private Project? project;
+    private List<ImageEntry> images = new();
+    private bool isLoading = true;
+    private bool showLabelingModal = false;
+    private string selectedImagePath = string.Empty;
+    private int selectedImageId;
+    private string selectedLabels = string.Empty;
+    private bool pendingInitJS = false;
+    private DotNetObjectReference<ProjectViewer>? dotNetRef;
+
+    protected override async Task OnInitializedAsync()
+    {
+        project = await Db.Projects.FindAsync(projectId);
+        if (project == null)
+        {
+            Navigation.NavigateTo("/projects");
+            return;
+        }
+
+        await LoadImages();
+        isLoading = false;
+        selectedLabels = project.Labels;
+    }
+
+    private async Task LoadImages()
+    {
+        images = await Db.Images
+            .Where(i => i.ProjectId == projectId)
+            .OrderBy(i => i.FileName)
+            .ToListAsync();
+        StateHasChanged();
+    }
+
+    private void OpenLabelingModal(string imagePath, int imageId)
+    {
+        selectedImagePath = "/" + imagePath;
+        selectedImageId = imageId;
+        showLabelingModal = true;
+        pendingInitJS = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (showLabelingModal && pendingInitJS)
+        {
+            var image = await Db.Images.FindAsync(selectedImageId);
+            var labelData = string.IsNullOrWhiteSpace(image?.LabelData) || image?.LabelData == "{}" ? "[]" : image.LabelData;
+
+            dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("initLabelingCanvas", dotNetRef, labelData);
+            pendingInitJS = false;
+        }
+    }
+
+    private string GetDisplayImagePath(ImageEntry image)
+    {
+        var folder = System.IO.Path.GetDirectoryName(image.RelativePath) ?? "";
+        var filename = System.IO.Path.GetFileName(image.RelativePath);
+        var annotatedPath = image.LabelStatus == "Labeled"
+            ? folder.Replace("images", "annotated_images")
+            : folder;
+
+        return "/" + System.IO.Path.Combine(annotatedPath, filename).Replace("\\", "/") + $"?t={DateTime.UtcNow.Ticks}";    // ✅ 캐시 방지용 timestamp 추가
+    }
+
+    [JSInvokable]
+    public async Task SaveLabelWrapper(string labelJson)
+    {
+        var image = await Db.Images.FindAsync(selectedImageId);
+        if (image == null) return;
+
+        image.LabelData = labelJson;
+        image.LabelStatus = string.IsNullOrWhiteSpace(labelJson) || labelJson == "[]" ? "Unlabeled" : "Labeled";
+        await Db.SaveChangesAsync();
+
+        var sourcePath = System.IO.Path.Combine(Env.WebRootPath, image.RelativePath);
+        var originalFileName = System.IO.Path.GetFileName(sourcePath);
+        var imagesFolder = System.IO.Path.GetDirectoryName(sourcePath)!;
+        var parentFolder = System.IO.Path.GetDirectoryName(imagesFolder)!;
+        var annotatedFolder = System.IO.Path.Combine(parentFolder, "annotated_images");
+        var annotatedPath = System.IO.Path.Combine(annotatedFolder, originalFileName);
+
+        try
+        {
+            if (image.LabelStatus == "Labeled")
+            {
+                Directory.CreateDirectory(annotatedFolder);
+
+                using var srcImage = await Image.LoadAsync<Rgba32>(sourcePath);
+                var font = SystemFonts.CreateFont("Arial", 16);
+                var colorMap = new[] { Color.Red, Color.Green, Color.Blue, Color.Orange, Color.Purple };
+                var labelList = project.Labels.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()).ToList();
+                var labelBoxes = JsonDocument.Parse(labelJson).RootElement;
+
+                foreach (var box in labelBoxes.EnumerateArray())
+                {
+                    var x = (float)box.GetProperty("x").GetDouble();
+                    var y = (float)box.GetProperty("y").GetDouble();
+                    var w = (float)box.GetProperty("w").GetDouble();
+                    var h = (float)box.GetProperty("h").GetDouble();
+                    var label = box.GetProperty("label").GetString() ?? "";                    
+                    Console.WriteLine($"[📦] Box: x={x}, y={y}, w={w}, h={h} (label={label})");
+
+                    var index = labelList.IndexOf(label);
+                    var labelColor = colorMap[index % colorMap.Length];
+
+                    srcImage.Mutate(ctx =>
+                    {
+                        var rect = new RectangleF(x, y, w, h);
+                        ctx.Draw(labelColor, 1, rect);
+                        ctx.DrawText(label, font, labelColor, new PointF(x + 4, y - 16));
+                    });
+                }
+
+                await srcImage.SaveAsJpegAsync(annotatedPath);
+                Console.WriteLine($"[✔] Annotated image saved: {annotatedPath}");
+            }
+            else if (File.Exists(annotatedPath))
+            {
+                File.Delete(annotatedPath);
+                Console.WriteLine($"[🗑️] Deleted annotated image: {annotatedPath}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[❌] Error handling annotated image: {ex.Message}");
+        }
+
+        showLabelingModal = false;
+        await LoadImages(); // ✅ 이미지 목록 다시 로딩
+    }
+}
+
+
+
+
+@if (isLoading)
+{
+    <p><em>Loading project...</em></p>
+}
+else if (project == null)
+{
+    <p class="text-danger">Project not found.</p>
+}
+else
+{
+    <h3>Project: @project.Name</h3>
+    <p><strong>Labels:</strong> @project.Labels</p>
+    <p><strong>Created At:</strong> @project.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</p>
+
+    <h4>Uploaded Images (@images.Count)</h4>
+
+    @if (images.Count == 0)
+    {
+        <p>No images uploaded for this project.</p>
+    }
+    else
+    {
+        <div class="row">
+            @foreach (var image in images)
+            {
+                <div class="col-md-3 mb-3">
+                    <div class="card">
+                        <img class="card-img-top"
+                             src="@GetDisplayImagePath(image)"
+                             @onclick="() => OpenLabelingModal(image.RelativePath, image.Id)"
+                             style="cursor: pointer;" />
+
+                        <div class="card-body">
+                            <p class="card-text">@image.FileName</p>
+                            <p class="card-text text-muted">@image.Width x @image.Height</p>
+                            <p class="card-text"><small>@image.LabelStatus</small></p>
+                            <p class="card-text"><small>@image.LabelData</small></p>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+}
+
+@if (showLabelingModal)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.6);">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Label Image</h5>
+                    <button type="button" class="btn-close" @onclick="() => showLabelingModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div style="position: relative;">
+                        <img id="targetImage" src="@selectedImagePath" style="width: 100%; display: block;" />
+                        <canvas id="labelCanvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></canvas>
+                    </div>
+                    <div class="mt-3">
+                        <select id="labelSelector" class="form-select">
+                            @foreach (var label in selectedLabels.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                            {
+                                <option value="@label.Trim()">@label.Trim()</option>
+                            }
+                        </select>
+                        <button class="btn btn-outline-danger btn-sm mt-2" onclick="clearBoxes()">Clear Boxes</button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showLabelingModal = false">Close</button>
+                    <button class="btn btn-primary" onclick="saveLabelData()">Save Labels</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}

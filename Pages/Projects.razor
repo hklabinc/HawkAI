@@ -1,0 +1,272 @@
+﻿@page "/projects"
+@inject HawkAI.Data.ProjectService.IProjectService ProjectService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+@inject IWebHostEnvironment Env
+@inject DataDbContext Db
+
+<h3>Project Manager</h3>
+
+<button @onclick="() => showCreateModal = true" class="btn btn-primary mb-3">+ Create New Project</button>
+
+@if (projects == null)
+{
+    <p><em>Loading...</em></p>
+}
+else if (projects.Count == 0)
+{
+    <p>No projects found.</p>
+}
+else
+{
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Labels</th>
+                <th>Image Count</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in projects)
+            {
+                <tr>
+                    <td>@p.Name</td>
+                    <td>@p.Labels</td>
+                    <td>@p.ImageCount</td>
+                    <td>@GetFriendlyTime(p.CreatedAt)</td>
+                    <td>
+                        <button class="btn btn-sm btn-info" @onclick="() => OpenProject(p.Id)">Open</button>
+                        <button class="btn btn-sm btn-danger" @onclick="() => PromptDelete(p.Id, p.Name)">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (showCreateModal)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Create New Project</h5>
+                    <button type="button" class="btn-close" @onclick="() => showCreateModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Project Name</label>
+                        <input class="form-control" @bind="newProjectName" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Labels (comma-separated)</label>
+                        <input class="form-control" @bind="labelInput" placeholder="e.g., person, car, dog" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Upload Images</label>
+                        <InputFile OnChange="HandleImageUpload" multiple />
+                        @if (uploadedFiles.Count > 0)
+                        {
+                            <ul>
+                                @foreach (var file in uploadedFiles)
+                                {
+                                    <li>@file.Name</li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(errorMessage))
+                    {
+                        <div class="alert alert-danger">@errorMessage</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showCreateModal = false">Cancel</button>
+                    <button class="btn btn-primary" @onclick="CreateProject">Create</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showDeleteConfirm)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Delete Project</h5>
+                    <button type="button" class="btn-close" @onclick="() => showDeleteConfirm = false"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete project '<strong>@projectToDeleteName</strong>'?</p>
+                    <p class="text-danger">This will also delete all associated images and files.</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showDeleteConfirm = false">Cancel</button>
+                    <button class="btn btn-danger" @onclick="ConfirmDelete">Yes, Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Project> projects = new();
+    private string newProjectName = string.Empty;
+    private string labelInput = string.Empty;
+    private bool showCreateModal = false;
+    private string errorMessage = string.Empty;
+    private string userId = string.Empty;
+
+    private List<IBrowserFile> uploadedFiles = new();
+
+    private bool showDeleteConfirm = false;
+    private int projectToDeleteId = -1;
+    private string projectToDeleteName = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        userId = user.Identity?.Name ?? "unknown";
+
+        var result = await ProjectService.GetUserProjects(userId);
+        projects = result.ToList();
+    }
+
+    private async Task CreateProject()
+    {
+        if (projects.Any(p => p.Name == newProjectName))
+        {
+            errorMessage = "Project name already exists. Please choose a different name.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(labelInput))
+        {
+            errorMessage = "Labels cannot be empty. Please provide at least one label.";
+            return;
+        }
+
+        var project = new Project
+            {
+                Name = newProjectName,
+                Labels = labelInput,
+                CreatorUserId = userId,
+                ImageCount = uploadedFiles.Count
+            };
+
+        await ProjectService.CreateProject(project);
+
+        var imagePath = Path.Combine(Env.WebRootPath, "datasets", newProjectName, "images");
+        Directory.CreateDirectory(imagePath);
+
+        foreach (var file in uploadedFiles)
+        {
+            var filePath = Path.Combine(imagePath, file.Name);
+            await using var stream = new FileStream(filePath, FileMode.Create);
+            await file.OpenReadStream().CopyToAsync(stream);
+
+            using var image = await SixLabors.ImageSharp.Image.LoadAsync(file.OpenReadStream());
+
+            var imageEntry = new ImageEntry
+                {
+                    ProjectId = project.Id,
+                    FileName = file.Name,
+                    RelativePath = $"datasets/{newProjectName}/images/{file.Name}",
+                    UploadedAt = DateTime.Now,
+                    UploadedByUserId = userId,
+                    Width = image.Width,
+                    Height = image.Height,
+                    LabelStatus = "Unlabeled",
+                    LabelData = "{}"
+                };
+
+            Db.Images.Add(imageEntry);
+        }
+
+        await Db.SaveChangesAsync();
+
+        newProjectName = string.Empty;
+        labelInput = string.Empty;
+        errorMessage = string.Empty;
+        showCreateModal = false;
+        uploadedFiles.Clear();
+
+        var updated = await ProjectService.GetUserProjects(userId);
+        projects = updated.ToList();
+    }
+
+    private async Task ConfirmDelete()
+    {
+        var project = await Db.Projects.FindAsync(projectToDeleteId);
+        if (project == null) return;
+
+        var images = Db.Images.Where(i => i.ProjectId == project.Id);
+        Db.Images.RemoveRange(images);
+        Db.Projects.Remove(project);
+        await Db.SaveChangesAsync();
+
+        var path = Path.Combine(Env.WebRootPath, "datasets", project.Name);
+        if (Directory.Exists(path)) Directory.Delete(path, true);
+
+        showDeleteConfirm = false;
+        var result = await ProjectService.GetUserProjects(userId);
+        projects = result.ToList();
+    }
+
+    private void PromptDelete(int id, string name)
+    {
+        projectToDeleteId = id;
+        projectToDeleteName = name;
+        showDeleteConfirm = true;
+    }
+
+    private void OpenProject(int id)
+    {
+        Navigation.NavigateTo($"/projects/{id}");
+    }
+
+    private void HandleImageUpload(InputFileChangeEventArgs e)
+    {
+        uploadedFiles.Clear();
+        var validExtensions = new[] { ".jpg", ".jpeg", ".png", ".bmp" };
+        const long maxSize = 5 * 1024 * 1024; // 5MB
+
+        foreach (var file in e.GetMultipleFiles())
+        {
+            var ext = Path.GetExtension(file.Name).ToLowerInvariant();
+            if (!validExtensions.Contains(ext) || file.Size > maxSize)
+            {
+                errorMessage = "Only image files (.jpg, .png, .bmp) under 5MB are allowed.";
+                return;
+            }
+
+            uploadedFiles.Add(file);
+        }
+    }
+
+    private string GetFriendlyTime(DateTime dt)
+    {
+        var now = DateTime.Now;
+        var elapsed = now - dt;
+
+        if (elapsed.TotalDays >= 1)
+        {
+            if (elapsed.TotalDays < 7)
+                return $"{(int)elapsed.TotalDays} day(s) ago";
+            if (elapsed.TotalDays < 30)
+                return $"{(int)(elapsed.TotalDays / 7)} week(s) ago";
+            return dt.ToString("yyyy-MM-dd HH:mm:ss");
+        }
+        if (elapsed.TotalHours >= 1)
+            return $"{(int)elapsed.TotalHours} hour(s) ago";
+        if (elapsed.TotalMinutes >= 1)
+            return $"{(int)elapsed.TotalMinutes} minute(s) ago";
+        return "just now";
+    }
+}

@@ -4,6 +4,7 @@ using HawkAI.Data.SuperHeroService;
 using HawkAI.Data.GameService;
 using HawkAI.Data.CameraService;
 using HawkAI.Data.EventService;
+using HawkAI.Data.ProjectService;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
@@ -44,6 +45,7 @@ builder.Services.AddScoped<ICameraService, CameraService>();
 builder.Services.AddScoped<IEventService, EventService>(); 
 builder.Services.AddScoped<IGameService, GameService>();
 builder.Services.AddScoped<ISuperHeroService, SuperHeroService>();
+builder.Services.AddScoped<IProjectService, ProjectService>();
 
 
 /************ 인증, 구글인증 관련 ************/

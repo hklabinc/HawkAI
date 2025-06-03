@@ -3,6 +3,7 @@ using HawkAI.Data.SuperHeroService;
 using HawkAI.Data.GameService;
 using HawkAI.Data.CameraService;
 using HawkAI.Data.EventService;
+using HawkAI.Data.ProjectService;
 
 namespace HawkAI.Data
 {
@@ -110,14 +111,16 @@ namespace HawkAI.Data
         }
 
         public DbSet<Game> Games => Set<Game>();
+        public DbSet<SuperHero> SuperHeroes { get; set; }
+        public DbSet<Comic> Comics { get; set; }
+
 
         public DbSet<Camera> Cameras => Set<Camera>();
-
         public DbSet<Event> Events => Set<Event>();
 
-        public DbSet<SuperHero> SuperHeroes { get; set; }
 
-        public DbSet<Comic> Comics { get; set; }
+        public DbSet<Project> Projects => Set<Project>();
+        public DbSet<ImageEntry> Images => Set<ImageEntry>();
 
     }
 }

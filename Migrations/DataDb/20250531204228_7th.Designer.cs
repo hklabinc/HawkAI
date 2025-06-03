@@ -3,6 +3,7 @@ using System;
 using HawkAI.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,10 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace HawkAI.Migrations.DataDb
 {
     [DbContext(typeof(DataDbContext))]
-    partial class DataDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250531204228_7th")]
+    partial class _7th
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -222,9 +224,6 @@ namespace HawkAI.Migrations.DataDb
                     b.Property<string>("CreatorUserId")
                         .IsRequired()
                         .HasColumnType("longtext");
-
-                    b.Property<int>("ImageCount")
-                        .HasColumnType("int");
 
                     b.Property<string>("Labels")
                         .IsRequired()
