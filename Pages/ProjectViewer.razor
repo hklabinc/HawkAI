@@ -105,7 +105,7 @@
                 Directory.CreateDirectory(annotatedFolder);
 
                 using var srcImage = await Image.LoadAsync<Rgba32>(sourcePath);
-                var font = SystemFonts.CreateFont("Arial", 16);
+                var font = SystemFonts.CreateFont("DejaVu Sans", 16);
                 var colorMap = new[] { Color.Red, Color.Green, Color.Blue, Color.Orange, Color.Purple };
                 var labelList = project.Labels.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()).ToList();
                 var labelBoxes = JsonDocument.Parse(labelJson).RootElement;
