@@ -139,5 +139,7 @@ input:checked + .slider:before {
     }
 
 
-
-
+/* Canvas에서 mouse cursor 모양 변경을 위해 by hhchoi */
+#labelCanvas {
+    pointer-events: auto !important;
+}

@@ -127,6 +127,63 @@
         const moveX = e.offsetX;
         const moveY = e.offsetY;
 
+        const invX = img.naturalWidth / canvas.clientWidth;
+        const invY = img.naturalHeight / canvas.clientHeight;
+        const px = moveX * invX;
+        const py = moveY * invY;
+
+        // ✅ 1. 라벨 텍스트 영역 위에 있는지 모든 박스에 대해 확인
+        for (let i = boxes.length - 1; i >= 0; i--) {
+            const box = boxes[i];
+            const textWidth = ctx.measureText(box.label).width;
+            const textHeight = 16;
+
+            if (px >= box.x && px <= box.x + textWidth &&
+                py >= box.y - textHeight && py <= box.y) {
+                canvas.style.cursor = 'pointer';
+                return;
+            }
+        }
+
+        // ✅ 2. 핸들 위에 있는지 확인하고 커서 변경
+        let hoveredHandle = null;
+        if (selectedBoxIndex !== -1) {
+            const box = boxes[selectedBoxIndex];
+            const handles = getHandles(box);
+            for (const [key, { x, y }] of Object.entries(handles)) {
+                const hx = x * canvas.clientWidth / img.naturalWidth;
+                const hy = y * canvas.clientHeight / img.naturalHeight;
+                if (Math.abs(moveX - hx) < HANDLE_SIZE && Math.abs(moveY - hy) < HANDLE_SIZE) {
+                    hoveredHandle = key;
+                    break;
+                }
+            }
+        }
+
+        // ✅ 커서 모양 지정
+        switch (hoveredHandle) {
+            case 'tl':
+            case 'br':
+                canvas.style.cursor = 'nwse-resize';
+                break;
+            case 'tr':
+            case 'bl':
+                canvas.style.cursor = 'nesw-resize';
+                break;
+            case 'tm':
+            case 'bm':
+                canvas.style.cursor = 'ns-resize';
+                break;
+            case 'ml':
+            case 'mr':
+                canvas.style.cursor = 'ew-resize';
+                break;
+            default:
+                canvas.style.cursor = isDrawing ? 'crosshair' : 'default';
+                break;
+        }
+
+
         if (draggingHandle && selectedBoxIndex !== -1) {
             const { scaleX, scaleY } = getScaleFactors();
             const box = boxes[selectedBoxIndex];

@@ -4,6 +4,14 @@
 @inject NavigationManager Navigation
 @inject IWebHostEnvironment Env
 @inject DataDbContext Db
+@inject IJSRuntime JS
+@using Microsoft.EntityFrameworkCore
+@using System.Text.Json
+@using System.IO.Compression
+@using SixLabors.ImageSharp
+@using SixLabors.ImageSharp.PixelFormats
+@using SixLabors.ImageSharp.Processing
+
 
 <h3>Project Manager</h3>
 
@@ -19,32 +27,24 @@ else if (projects.Count == 0)
 }
 else
 {
-    <table class="table table-bordered">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Labels</th>
-                <th>Image Count</th>
-                <th>Created</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var p in projects)
-            {
-                <tr>
-                    <td>@p.Name</td>
-                    <td>@p.Labels</td>
-                    <td>@p.ImageCount</td>
-                    <td>@GetFriendlyTime(p.CreatedAt)</td>
-                    <td>
-                        <button class="btn btn-sm btn-info" @onclick="() => OpenProject(p.Id)">Open</button>
-                        <button class="btn btn-sm btn-danger" @onclick="() => PromptDelete(p.Id, p.Name)">Delete</button>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
+    <div class="d-flex flex-wrap gap-3">
+        @foreach (var p in projects)
+        {
+            <div class="card" style="width: 320px;">
+                @if (p.Images.Count > 0)
+                {
+                    <img src="@("/" + p.Images.First().RelativePath)" class="card-img-top" style="height: 180px; object-fit: cover; cursor: pointer;" @onclick="() => OpenProject(p.Id)" />
+                }
+                <div class="card-body">
+                    <h5 class="card-title"><strong>@p.Name</strong> <span class="text-muted" style="font-size: 1rem;">(@p.Images.Count images)</span></h5>
+                    <p class="card-text">Labels: @p.Labels</p>
+                    <button class="btn btn-sm btn-info" @onclick="() => OpenEditModal(p)">Edit</button>
+                    <button class="btn btn-sm btn-danger" @onclick="() => PromptDelete(p.Id, p.Name)">Delete</button>
+                    <button class="btn btn-sm btn-outline-primary ms-2" @onclick="() => OpenExportModal(p.Id)">Export</button>
+                </div>
+            </div>
+        }
+    </div>
 }
 
 @if (showCreateModal)
@@ -68,10 +68,10 @@ else
                     <div class="mb-3">
                         <label class="form-label">Upload Images</label>
                         <InputFile OnChange="HandleImageUpload" multiple />
-                        @if (uploadedFiles.Count > 0)
+                        @if (createUploadedFiles.Count > 0)
                         {
                             <ul>
-                                @foreach (var file in uploadedFiles)
+                                @foreach (var file in createUploadedFiles)
                                 {
                                     <li>@file.Name</li>
                                 }
@@ -86,6 +86,42 @@ else
                 <div class="modal-footer">
                     <button class="btn btn-secondary" @onclick="() => showCreateModal = false">Cancel</button>
                     <button class="btn btn-primary" @onclick="CreateProject">Create</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showEditModal)
+{
+    <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Project</h5>
+                    <button type="button" class="btn-close" @onclick="() => showEditModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(errorMessage2))
+                    {
+                        <div class="alert alert-danger">@errorMessage2</div>
+                    }
+                    <div class="mb-3">
+                        <label class="form-label">Project Name</label>
+                        <input class="form-control" @bind="editingProject.Name" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Labels (comma-separated)</label>
+                        <input class="form-control" @bind="editingProject.Labels" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Add Images</label>
+                        <InputFile OnChange="HandleFileUpload" multiple />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showEditModal = false">Cancel</button>
+                    <button class="btn btn-primary" @onclick="SaveProjectEdits">Save</button>
                 </div>
             </div>
         </div>
@@ -114,19 +150,63 @@ else
     </div>
 }
 
+@if (showExportModal)
+{
+    <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Export Options</h5>
+                    <button type="button" class="btn-close" @onclick="() => showExportModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Export Image Size</label>
+                        <select class="form-select" @bind="selectedImageSize">
+                            <option value="640">640 x 640</option>
+                            <option value="512">512 x 512</option>
+                            <option value="416">416 x 416</option>
+                            <option value="320">320 x 320</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Validation Ratio: @($"{selectedValidRatio:P0}")</label>
+                        <input type="range" class="form-range" min="0" max="100" step="5" @bind="sliderValue">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showExportModal = false">Cancel</button>
+                    <button class="btn btn-primary" @onclick="() => Export(exportProjectId)">Export</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private List<Project> projects = new();
     private string newProjectName = string.Empty;
     private string labelInput = string.Empty;
     private bool showCreateModal = false;
     private string errorMessage = string.Empty;
+    private string errorMessage2 = string.Empty;
     private string userId = string.Empty;
 
-    private List<IBrowserFile> uploadedFiles = new();
+    private List<IBrowserFile> createUploadedFiles = new();
 
     private bool showDeleteConfirm = false;
     private int projectToDeleteId = -1;
     private string projectToDeleteName = string.Empty;
+
+    private bool showExportModal = false;
+    private int exportProjectId;
+    private int selectedImageSize = 640;
+    private int sliderValue = 30; // percentage from 0 to 100
+    private float selectedValidRatio => sliderValue / 100f;
+
+    private bool showEditModal = false;
+    private Project editingProject = new();
+    private IBrowserFile[] editUploadedFiles = Array.Empty<IBrowserFile>();
 
     protected override async Task OnInitializedAsync()
     {
@@ -140,6 +220,11 @@ else
 
     private async Task CreateProject()
     {
+        if (string.IsNullOrWhiteSpace(newProjectName))
+        {
+            errorMessage = "Project name cannot be empty.";
+            return;
+        }
         if (projects.Any(p => p.Name == newProjectName))
         {
             errorMessage = "Project name already exists. Please choose a different name.";
@@ -157,7 +242,7 @@ else
                 Name = newProjectName,
                 Labels = labelInput,
                 CreatorUserId = userId,
-                ImageCount = uploadedFiles.Count
+                ImageCount = createUploadedFiles.Count
             };
 
         await ProjectService.CreateProject(project);
@@ -165,7 +250,7 @@ else
         var imagePath = Path.Combine(Env.WebRootPath, "datasets", newProjectName, "images");
         Directory.CreateDirectory(imagePath);
 
-        foreach (var file in uploadedFiles)
+        foreach (var file in createUploadedFiles)
         {
             var filePath = Path.Combine(imagePath, file.Name);
             await using var stream = new FileStream(filePath, FileMode.Create);
@@ -195,7 +280,7 @@ else
         labelInput = string.Empty;
         errorMessage = string.Empty;
         showCreateModal = false;
-        uploadedFiles.Clear();
+        createUploadedFiles.Clear();
 
         var updated = await ProjectService.GetUserProjects(userId);
         projects = updated.ToList();
@@ -233,7 +318,7 @@ else
 
     private void HandleImageUpload(InputFileChangeEventArgs e)
     {
-        uploadedFiles.Clear();
+        createUploadedFiles.Clear();
         var validExtensions = new[] { ".jpg", ".jpeg", ".png", ".bmp" };
         const long maxSize = 5 * 1024 * 1024; // 5MB
 
@@ -246,7 +331,7 @@ else
                 return;
             }
 
-            uploadedFiles.Add(file);
+            createUploadedFiles.Add(file);
         }
     }
 
@@ -268,5 +353,225 @@ else
         if (elapsed.TotalMinutes >= 1)
             return $"{(int)elapsed.TotalMinutes} minute(s) ago";
         return "just now";
+    }
+
+    private void OpenExportModal(int projectId)
+    {
+        exportProjectId = projectId;
+        showExportModal = true;
+    }
+
+    private async Task Export(int projectId)
+    {
+        showExportModal = false;
+
+        var exportsRoot = Path.Combine(Env.WebRootPath, "exports");
+        if (Directory.Exists(exportsRoot))
+        {
+            Directory.Delete(exportsRoot, recursive: true);
+        }
+        Directory.CreateDirectory(exportsRoot);
+
+        var project = await Db.Projects.Include(p => p.Images).FirstOrDefaultAsync(p => p.Id == projectId);
+        if (project == null || project.Images.Count == 0) return;
+
+        var baseDir = Path.Combine(exportsRoot, project.Name);
+        var trainImg = Path.Combine(baseDir, "train", "images");
+        var trainLbl = Path.Combine(baseDir, "train", "labels");
+        var validImg = Path.Combine(baseDir, "valid", "images");
+        var validLbl = Path.Combine(baseDir, "valid", "labels");
+
+        Directory.CreateDirectory(trainImg);
+        Directory.CreateDirectory(trainLbl);
+        Directory.CreateDirectory(validImg);
+        Directory.CreateDirectory(validLbl);
+
+        var random = new Random();
+        var images = project.Images.OrderBy(_ => random.Next()).ToList();
+        int splitIndex = (int)(images.Count * (1 - selectedValidRatio));
+        var train = images.Take(splitIndex).ToList();
+        var valid = images.Skip(splitIndex).ToList();
+
+        foreach (var image in train.Concat(valid))
+        {
+            var folderType = train.Contains(image) ? "train" : "valid";
+            var imgDest = Path.Combine(baseDir, folderType, "images", image.FileName);
+            var srcImg = Path.Combine(Env.WebRootPath, image.RelativePath);
+
+            if (File.Exists(srcImg))
+            {
+                using var img = SixLabors.ImageSharp.Image.Load<Rgba32>(srcImg);
+                img.Mutate(x => x.Resize(selectedImageSize, selectedImageSize));
+                await img.SaveAsJpegAsync(imgDest);
+            }
+
+            var labelPath = Path.Combine(baseDir, folderType, "labels", Path.ChangeExtension(image.FileName, ".txt"));
+            if (!string.IsNullOrWhiteSpace(image.LabelData))
+            {
+                var labelLines = new List<string>();
+                var labelList = project.Labels.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()).ToList();
+                var json = JsonDocument.Parse(image.LabelData);
+                foreach (var box in json.RootElement.EnumerateArray())
+                {
+                    var cls = labelList.IndexOf(box.GetProperty("label").GetString() ?? "");
+                    var xMin = box.GetProperty("x").GetDouble();
+                    var yMin = box.GetProperty("y").GetDouble();
+                    var width = box.GetProperty("w").GetDouble();
+                    var height = box.GetProperty("h").GetDouble();
+
+                    var x_center = (xMin + width / 2.0) / image.Width;
+                    var y_center = (yMin + height / 2.0) / image.Height;
+                    var w_norm = width / image.Width;
+                    var h_norm = height / image.Height;
+
+                    labelLines.Add($"{cls} {x_center:F6} {y_center:F6} {w_norm:F6} {h_norm:F6}");
+                }
+                await File.WriteAllLinesAsync(labelPath, labelLines);
+            }
+        }
+
+        var yamlPath = Path.Combine(baseDir, "data.yaml");
+        var yaml =
+            $"train: train/images\n" +
+            $"val: valid/images\n\n" +
+            $"nc: {project.Labels.Split(',', StringSplitOptions.RemoveEmptyEntries).Length}\n" +
+            $"names: [{string.Join(", ", project.Labels.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(x => $"'{x.Trim()}'"))}]\n\n" +
+            $"hklab:\n" +
+            $"  project: {project.Name.ToLower().Replace(" ", "-")}\n" +
+            $"  version: 1\n" +
+            $"  ratioOfValid: {selectedValidRatio}\n" +
+            $"  url: https://hawkai.hknu.ac.kr/projects/{projectId}\n";
+
+        await File.WriteAllTextAsync(yamlPath, yaml);
+
+        var zipPath = Path.Combine(Env.WebRootPath, "exports", $"{project.Name}_yolo_export.zip");
+        if (File.Exists(zipPath)) File.Delete(zipPath);
+        ZipFile.CreateFromDirectory(baseDir, zipPath);
+
+        var relativeZip = "/exports/" + Path.GetFileName(zipPath);
+        Navigation.NavigateTo(relativeZip, true);
+    }
+
+
+    private void OpenEditModal(Project project)
+    {
+        editingProject = new Project
+            {
+                Id = project.Id,
+                Name = project.Name,
+                Labels = project.Labels,
+                CreatorUserId = project.CreatorUserId,
+                CreatedAt = project.CreatedAt,
+                Images = project.Images.ToList()
+            };
+        showEditModal = true;
+    }
+
+    private void HandleFileUpload(InputFileChangeEventArgs e)
+    {
+        editUploadedFiles = e.GetMultipleFiles().ToArray();
+    }
+
+    private async Task SaveProjectEdits()
+    {
+        if (string.IsNullOrWhiteSpace(editingProject.Name))
+        {
+            errorMessage2 = "Project name cannot be empty.";
+            return;
+        }
+        if (Db.Projects.Any(p => p.Name == editingProject.Name && p.Id != editingProject.Id))
+        {
+            errorMessage2 = "Project name already exists. Please choose a different name.";
+            return;
+        }
+        var project = await Db.Projects.Include(p => p.Images).FirstOrDefaultAsync(p => p.Id == editingProject.Id);
+        if (project != null)
+        {
+            var oldProjectName = project.Name;
+            project.Name = editingProject.Name;
+            project.Labels = editingProject.Labels;
+
+            // If project name changed, rename folder and update paths
+            if (!string.Equals(oldProjectName, project.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                var oldFolder = Path.Combine(Env.WebRootPath, "datasets", oldProjectName);
+                var newFolder = Path.Combine(Env.WebRootPath, "datasets", project.Name);
+                if (Directory.Exists(oldFolder))
+                {
+                    Directory.Move(oldFolder, newFolder);
+                }
+
+                foreach (var img in project.Images)
+                {
+                    var fileName = Path.GetFileName(img.RelativePath);
+                    img.RelativePath = Path.Combine("datasets", project.Name, "images", fileName).Replace("\\", "/");
+                    Db.Images.Update(img);
+                }
+            }
+            project.ImageCount = project.Images.Count + editUploadedFiles.Length;
+            Db.Projects.Update(project);
+            await Db.SaveChangesAsync();
+
+            var uploadPath = Path.Combine(Env.WebRootPath, "datasets", project.Name, "images");
+            Directory.CreateDirectory(uploadPath);
+
+            foreach (var file in editUploadedFiles)
+            {
+                var fileName = Path.GetFileName(file.Name);
+                var savePath = Path.Combine(uploadPath, fileName);
+
+                var existingEntry = project.Images.FirstOrDefault(img => img.FileName == fileName);
+
+                if (File.Exists(savePath))
+                {
+                    var overwrite = await JS.InvokeAsync<bool>("confirm", $"The file '{fileName}' already exists. Overwrite?");
+                    if (!overwrite)
+                        continue;
+
+                    // 기존 이미지가 Labeled 상태였다면 annotated_images에서 삭제
+                    if (existingEntry != null && existingEntry.LabelStatus == "Labeled")
+                    {
+                        var annotatedPath = Path.Combine(Env.WebRootPath, "datasets", project.Name, "annotated_images", fileName);
+                        if (File.Exists(annotatedPath))
+                        {
+                            File.Delete(annotatedPath);
+                        }
+                    }
+                }
+
+                await using var stream = File.Create(savePath);
+                await file.OpenReadStream().CopyToAsync(stream);
+
+                using var imageInfo = await SixLabors.ImageSharp.Image.LoadAsync(file.OpenReadStream());
+                if (existingEntry != null)
+                {
+                    // 덮어쓰기: 기존 DB 정보 업데이트
+                    existingEntry.Width = imageInfo.Width;
+                    existingEntry.Height = imageInfo.Height;
+                    existingEntry.LabelStatus = "Unlabeled";
+                    existingEntry.LabelData = "{}";
+                    Db.Images.Update(existingEntry);
+                }
+                else
+                {
+                    // 새로 추가
+                    Db.Images.Add(new ImageEntry
+                        {
+                            ProjectId = project.Id,
+                            FileName = fileName,
+                            RelativePath = Path.Combine("datasets", project.Name, "images", fileName).Replace("\\", "/"),
+                            LabelStatus = "Unlabeled",
+                            Width = imageInfo.Width,
+                            Height = imageInfo.Height,
+                            UploadedByUserId = project.CreatorUserId
+                        });
+                }
+            }
+
+            await Db.SaveChangesAsync();
+        }
+
+        showEditModal = false;
+        await ProjectService.LoadProjects();
     }
 }
