@@ -28,6 +28,7 @@
   <ItemGroup>
     <Folder Include="Migrations\" />
     <Folder Include="wwwroot\cert\" />
+    <Folder Include="wwwroot\datasets\" />
   </ItemGroup>
 
 </Project>
