@@ -67,7 +67,7 @@ else
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Upload Images</label>
-                        <InputFile OnChange="HandleImageUpload" multiple />
+                        <InputFile OnChange="HandleImageUpload" multiple MaxFiles="500" />
                         @if (createUploadedFiles.Count > 0)
                         {
                             <ul>
@@ -116,7 +116,7 @@ else
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Add Images</label>
-                        <InputFile OnChange="HandleFileUpload" multiple />
+                        <InputFile OnChange="HandleFileUpload" multiple MaxFiles="500" />
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -322,7 +322,7 @@ else
         var validExtensions = new[] { ".jpg", ".jpeg", ".png", ".bmp" };
         const long maxSize = 5 * 1024 * 1024; // 5MB
 
-        foreach (var file in e.GetMultipleFiles())
+        foreach (var file in e.GetMultipleFiles(500))
         {
             var ext = Path.GetExtension(file.Name).ToLowerInvariant();
             if (!validExtensions.Contains(ext) || file.Size > maxSize)
@@ -469,7 +469,7 @@ else
 
     private void HandleFileUpload(InputFileChangeEventArgs e)
     {
-        editUploadedFiles = e.GetMultipleFiles().ToArray();
+        editUploadedFiles = e.GetMultipleFiles(500).ToArray();
     }
 
     private async Task SaveProjectEdits()

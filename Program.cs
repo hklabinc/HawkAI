@@ -16,6 +16,7 @@ using HawkAI.Hubs;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.AspNetCore.Http.Features;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -74,6 +75,18 @@ builder.Services.AddSignalR(hubOptions =>
     hubOptions.MaximumReceiveMessageSize = 100000000;       // 제한 풀려면 null로 셋팅?
 });
 
+
+/************ 업로드 파일 크기 제한 해제 관련 설정 ************/
+builder.Services.AddServerSideBlazor()
+    .AddHubOptions(options =>
+    {
+        options.MaximumReceiveMessageSize = 1024 * 1024 * 100; // 100MB 등 충분히 크게
+    });
+
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 1024 * 1024 * 100; // 100MB 이상
+});
 
 
 /************ MQTT 관련 ************/
