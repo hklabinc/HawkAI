@@ -97,6 +97,11 @@ builder.Services.AddHostedService<HostedMqttHub>();
 /*  Web API Controller 사용을 위해 */
 builder.Services.AddControllers(); // API controller 활성화
 
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = 500 * 1024 * 1024; // 500MB
+});
+
 /************ 포트 번호 변경 관련 ************/
 // Add for external access
 builder.WebHost.UseUrls("http://*:8080;https://*:8081");
