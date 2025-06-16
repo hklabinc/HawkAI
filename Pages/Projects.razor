@@ -38,6 +38,10 @@ else
                 <div class="card-body">
                     <h5 class="card-title"><strong>@p.Name</strong> <span class="text-muted" style="font-size: 1rem;">(@p.Images.Count images)</span></h5>
                     <p class="card-text">Labels: @p.Labels</p>
+                    @if (isAdmin)
+                    {
+                        <p class="card-text text-muted" style="font-size: 0.85rem;">Created by: @p.CreatorUserId</p>
+                    }
                     <button class="btn btn-sm btn-info" @onclick="() => OpenEditModal(p)">Edit</button>
                     <button class="btn btn-sm btn-danger" @onclick="() => PromptDelete(p.Id, p.Name)">Delete</button>
                     <button class="btn btn-sm btn-outline-primary ms-2" @onclick="() => OpenExportModal(p.Id)">Export</button>
@@ -207,15 +211,23 @@ else
     private bool showEditModal = false;
     private Project editingProject = new();
     private IBrowserFile[] editUploadedFiles = Array.Empty<IBrowserFile>();
+    private bool isAdmin = false;
 
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
         userId = user.Identity?.Name ?? "unknown";
+        isAdmin = user.IsInRole("Admin");
 
-        var result = await ProjectService.GetUserProjects(userId);
-        projects = result.ToList();
+        if (user.IsInRole("Admin"))
+        {
+            projects = (await ProjectService.GetAllProjects()).ToList();
+        }
+        else
+        {
+            projects = (await ProjectService.GetUserProjects(userId)).ToList();
+        }
     }
 
     private async Task CreateProject()
