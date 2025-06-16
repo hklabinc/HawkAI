@@ -94,6 +94,8 @@ builder.Services.AddSingleton<MqttFactory>();
 builder.Services.AddScoped<IMqttHub, MqttHub>();
 builder.Services.AddHostedService<HostedMqttHub>();
 
+/*  Web API Controller 사용을 위해 */
+builder.Services.AddControllers(); // API controller 활성화
 
 /************ 포트 번호 변경 관련 ************/
 // Add for external access
