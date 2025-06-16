@@ -267,7 +267,7 @@
             redraw();
             const tempW = moveX - startX;
             const tempH = moveY - startY;
-            ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+            ctx.strokeStyle = 'yellow';
             ctx.setLineDash([5, 3]);
             ctx.lineWidth = 1;
             ctx.strokeRect(startX, startY, tempW, tempH);
