@@ -6,6 +6,8 @@
     let selectedBoxIndex = -1; // ✅ 선택된 박스 인덱스
     let draggingHandle = null;
     let startX, startY, isDrawing = false;
+    let lastMouseX = null;
+    let lastMouseY = null;
 
     const HANDLE_SIZE = 8;
     const canvas = document.getElementById('labelCanvas');
@@ -54,30 +56,52 @@
         for (let i = boxes.length - 1; i >= 0; i--) {
             const box = boxes[i];
             const handles = getHandles(box);
+
+            // ✅ 1. 핸들 클릭 (모서리 핸들)
             for (const [key, { x, y }] of Object.entries(handles)) {
                 const dx = clickX - (x * canvas.clientWidth / img.naturalWidth);
                 const dy = clickY - (y * canvas.clientHeight / img.naturalHeight);
                 if (Math.abs(dx) < HANDLE_SIZE && Math.abs(dy) < HANDLE_SIZE) {
                     selectedBoxIndex = i;
                     draggingHandle = key;
+
+                    // ✅ 마우스 현재 좌표 저장 (정밀한 이동 계산용)
+                    lastMouseX = e.offsetX;
+                    lastMouseY = e.offsetY;
+                    redraw();  // ✅ 선택되면 redraw
                     return;
                 }
             }
 
-            const textWidth = ctx.measureText(box.label).width;
-            const textHeight = 16; // 기본 폰트 크기
-            if (px >= box.x && px <= box.x + box.w && py >= box.y && py <= box.y + box.h) {
+            // ✅ 2. 박스 테두리 선 클릭
+            const sx = box.x * canvas.clientWidth / img.naturalWidth;
+            const sy = box.y * canvas.clientHeight / img.naturalHeight;
+            const sw = box.w * canvas.clientWidth / img.naturalWidth;
+            const sh = box.h * canvas.clientHeight / img.naturalHeight;
+
+            const margin = 5;
+
+            const onLeftEdge = Math.abs(clickX - sx) < margin && clickY >= sy && clickY <= sy + sh;
+            const onRightEdge = Math.abs(clickX - (sx + sw)) < margin && clickY >= sy && clickY <= sy + sh;
+            const onTopEdge = Math.abs(clickY - sy) < margin && clickX >= sx && clickX <= sx + sw;
+            const onBottomEdge = Math.abs(clickY - (sy + sh)) < margin && clickX >= sx && clickX <= sx + sw;
+
+            if (onLeftEdge || onRightEdge || onTopEdge || onBottomEdge) {
                 selectedBoxIndex = i;
                 redraw();
                 return;
             }
-            else if (px >= box.x && px <= box.x + textWidth && py >= box.y - textHeight && py <= box.y) {
+
+            // ✅ 3. 라벨 텍스트 클릭 시 라벨 변경만
+            const textWidth = ctx.measureText(box.label).width;
+            const textHeight = 16;
+            if (px >= box.x && px <= box.x + textWidth &&
+                py >= box.y - textHeight && py <= box.y) {
                 const labelSelector = document.getElementById('labelSelector');
                 const options = Array.from(labelSelector.options);
                 const currentIndex = options.findIndex(opt => opt.value === box.label);
                 const nextIndex = (currentIndex + 1) % options.length;
                 box.label = options[nextIndex].value;
-
                 redraw();
                 return;
             }
@@ -104,11 +128,21 @@
         const label = document.getElementById('labelSelector').value;
         const { scaleX, scaleY } = getScaleFactors();
 
+        let x1 = startX * scaleX;
+        let y1 = startY * scaleY;
+        let x2 = endX * scaleX;
+        let y2 = endY * scaleY;
+
+        let boxX = Math.round(Math.min(x1, x2));
+        let boxY = Math.round(Math.min(y1, y2));
+        let boxW = Math.round(Math.abs(x2 - x1));
+        let boxH = Math.round(Math.abs(y2 - y1));
+
         const correctedBox = {
-            x: Math.round(startX * scaleX),
-            y: Math.round(startY * scaleY),
-            w: Math.round((endX - startX) * scaleX),
-            h: Math.round((endY - startY) * scaleY),
+            x: boxX,
+            y: boxY,
+            w: boxW,
+            h: boxH,
             label
         };
 
@@ -121,7 +155,6 @@
         }
     });
 
-    const round6 = (v) => parseFloat(v.toFixed(6));
 
     canvas.addEventListener('mousemove', (e) => {
         const moveX = e.offsetX;
@@ -132,7 +165,41 @@
         const px = moveX * invX;
         const py = moveY * invY;
 
-        // ✅ 1. 라벨 텍스트 영역 위에 있는지 모든 박스에 대해 확인
+        // ✅ 1. 핸들 위에 있는지 먼저 확인 (우선 적용)
+        let hoveredHandle = null;
+        if (selectedBoxIndex !== -1) {
+            const box = boxes[selectedBoxIndex];
+            const handles = getHandles(box);
+            for (const [key, { x, y }] of Object.entries(handles)) {
+                const hx = x * canvas.clientWidth / img.naturalWidth;
+                const hy = y * canvas.clientHeight / img.naturalHeight;
+                if (Math.abs(moveX - hx) < HANDLE_SIZE && Math.abs(moveY - hy) < HANDLE_SIZE) {
+                    hoveredHandle = key;
+
+                    // 커서 설정 후 즉시 return
+                    switch (hoveredHandle) {
+                        case 'tl':
+                        case 'br':
+                            canvas.style.cursor = 'nwse-resize';
+                            return;
+                        case 'tr':
+                        case 'bl':
+                            canvas.style.cursor = 'nesw-resize';
+                            return;
+                        case 'tm':
+                        case 'bm':
+                            canvas.style.cursor = 'ns-resize';
+                            return;
+                        case 'ml':
+                        case 'mr':
+                            canvas.style.cursor = 'ew-resize';
+                            return;
+                    }
+                }
+            }
+        }
+
+        // ✅ 2. 라벨 텍스트 위에 있는지 확인
         for (let i = boxes.length - 1; i >= 0; i--) {
             const box = boxes[i];
             const textWidth = ctx.measureText(box.label).width;
@@ -145,65 +212,56 @@
             }
         }
 
-        // ✅ 2. 핸들 위에 있는지 확인하고 커서 변경
-        let hoveredHandle = null;
-        if (selectedBoxIndex !== -1) {
-            const box = boxes[selectedBoxIndex];
-            const handles = getHandles(box);
-            for (const [key, { x, y }] of Object.entries(handles)) {
-                const hx = x * canvas.clientWidth / img.naturalWidth;
-                const hy = y * canvas.clientHeight / img.naturalHeight;
-                if (Math.abs(moveX - hx) < HANDLE_SIZE && Math.abs(moveY - hy) < HANDLE_SIZE) {
-                    hoveredHandle = key;
-                    break;
-                }
+        // ✅ 3. 박스 테두리 선 위에 있는지 확인
+        const margin = 5;
+        for (let i = boxes.length - 1; i >= 0; i--) {
+            const box = boxes[i];
+            const sx = box.x * canvas.clientWidth / img.naturalWidth;
+            const sy = box.y * canvas.clientHeight / img.naturalHeight;
+            const sw = box.w * canvas.clientWidth / img.naturalWidth;
+            const sh = box.h * canvas.clientHeight / img.naturalHeight;
+
+            const onLeftEdge = Math.abs(moveX - sx) < margin && moveY >= sy && moveY <= sy + sh;
+            const onRightEdge = Math.abs(moveX - (sx + sw)) < margin && moveY >= sy && moveY <= sy + sh;
+            const onTopEdge = Math.abs(moveY - sy) < margin && moveX >= sx && moveX <= sx + sw;
+            const onBottomEdge = Math.abs(moveY - (sy + sh)) < margin && moveX >= sx && moveX <= sx + sw;
+
+            if (onLeftEdge || onRightEdge || onTopEdge || onBottomEdge) {
+                canvas.style.cursor = 'pointer';
+                return;
             }
         }
 
-        // ✅ 커서 모양 지정
-        switch (hoveredHandle) {
-            case 'tl':
-            case 'br':
-                canvas.style.cursor = 'nwse-resize';
-                break;
-            case 'tr':
-            case 'bl':
-                canvas.style.cursor = 'nesw-resize';
-                break;
-            case 'tm':
-            case 'bm':
-                canvas.style.cursor = 'ns-resize';
-                break;
-            case 'ml':
-            case 'mr':
-                canvas.style.cursor = 'ew-resize';
-                break;
-            default:
-                canvas.style.cursor = isDrawing ? 'crosshair' : 'default';
-                break;
-        }
+        // ✅ 4. 기본 커서
+        canvas.style.cursor = isDrawing ? 'crosshair' : 'default';
 
-
+        // ✅ 박스 핸들 드래그 중일 때
         if (draggingHandle && selectedBoxIndex !== -1) {
             const { scaleX, scaleY } = getScaleFactors();
             const box = boxes[selectedBoxIndex];
-            const newX = moveX * scaleX;
-            const newY = moveY * scaleY;
+
+            // 마우스 이동량만큼만 반영
+            const deltaX = (moveX - lastMouseX) * scaleX;
+            const deltaY = (moveY - lastMouseY) * scaleY;
 
             switch (draggingHandle) {
-                case 'tl': box.w += box.x - newX; box.h += box.y - newY; box.x = newX; box.y = newY; break;
-                case 'tr': box.w = newX - box.x; box.h += box.y - newY; box.y = newY; break;
-                case 'bl': box.w += box.x - newX; box.x = newX; box.h = newY - box.y; break;
-                case 'br': box.w = newX - box.x; box.h = newY - box.y; break;
-                case 'tm': box.h += box.y - newY; box.y = newY; break;
-                case 'bm': box.h = newY - box.y; break;
-                case 'ml': box.w += box.x - newX; box.x = newX; break;
-                case 'mr': box.w = newX - box.x; break;
+                case 'tl': box.x += deltaX; box.y += deltaY; box.w -= deltaX; box.h -= deltaY; break;
+                case 'tr': box.y += deltaY; box.w += deltaX; box.h -= deltaY; break;
+                case 'bl': box.x += deltaX; box.w -= deltaX; box.h += deltaY; break;
+                case 'br': box.w += deltaX; box.h += deltaY; break;
+                case 'tm': box.y += deltaY; box.h -= deltaY; break;
+                case 'bm': box.h += deltaY; break;
+                case 'ml': box.x += deltaX; box.w -= deltaX; break;
+                case 'mr': box.w += deltaX; break;
             }
-            box.x = round6(box.x);
-            box.y = round6(box.y);
-            box.w = round6(box.w);
-            box.h = round6(box.h);
+
+            // 최소 크기 제어
+            if (box.w < 1) box.w = 1;
+            if (box.h < 1) box.h = 1;
+
+            lastMouseX = moveX;
+            lastMouseY = moveY;
+
             redraw();
         } else if (isDrawing) {
             redraw();
@@ -216,6 +274,7 @@
             ctx.setLineDash([]);
         }
     });
+
 
     // ✅ Delete 키 이벤트 등록
     document.addEventListener('keydown', (e) => {
@@ -291,7 +350,15 @@
     };
 
     window.saveLabelData = () => {
-        const json = JSON.stringify(boxes);
+        const cleanBoxes = boxes.map(box => ({
+            x: parseFloat(box.x.toFixed(2)),
+            y: parseFloat(box.y.toFixed(2)),
+            w: parseFloat(box.w.toFixed(2)),
+            h: parseFloat(box.h.toFixed(2)),
+            label: box.label
+        }));
+
+        const json = JSON.stringify(cleanBoxes);
         window.dotNetHelper.invokeMethodAsync('SaveLabelWrapper', json);
     };
 
