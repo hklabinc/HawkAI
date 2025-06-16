@@ -85,7 +85,8 @@ builder.Services.AddServerSideBlazor()
 
 builder.Services.Configure<FormOptions>(options =>
 {
-    options.MultipartBodyLengthLimit = 1024 * 1024 * 100; // 100MB 이상
+    options.ValueCountLimit = 10000; // 기본은 1024 → 넉넉하게 증가
+    options.MultipartBodyLengthLimit = 1024L * 1024L * 1024L; // 선택: 1GB 제한
 });
 
 
