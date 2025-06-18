@@ -72,6 +72,107 @@ namespace HawkAI.Controllers
             await _db.SaveChangesAsync();
             return Ok("Project created and images uploaded successfully.");
         }
+
+
+        [HttpPost("fullupload")]
+        public async Task<IActionResult> UploadFullProject()
+        {
+            var form = await Request.ReadFormAsync();
+
+            var name = form["Name"].ToString();
+            var labels = form["Labels"].ToString();
+            var userId = form["CreatorUserId"].ToString();
+            var files = form.Files;
+
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(labels))
+                return BadRequest("Project name and labels are required.");
+
+            if (files.Count == 0)
+                return BadRequest("No files uploaded.");
+
+            if (_db.Projects.Any(p => p.Name == name))
+                return BadRequest("A project with this name already exists.");
+
+            // Create project
+            var project = new Project
+            {
+                Name = name,
+                Labels = labels,
+                CreatorUserId = userId,
+                CreatedAt = DateTime.Now
+            };
+            _db.Projects.Add(project);
+            await _db.SaveChangesAsync();
+
+            // Directory setup
+            var rootPath = Path.Combine(_env.WebRootPath, "datasets", name);
+            var imagesPath = Path.Combine(rootPath, "images");
+            var annotatedPath = Path.Combine(rootPath, "images_annotated");
+            var labelsPath = Path.Combine(rootPath, "labels");
+
+            Directory.CreateDirectory(imagesPath);
+            Directory.CreateDirectory(annotatedPath);
+            Directory.CreateDirectory(labelsPath);
+
+            var imageEntries = new Dictionary<string, ImageEntry>();
+
+            foreach (var file in files)
+            {
+                var fileName = file.FileName;
+                var ext = Path.GetExtension(fileName).ToLower();
+                var nameWithoutExt = Path.GetFileNameWithoutExtension(fileName);
+                var targetFolder = file.Name switch
+                {
+                    "Files" => imagesPath,
+                    "AnnotatedFiles" => annotatedPath,
+                    "LabelTexts" => labelsPath,
+                    _ => null
+                };
+
+                if (targetFolder == null) continue;
+
+                var fullPath = Path.Combine(targetFolder, fileName);
+                await using var stream = new FileStream(fullPath, FileMode.Create);
+                await file.CopyToAsync(stream);
+
+                // 원본 이미지 정보 저장
+                if (file.Name == "Files")
+                {
+                    using var image = await SixLabors.ImageSharp.Image.LoadAsync(file.OpenReadStream());
+                    var entry = new ImageEntry
+                    {
+                        ProjectId = project.Id,
+                        FileName = fileName,
+                        RelativePath = Path.Combine("datasets", name, "images", fileName).Replace("\\", "/"),
+                        UploadedAt = DateTime.Now,
+                        UploadedByUserId = userId,
+                        Width = image.Width,
+                        Height = image.Height,
+                        LabelStatus = "Unlabeled",
+                        LabelData = "{}"
+                    };
+                    _db.Images.Add(entry);
+                    imageEntries[nameWithoutExt] = entry;
+                }
+            }
+
+            // .txt 파일에서 레이블 데이터를 읽어 ImageEntry에 반영
+            foreach (var file in files.Where(f => f.Name == "LabelTexts"))
+            {
+                var txtFileName = Path.GetFileNameWithoutExtension(file.FileName); // 예: abc123
+                var labelText = await new StreamReader(file.OpenReadStream()).ReadToEndAsync();
+
+                if (imageEntries.TryGetValue(txtFileName, out var imageEntry))
+                {
+                    imageEntry.LabelData = labelText;
+                    imageEntry.LabelStatus = "Labeled";
+                }
+            }
+
+            await _db.SaveChangesAsync();
+            return Ok("Project uploaded with images, annotations, and labels.");
+        }
+
     }
 
     public class ProjectUploadRequest
