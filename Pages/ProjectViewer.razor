@@ -76,7 +76,7 @@
         var folder = System.IO.Path.GetDirectoryName(image.RelativePath) ?? "";
         var filename = System.IO.Path.GetFileName(image.RelativePath);
         var annotatedPath = image.LabelStatus == "Labeled"
-            ? folder.Replace("images", "annotated_images")
+            ? folder.Replace("images", "images_annotated")
             : folder;
 
         return "/" + System.IO.Path.Combine(annotatedPath, filename).Replace("\\", "/") + $"?t={DateTime.UtcNow.Ticks}";    // ✅ 캐시 방지용 timestamp 추가
@@ -95,7 +95,7 @@
         var sourcePath = System.IO.Path.Combine(Env.WebRootPath, image.RelativePath);        
         var imagesFolder = System.IO.Path.GetDirectoryName(sourcePath)!;
         var parentFolder = System.IO.Path.GetDirectoryName(imagesFolder)!;
-        var annotatedFolder = System.IO.Path.Combine(parentFolder, "annotated_images");
+        var annotatedFolder = System.IO.Path.Combine(parentFolder, "images_annotated");
         var annotatedPath = System.IO.Path.Combine(annotatedFolder, image.FileName);
 
         try
@@ -166,7 +166,7 @@
             var sourcePath = System.IO.Path.Combine(Env.WebRootPath, image.RelativePath);
             var imagesFolder = System.IO.Path.GetDirectoryName(sourcePath)!;
             var parentFolder = System.IO.Path.GetDirectoryName(imagesFolder)!;
-            var annotatedFolder = System.IO.Path.Combine(parentFolder, "annotated_images");
+            var annotatedFolder = System.IO.Path.Combine(parentFolder, "images_annotated");
             var annotatedPath = System.IO.Path.Combine(annotatedFolder, image.FileName);
 
             // 원본 이미지 삭제

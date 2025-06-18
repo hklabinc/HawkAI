@@ -15,7 +15,7 @@
             </NavLink>
         </div>       
 
-        <AuthorizeView Roles="Admin,Normal">
+        <AuthorizeView Roles="Admin">
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="dashboard">
                     <span class="oi oi-dashboard" aria-hidden="true"></span> Dashboard
@@ -36,6 +36,8 @@
                     <span class="oi oi-video" aria-hidden="true"></span> Video
                 </NavLink>
             </div>
+        </AuthorizeView>
+        <AuthorizeView Roles="Admin,Normal">
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="projects">
                     <span class="oi oi-folder" aria-hidden="true"></span> Projects
@@ -45,7 +47,7 @@
         
         <hr class="my-hr1"/>
 
-        <AuthorizeView Roles="Admin,Normal">
+        <AuthorizeView Roles="Admin">
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="https://ictrobot.hknu.ac.kr:8089">
                     <span class="oi oi-play-circle" aria-hidden="true"></span> WebRTC
@@ -61,44 +63,44 @@
             </div>
         </AuthorizeView>
         
+        <AuthorizeView Roles="Admin">
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="/test/opencv">
+                    <span class="oi oi-bug" aria-hidden="true"></span> OpenCV
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="/test/motion_detection">
+                    <span class="oi oi-bug" aria-hidden="true"></span> Motion Detection
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="/test/chat">
+                    <span class="oi oi-chat" aria-hidden="true"></span> SignalR Chat
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="/test/mqtt">
+                    <span class="oi oi-link-intact" aria-hidden="true"></span> MQTT Test
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="/test/fcm">
+                    <span class="oi oi-bell" aria-hidden="true"></span> FCM Test
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="/test/webcam">
+                    <span class="oi oi-play-circle" aria-hidden="true"></span> WebCam
+                </NavLink>
+            </div>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="/test/opencv">
-                <span class="oi oi-bug" aria-hidden="true"></span> OpenCV
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="/test/motion_detection">
-                <span class="oi oi-bug" aria-hidden="true"></span> Motion Detection
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="/test/chat">
-                <span class="oi oi-chat" aria-hidden="true"></span> SignalR Chat
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="/test/mqtt">
-                <span class="oi oi-link-intact" aria-hidden="true"></span> MQTT Test
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="/test/fcm">
-                <span class="oi oi-bell" aria-hidden="true"></span> FCM Test
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="/test/webcam">
-                <span class="oi oi-play-circle" aria-hidden="true"></span> WebCam
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="/example/webgl">
-                <span class="oi oi-plus" aria-hidden="true"></span> WebGL
-            </NavLink>
-        </div>
-
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="/example/webgl">
+                    <span class="oi oi-plus" aria-hidden="true"></span> WebGL
+                </NavLink>
+            </div>
+        </AuthorizeView>
 
         <hr class="my-hr1"/>
 

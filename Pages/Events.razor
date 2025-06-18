@@ -1,5 +1,5 @@
 ﻿@page "/events"
-@attribute [Authorize(Roles = "Admin,Normal")]
+@attribute [Authorize(Roles = "Admin")]
 @inject IEventService EventService
 @inject IJSRuntime _jsRuntime
 @*@inject NavigationManager NavigationManager*@

@@ -540,10 +540,10 @@ else
                     if (!overwrite)
                         continue;
 
-                    // 기존 이미지가 Labeled 상태였다면 annotated_images에서 삭제
+                    // 기존 이미지가 Labeled 상태였다면 images_annotated에서 삭제
                     if (existingEntry != null && existingEntry.LabelStatus == "Labeled")
                     {
-                        var annotatedPath = Path.Combine(Env.WebRootPath, "datasets", project.Name, "annotated_images", fileName);
+                        var annotatedPath = Path.Combine(Env.WebRootPath, "datasets", project.Name, "images_annotated", fileName);
                         if (File.Exists(annotatedPath))
                         {
                             File.Delete(annotatedPath);
