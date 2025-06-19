@@ -15,7 +15,10 @@
 
 <h3>Project Manager</h3>
 
-<button @onclick="() => showCreateModal = true" class="btn btn-primary mb-3">+ Create New Project</button>
+<div class="d-flex gap-2 mb-3">
+    <button @onclick="() => showCreateModal = true" class="btn btn-primary">+ Create New Project</button>
+    <button class="btn btn-outline-success" @onclick="PrepareMerge">🔀 Project Merge</button>
+</div>
 
 @if (projects == null)
 {
@@ -36,15 +39,29 @@ else
                     <img src="@("/" + p.Images.First().RelativePath)" class="card-img-top" style="height: 180px; object-fit: cover; cursor: pointer;" @onclick="() => OpenProject(p.Id)" />
                 }
                 <div class="card-body">
-                    <h5 class="card-title"><strong>@p.Name</strong> <span class="text-muted" style="font-size: 1rem;">(@p.Images.Count images)</span></h5>
+                    <h5 class="card-title">
+                        <strong>@p.Name</strong>
+                        <span class="text-muted" style="font-size: 1rem;">(@p.Images.Count images)</span>
+                    </h5>
                     <p class="card-text">Labels: @p.Labels</p>
                     @if (isAdmin)
                     {
-                        <p class="card-text text-muted" style="font-size: 0.85rem;">Created by: @p.CreatorUserId</p>
+                        <p class="card-text text-muted" style="font-size: 0.85rem;">
+                            Created @GetRelativeTime(p.CreatedAt) by @p.CreatorUserId
+                        </p>
                     }
-                    <button class="btn btn-sm btn-info" @onclick="() => OpenEditModal(p)">Edit</button>
-                    <button class="btn btn-sm btn-danger" @onclick="() => PromptDelete(p.Id, p.Name)">Delete</button>
-                    <button class="btn btn-sm btn-outline-primary ms-2" @onclick="() => OpenExportModal(p.Id)">Export</button>
+
+                    <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-info" @onclick="() => OpenEditModal(p)">Edit</button>
+                            <button class="btn btn-sm btn-danger" @onclick="() => PromptDelete(p.Id, p.Name)">Delete</button>
+                            <button class="btn btn-sm btn-outline-primary ms-2" @onclick="() => OpenExportModal(p.Id)">Export</button>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" @bind="p.IsSelectedForMerge" class="form-check-input me-1" id="mergeCheck_@p.Id" />
+                            <label class="form-check-label" for="mergeCheck_@p.Id">Merge</label>
+                        </div>
+                    </div>
                 </div>
             </div>
         }
@@ -132,6 +149,34 @@ else
     </div>
 }
 
+@if (showMergeModal)
+{
+    <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Merge Selected Projects</h5>
+                    <button type="button" class="btn-close" @onclick="() => showMergeModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Merged Project Name</label>
+                        <input class="form-control" @bind="mergeProjectName" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Labels (merged)</label>
+                        <textarea class="form-control" rows="3" readonly>@mergeLabels</textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showMergeModal = false">Cancel</button>
+                    <button class="btn btn-primary" @onclick="ExecuteMerge">Merge</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @if (showDeleteConfirm)
 {
     <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
@@ -188,7 +233,7 @@ else
 }
 
 @code {
-    private List<Project> projects = new();
+    private List<ProjectViewModel> projects = new();
     private string newProjectName = string.Empty;
     private string labelInput = string.Empty;
     private bool showCreateModal = false;
@@ -213,6 +258,11 @@ else
     private IBrowserFile[] editUploadedFiles = Array.Empty<IBrowserFile>();
     private bool isAdmin = false;
 
+    private bool showMergeModal = false;
+    private string mergeProjectName = string.Empty;
+    private string mergeLabels = string.Empty;
+
+
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
@@ -220,14 +270,22 @@ else
         userId = user.Identity?.Name ?? "unknown";
         isAdmin = user.IsInRole("Admin");
 
-        if (user.IsInRole("Admin"))
-        {
-            projects = (await ProjectService.GetAllProjects()).ToList();
-        }
-        else
-        {
-            projects = (await ProjectService.GetUserProjects(userId)).ToList();
-        }
+        var rawProjects = isAdmin
+            ? await ProjectService.GetAllProjects()
+            : await ProjectService.GetUserProjects(userId);
+
+        // ✅ ViewModel로 변환
+        projects = rawProjects.Select(p => new ProjectViewModel
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Labels = p.Labels,
+                CreatorUserId = p.CreatorUserId,
+                CreatedAt = p.CreatedAt,
+                ImageCount = p.ImageCount,
+                Images = p.Images,
+                IsSelectedForMerge = false
+            }).ToList();
     }
 
     private async Task CreateProject()
@@ -295,7 +353,17 @@ else
         createUploadedFiles.Clear();
 
         var updated = await ProjectService.GetUserProjects(userId);
-        projects = updated.ToList();
+        projects = updated.Select(p => new ProjectViewModel
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Labels = p.Labels,
+                CreatorUserId = p.CreatorUserId,
+                CreatedAt = p.CreatedAt,
+                ImageCount = p.ImageCount,
+                Images = p.Images,
+                IsSelectedForMerge = false
+            }).ToList();
     }
 
     private async Task ConfirmDelete()
@@ -312,8 +380,20 @@ else
         if (Directory.Exists(path)) Directory.Delete(path, true);
 
         showDeleteConfirm = false;
-        var result = await ProjectService.GetUserProjects(userId);
-        projects = result.ToList();
+        var result = isAdmin
+            ? await ProjectService.GetAllProjects()
+            : await ProjectService.GetUserProjects(userId);
+        projects = result.Select(p => new ProjectViewModel
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Labels = p.Labels,
+                CreatorUserId = p.CreatorUserId,
+                CreatedAt = p.CreatedAt,
+                ImageCount = p.ImageCount,
+                Images = p.Images,
+                IsSelectedForMerge = false
+            }).ToList();
     }
 
     private void PromptDelete(int id, string name)
@@ -586,4 +666,167 @@ else
         showEditModal = false;
         await ProjectService.LoadProjects();
     }
+
+
+    private void PrepareMerge()
+    {
+        var selected = projects.Where(p => p.IsSelectedForMerge).ToList();        
+        if (selected.Count <= 1)
+        {
+            JS.InvokeVoidAsync("alert", "⚠️ Please select at least two projects to merge.");
+            return;
+        }
+
+        var baseNames = selected.Select(p => p.Name).ToList();
+        mergeProjectName = string.Join("-", baseNames);
+
+        var labelSet = new HashSet<string>();
+        foreach (var proj in selected)
+        {
+            var labels = proj.Labels.Split(',', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var l in labels) labelSet.Add(l.Trim());
+        }
+        mergeLabels = string.Join(", ", labelSet);
+        showMergeModal = true;
+    }
+
+    private async Task ExecuteMerge()
+    {
+        // ✅ 1. ViewModel에서 선택된 프로젝트 확인
+        var selectedProjectVMs = projects.Where(p => p.IsSelectedForMerge).ToList();        
+
+        // ✅ 2. 이름 중복 확인
+        if (Db.Projects.Any(p => p.Name == mergeProjectName))
+        {
+            await JS.InvokeVoidAsync("alert", $"❌ A project named '{mergeProjectName}' already exists. Please choose a different name.");
+            return;
+        }
+
+        // ✅ 3. 새 프로젝트 생성
+        var newProj = new Project
+            {
+                Name = mergeProjectName,
+                Labels = mergeLabels,
+                CreatorUserId = userId,
+                ImageCount = 0
+            };
+        await ProjectService.CreateProject(newProj);
+
+        // ✅ 4. 폴더 준비
+        var newDir = Path.Combine(Env.WebRootPath, "datasets", newProj.Name);
+        var imgDir = Path.Combine(newDir, "images");
+        var lblDir = Path.Combine(newDir, "labels");
+        var annDir = Path.Combine(newDir, "images_annotated");
+        Directory.CreateDirectory(imgDir);
+        Directory.CreateDirectory(lblDir);
+        Directory.CreateDirectory(annDir);
+
+        // ✅ 5. 중복 제거용 Set
+        var addedFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var skippedFiles = new List<string>();
+
+        // ✅ 6. 실제 Project 목록 조회
+        var allProjects = await ProjectService.GetUserProjects(userId);
+        var selectedProjects = allProjects
+            .Where(p => selectedProjectVMs.Any(vm => vm.Id == p.Id))
+            .ToList();
+
+        foreach (var proj in selectedProjects)
+        {
+            var imageEntries = await Db.Images.Where(img => img.ProjectId == proj.Id).ToListAsync();
+            foreach (var entry in imageEntries)
+            {
+                if (!addedFileNames.Add(entry.FileName))
+                {
+                    skippedFiles.Add(entry.FileName);
+                    continue;
+                }
+
+                // 이미지 복사
+                var src = Path.Combine(Env.WebRootPath, entry.RelativePath);
+                var dest = Path.Combine(imgDir, entry.FileName);
+                if (File.Exists(src))
+                    File.Copy(src, dest, overwrite: false);
+
+                // DB에 이미지 추가
+                var newEntry = new ImageEntry
+                    {
+                        ProjectId = newProj.Id,
+                        FileName = entry.FileName,
+                        RelativePath = $"datasets/{newProj.Name}/images/{entry.FileName}",
+                        UploadedAt = DateTime.Now,
+                        UploadedByUserId = userId,
+                        Width = entry.Width,
+                        Height = entry.Height,
+                        LabelStatus = entry.LabelStatus,
+                        LabelData = entry.LabelData
+                    };
+                Db.Images.Add(newEntry);
+
+                // 라벨 파일 복사
+                var labelSrc = Path.Combine(Env.WebRootPath, "datasets", proj.Name, "labels", Path.ChangeExtension(entry.FileName, ".txt"));
+                var labelDest = Path.Combine(lblDir, Path.GetFileName(labelSrc));
+                if (File.Exists(labelSrc))
+                    File.Copy(labelSrc, labelDest, overwrite: false);
+
+                // annotated 이미지 복사
+                var annSrc = Path.Combine(Env.WebRootPath, "datasets", proj.Name, "images_annotated", entry.FileName);
+                var annDest = Path.Combine(annDir, entry.FileName);
+                if (File.Exists(annSrc))
+                    File.Copy(annSrc, annDest, overwrite: false);
+            }
+        }
+
+        // ✅ 7. 이미지 수 업데이트
+        newProj.ImageCount = addedFileNames.Count;
+        Db.Projects.Update(newProj);
+        await Db.SaveChangesAsync();
+
+        // ✅ 8. 병합 후 상태 업데이트
+        showMergeModal = false;
+        var updated = await ProjectService.GetUserProjects(userId);
+        projects = updated.Select(p => new ProjectViewModel
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Labels = p.Labels,
+                CreatorUserId = p.CreatorUserId,
+                CreatedAt = p.CreatedAt,
+                ImageCount = p.ImageCount,
+                Images = p.Images,
+                IsSelectedForMerge = false
+            }).ToList();
+
+        // ✅ 9. 중복된 파일 경고
+        if (skippedFiles.Any())
+        {
+            var message = $"⚠️ {skippedFiles.Count} duplicated file(s) were skipped:\n" + string.Join("\n", skippedFiles);
+            await JS.InvokeVoidAsync("alert", message);
+        }
+    }
+
+
+    public class ProjectViewModel : HawkAI.Data.ProjectService.Project
+    {
+        public bool IsSelectedForMerge { get; set; } = false;
+    }
+
+
+    private string GetRelativeTime(DateTime createdAt)
+    {
+        var now = DateTime.Now;
+        var span = now - createdAt;
+
+        if (span.TotalSeconds < 60)
+            return "just now";
+        if (span.TotalMinutes < 60)
+            return $"{(int)span.TotalMinutes} minutes ago";
+        if (span.TotalHours < 24)
+            return $"{(int)span.TotalHours} hours ago";
+        if (span.TotalDays < 7)
+            return $"{(int)span.TotalDays} days ago";
+
+        return createdAt.ToString("yyyy-MM-dd");
+    }
+
 }

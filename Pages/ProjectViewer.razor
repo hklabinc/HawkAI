@@ -216,11 +216,11 @@ else if (project == null)
 }
 else
 {
-    <h3>Project: @project.Name</h3>
-    <p><strong>Labels:</strong> @project.Labels</p>
-    <p><strong>Created At:</strong> @project.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</p>
-
-    <h4>Uploaded Images (@images.Count)</h4>
+    <h5 class="card-title">
+        <strong>@project.Name</strong>
+        <span class="text-muted" style="font-size: 1rem;">(@images.Count images)</span>
+    </h5>
+    <p class="card-text">Labels: @project.Labels, Created at @project.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</p>
 
     @if (images.Count == 0)
     {

@@ -53,7 +53,6 @@ window.ShowSweetAlert = (type, message) => {
 
 }
 
-
 function ShowDeleteConfirmationModal() {
     $('#deleteConfirmationModal').modal('show');
 }
