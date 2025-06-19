@@ -28,13 +28,19 @@ namespace HawkAI.Controllers
             if (request.Files == null || request.Files.Count == 0)
                 return BadRequest("At least one image file is required.");
 
-            if (_db.Projects.Any(p => p.Name == request.Name))
-                return BadRequest("A project with this name already exists.");
+            string baseName = request.Name;
+            string name = baseName;
+            int version = 1;
+            while (_db.Projects.Any(p => p.Name == name))
+            {
+                name = $"{baseName}_v{version}";
+                version++;
+            }
 
             // Create project
             var project = new Project
             {
-                Name = request.Name,
+                Name = name,
                 Labels = request.Labels,
                 CreatorUserId = request.CreatorUserId,
                 ImageCount = request.Files.Count,
@@ -70,7 +76,12 @@ namespace HawkAI.Controllers
             }
 
             await _db.SaveChangesAsync();
-            return Ok("Project created and images uploaded successfully.");
+            return Ok(new
+            {
+                success = true,
+                project_name = name,
+                message = "Project uploaded with images successfully."
+            });
         }
 
 
@@ -90,8 +101,13 @@ namespace HawkAI.Controllers
             if (files.Count == 0)
                 return BadRequest("No files uploaded.");
 
-            if (_db.Projects.Any(p => p.Name == name))
-                return BadRequest("A project with this name already exists.");
+            string baseName = name;
+            int version = 1;
+            while (_db.Projects.Any(p => p.Name == name))
+            {
+                name = $"{baseName}_v{version}";
+                version++;
+            }
 
             // Create project
             var project = new Project
@@ -170,7 +186,12 @@ namespace HawkAI.Controllers
             }
 
             await _db.SaveChangesAsync();
-            return Ok("Project uploaded with images, annotations, and labels.");
+            return Ok(new
+            {
+                success = true,
+                project_name = name,
+                message = "Project uploaded with images, annotations, and labels."
+            });
         }
 
     }
