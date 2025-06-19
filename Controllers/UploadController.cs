@@ -131,6 +131,7 @@ namespace HawkAI.Controllers
             Directory.CreateDirectory(labelsPath);
 
             var imageEntries = new Dictionary<string, ImageEntry>();
+            int imageCount = 0;
 
             foreach (var file in files)
             {
@@ -169,6 +170,7 @@ namespace HawkAI.Controllers
                     };
                     _db.Images.Add(entry);
                     imageEntries[nameWithoutExt] = entry;
+                    imageCount++;
                 }
             }
 
@@ -185,6 +187,7 @@ namespace HawkAI.Controllers
                 }
             }
 
+            project.ImageCount = imageCount;
             await _db.SaveChangesAsync();
             return Ok(new
             {
