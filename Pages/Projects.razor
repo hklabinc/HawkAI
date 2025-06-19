@@ -352,7 +352,9 @@ else
         showCreateModal = false;
         createUploadedFiles.Clear();
 
-        var updated = await ProjectService.GetUserProjects(userId);
+        var updated = isAdmin
+            ? await ProjectService.GetAllProjects()
+            : await ProjectService.GetUserProjects(userId);
         projects = updated.Select(p => new ProjectViewModel
             {
                 Id = p.Id,
@@ -784,7 +786,9 @@ else
 
         // ✅ 8. 병합 후 상태 업데이트
         showMergeModal = false;
-        var updated = await ProjectService.GetUserProjects(userId);
+        var updated = isAdmin
+            ? await ProjectService.GetAllProjects()
+            : await ProjectService.GetUserProjects(userId);
         projects = updated.Select(p => new ProjectViewModel
             {
                 Id = p.Id,
