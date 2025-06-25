@@ -298,6 +298,18 @@ else
                             <option value="xlarge">X-Large</option>
                         </select>
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label">Epochs</label>
+                        <input type="number" class="form-control" @bind="trainEpochs" min="1" max="1000" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Batch Size</label>
+                        <input type="number" class="form-control" @bind="trainBatch" min="1" max="128" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Seed (Optional)</label>
+                        <input type="number" class="form-control" @bind="trainSeed" placeholder="e.g. 42" />
+                    </div>
                     @if (!string.IsNullOrWhiteSpace(trainStatusMessage))
                     {
                         <div class="alert alert-info">@trainStatusMessage</div>
@@ -358,6 +370,9 @@ else
     private bool showTrainModal = false;
     private string trainModelSize = "small";
     private string trainStatusMessage = string.Empty;
+    private int trainEpochs = 300;
+    private int trainBatch = 32;
+    private int? trainSeed = null;
 
     protected override async Task OnInitializedAsync()
     {
@@ -1012,12 +1027,17 @@ else
             return;
         }
 
-        var payload = new
+        var payload = new Dictionary<string, object>
         {
-            project_name = selectedProject.Name,
-            base_dir = exportDir,
-            model_size = trainModelSize
+            { "project_name", selectedProject.Name },
+            { "base_dir", exportDir },
+            { "model_size", trainModelSize },
+            { "epochs", trainEpochs },
+            { "batch", trainBatch }
         };
+
+        if (trainSeed.HasValue)
+            payload["seed"] = trainSeed.Value;
 
         try
         {
