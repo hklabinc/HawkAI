@@ -310,10 +310,9 @@ else
                         <label class="form-label">Seed (Optional)</label>
                         <input type="number" class="form-control" @bind="trainSeed" placeholder="e.g. 42" />
                     </div>
-                    @if (!string.IsNullOrWhiteSpace(trainStatusMessage))
-                    {
-                        <div class="alert alert-info">@trainStatusMessage</div>
-                    }
+                    <div class="alert alert-info" role="alert">
+                        @trainStatusMessage
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" @onclick="() => showTrainModal = false">Cancel</button>
@@ -370,9 +369,22 @@ else
     private bool showTrainModal = false;
     private string trainModelSize = "small";
     private string trainStatusMessage = string.Empty;
+    private DotNetObjectReference<Projects>? sseRef;
     private int trainEpochs = 300;
     private int trainBatch = 32;
     private int? trainSeed = null;
+
+    [JSInvokable]
+    public async Task UpdateTrainStatus(string message)
+    {
+        trainStatusMessage = message;
+        StateHasChanged(); // ✅ UI 실시간 갱신
+    }
+
+    public void Dispose()
+    {
+        sseRef?.Dispose();
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -955,6 +967,7 @@ else
     public class ServerResponse
     {
         public string status { get; set; } = "";
+        public string session_id { get; set; } = "";
         public string message { get; set; } = "";
     }
 
@@ -1018,12 +1031,16 @@ else
 
     private async Task TriggerTrain()
     {
-        if (selectedProject == null) return;
+        if (selectedProject == null)
+        {
+            trainStatusMessage = "❌ No project selected.";
+            return;
+        }
 
         var exportDir = Path.Combine(Env.WebRootPath, "exports", selectedProject.Name);
         if (!Directory.Exists(exportDir))
         {
-            trainStatusMessage = "❌ Export folder not found.";
+            trainStatusMessage = $"❌ Export folder not found: {exportDir}";
             return;
         }
 
@@ -1043,23 +1060,25 @@ else
         {
             var response = await Http.PostAsJsonAsync("http://localhost:9002/api/train", payload);
 
-            if (response.IsSuccessStatusCode)
+            if (!response.IsSuccessStatusCode)
             {
-                var result = await response.Content.ReadFromJsonAsync<ServerResponse>();
-                if (result != null && result.status == "success")
-                {
-                    // SSE 시작
-                    sseRef = DotNetObjectReference.Create(this);
-                    await JS.InvokeVoidAsync("trainStatusStream.start", result.message /* session_id */, sseRef);
-                }
-                else
-                {
-                    trainStatusMessage = $"❌ Unexpected response format.";
-                }
+                trainStatusMessage = $"❌ Training server error: {response.StatusCode}";
+                return;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<ServerResponse>();
+
+            if (result?.status == "success" && !string.IsNullOrWhiteSpace(result.session_id))
+            {
+                var sessionId = result.session_id;
+
+                // Start SSE for progress updates
+                sseRef = DotNetObjectReference.Create(this);
+                await JS.InvokeVoidAsync("trainStatusStream.start", sessionId, sseRef);
             }
             else
             {
-                trainStatusMessage = $"❌ Server returned error {response.StatusCode}";
+                trainStatusMessage = result?.message ?? "❌ Unknown error from training server.";
             }
         }
         catch (Exception ex)
@@ -1068,22 +1087,4 @@ else
         }
     }
 
-
-    private DotNetObjectReference<Projects>? sseRef;
-
-    [JSInvokable]
-    public async Task UpdateTrainStatus(string message)
-    {
-        trainStatusMessage = message;
-        StateHasChanged(); // UI 갱신
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (sseRef != null)
-        {
-            await JS.InvokeVoidAsync("trainStatusStream.stop");
-            sseRef.Dispose();
-        }
-    }
 }
