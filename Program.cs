@@ -136,6 +136,7 @@ else
 var provider = new FileExtensionContentTypeProvider();
 //provider.Mappings[".obj"] = "text/plain";  // MIME 타입 설정 (text 형태로)
 provider.Mappings[".obj"] = "application/octet-stream";  // MIME 타입 설정 (binary 형태로) - .obj 파일 받아오기 위해 필요!
+provider.Mappings[".pt"] = "application/octet-stream";  // .pt 파일도 binary로 응답하도록 추가
 app.UseStaticFiles(new StaticFileOptions
 {
     ContentTypeProvider = provider
