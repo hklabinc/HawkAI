@@ -1050,7 +1050,7 @@ else
                 {
                     // SSE 시작
                     sseRef = DotNetObjectReference.Create(this);
-                    await JSRuntime.InvokeVoidAsync("trainStatusStream.start", result.message /* session_id */, sseRef);
+                    await JS.InvokeVoidAsync("trainStatusStream.start", result.message /* session_id */, sseRef);
                 }
                 else
                 {
@@ -1069,8 +1069,6 @@ else
     }
 
 
-    [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
-
     private DotNetObjectReference<Projects>? sseRef;
 
     [JSInvokable]
@@ -1084,7 +1082,7 @@ else
     {
         if (sseRef != null)
         {
-            await JSRuntime.InvokeVoidAsync("trainStatusStream.stop");
+            await JS.InvokeVoidAsync("trainStatusStream.stop");
             sseRef.Dispose();
         }
     }
