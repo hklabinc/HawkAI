@@ -1048,7 +1048,9 @@ else
                 var result = await response.Content.ReadFromJsonAsync<ServerResponse>();
                 if (result != null && result.status == "success")
                 {
-                    trainStatusMessage = $"✅ {result.message}";
+                    // SSE 시작
+                    sseRef = DotNetObjectReference.Create(this);
+                    await JSRuntime.InvokeVoidAsync("trainStatusStream.start", result.message /* session_id */, sseRef);
                 }
                 else
                 {
@@ -1057,15 +1059,33 @@ else
             }
             else
             {
-                var result = await response.Content.ReadFromJsonAsync<ServerResponse>();
-                trainStatusMessage = result != null
-                    ? $"❌ {result.message}"
-                    : $"❌ Training failed with status code {response.StatusCode}";
+                trainStatusMessage = $"❌ Server returned error {response.StatusCode}";
             }
         }
         catch (Exception ex)
         {
             trainStatusMessage = $"❌ Failed to contact training server: {ex.Message}";
+        }
+    }
+
+
+    [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
+
+    private DotNetObjectReference<Projects>? sseRef;
+
+    [JSInvokable]
+    public async Task UpdateTrainStatus(string message)
+    {
+        trainStatusMessage = message;
+        StateHasChanged(); // UI 갱신
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (sseRef != null)
+        {
+            await JSRuntime.InvokeVoidAsync("trainStatusStream.stop");
+            sseRef.Dispose();
         }
     }
 }

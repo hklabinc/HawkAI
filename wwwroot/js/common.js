@@ -1,4 +1,33 @@
-﻿/* Gobally 사용을 위하여 아래 window.를 붙임 */
+﻿window.trainStatusStream = {
+    source: null,
+
+    start: function (sessionId, dotNetHelper) {
+        if (this.source) {
+            this.source.close();
+        }
+
+        this.source = new EventSource(`/api/progress/${sessionId}`);
+        this.source.onmessage = function (event) {
+            console.log("📢 SSE:", event.data);
+            dotNetHelper.invokeMethodAsync("UpdateTrainStatus", event.data);
+        };
+        this.source.onerror = function () {
+            console.error("❌ SSE error, closing.");
+            this.source?.close();
+        };
+    },
+
+    stop: function () {
+        if (this.source) {
+            this.source.close();
+            this.source = null;
+        }
+    }
+};
+
+
+
+/* Gobally 사용을 위하여 아래 window.를 붙임 */
 window.ShowToastr = (type, message) => {
     if (type === "success") {        
         //confirm(message);
