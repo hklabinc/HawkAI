@@ -17,6 +17,7 @@ using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.AspNetCore.Http.Features;
+using System.Net.Http;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -107,6 +108,12 @@ builder.WebHost.ConfigureKestrel(options =>
 // Add for external access
 builder.WebHost.UseUrls("http://*:8080;https://*:8081");
 //builder.WebHost.UseUrls("http://*:8080");  // Only for http
+
+// Flask 서버 API를 사용하기 위해 HttpClient 등록
+builder.Services.AddScoped(sp => new HttpClient 
+{ 
+    BaseAddress = new Uri(builder.Configuration["BaseAddress"] ?? "http://localhost:5001/") 
+});
 
 
 

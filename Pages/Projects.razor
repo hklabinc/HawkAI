@@ -56,6 +56,8 @@ else
                             <button class="btn btn-sm btn-info" @onclick="() => OpenEditModal(p)">Edit</button>
                             <button class="btn btn-sm btn-danger" @onclick="() => PromptDelete(p.Id, p.Name)">Delete</button>
                             <button class="btn btn-sm btn-outline-primary ms-2" @onclick="() => OpenExportModal(p.Id)">Export</button>
+                            <button class="btn btn-sm btn-outline-warning" @onclick="() => OpenAugmentModal(p.Id)">Augment</button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => OpenTrainModal(p.Id)">Train</button>
                         </div>
                         <div class="form-check">
                             <input type="checkbox" @bind="p.IsSelectedForMerge" class="form-check-input me-1" id="mergeCheck_@p.Id" />
@@ -232,6 +234,86 @@ else
     </div>
 }
 
+@if (showAugmentModel)
+{
+    <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Augment Model for '@selectedProject?.Name'</h5>
+                    <button type="button" class="btn-close" @onclick="() => showAugmentModel = false"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Image Count:</strong> @selectedProject?.ImageCount</p>
+                    <div class="mb-3">
+                        <label class="form-label">Validation Ratio: @($"{validRatio * 100:F0}%")</label>
+                        <input type="range" class="form-range" min="10" max="50" step="5" @bind="validRatioInt" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">
+                            Augmentation Multiplier 
+                            @if (selectedProject?.ImageCount > 0)
+                            {
+                                <span class="text-muted">(recommended ≥ @recommendedAugMultiplier)</span>
+                            }
+                        </label>
+                        <input type="number" class="form-control" @bind="augMultiplier" min="1" max="10" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Seed Value (optional)</label>
+                        <input type="number" class="form-control" @bind="augmentSeed" placeholder="e.g. 42" />
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(augmentStatusMessage))
+                    {
+                        <div class="alert alert-info">@augmentStatusMessage</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showAugmentModel = false">Cancel</button>
+                    <button class="btn btn-success" @onclick="TriggerAugment">Start Augmentation</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showTrainModal)
+{
+    <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Train Model for '@selectedProject?.Name'</h5>
+                    <button type="button" class="btn-close" @onclick="() => showTrainModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong>Export Path:</strong> /exports/@selectedProject?.Name</p>
+                    <div class="mb-3">
+                        <label class="form-label">Model Size</label>
+                        <select class="form-select" @bind="trainModelSize">
+                            <option value="nano">Nano</option>
+                            <option value="small">Small</option>
+                            <option value="medium">Medium</option>
+                            <option value="large">Large</option>
+                            <option value="xlarge">X-Large</option>
+                        </select>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(trainStatusMessage))
+                    {
+                        <div class="alert alert-info">@trainStatusMessage</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showTrainModal = false">Cancel</button>
+                    <button class="btn btn-success" @onclick="TriggerTrain">Start Training</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+
+
 @code {
     private List<ProjectViewModel> projects = new();
     private string newProjectName = string.Empty;
@@ -250,7 +332,7 @@ else
     private bool showExportModal = false;
     private int exportProjectId;
     private int selectedImageSize = 640;
-    private int sliderValue = 30; // percentage from 0 to 100
+    private int sliderValue = 0; // percentage from 0 to 100
     private float selectedValidRatio => sliderValue / 100f;
 
     private bool showEditModal = false;
@@ -262,6 +344,20 @@ else
     private string mergeProjectName = string.Empty;
     private string mergeLabels = string.Empty;
 
+    private bool showAugmentModel = false;
+    private Project? selectedProject = null;
+    private int augMultiplier = 3;
+    private string augmentStatusMessage = string.Empty;
+    private int validRatioInt = 30; // 30% 기본값
+    private float validRatio => validRatioInt / 100f;
+    private int? augmentSeed = null;
+    private int recommendedAugMultiplier => selectedProject?.ImageCount > 0
+        ? (int)Math.Ceiling(10000.0 / (56 * selectedProject.ImageCount) - 1)
+        : 1;
+
+    private bool showTrainModal = false;
+    private string trainModelSize = "small";
+    private string trainStatusMessage = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -833,4 +929,123 @@ else
         return createdAt.ToString("yyyy-MM-dd");
     }
 
+
+    private void OpenAugmentModal(int projectId)
+    {
+        selectedProject = projects.FirstOrDefault(p => p.Id == projectId);
+        augmentStatusMessage = string.Empty;
+        showAugmentModel = true;
+    }
+
+    public class ServerResponse
+    {
+        public string status { get; set; } = "";
+        public string message { get; set; } = "";
+    }
+
+    [Inject] private HttpClient Http { get; set; } = default!;
+    private async Task TriggerAugment()
+    {
+        if (selectedProject == null) return;
+
+        var exportDir = Path.Combine(Env.WebRootPath, "exports", selectedProject.Name);
+        if (!Directory.Exists(exportDir))
+        {
+            augmentStatusMessage = "❌ Export folder not found.";
+            return;
+        }
+
+        var payload = new Dictionary<string, object>
+        {
+            { "project_name", selectedProject.Name },
+            { "base_dir", exportDir },
+            { "valid_ratio", validRatio },
+            { "n", augMultiplier }
+        };
+
+        if (augmentSeed.HasValue)
+        {
+            payload["seed"] = augmentSeed.Value;
+        }
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("http://localhost:9001/api/augment", payload);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ServerResponse>();
+                augmentStatusMessage = result?.status == "success"
+                    ? $"✅ {result.message}"
+                    : $"❌ Unexpected response format.";
+            }
+            else
+            {
+                var result = await response.Content.ReadFromJsonAsync<ServerResponse>();
+                augmentStatusMessage = result != null
+                    ? $"❌ {result.message}"
+                    : $"❌ Augmentation failed with status code {response.StatusCode}";
+            }
+        }
+        catch (Exception ex)
+        {
+            augmentStatusMessage = $"❌ Failed to contact augmentation server: {ex.Message}";
+        }
+    }
+
+
+    private void OpenTrainModal(int projectId)
+    {
+        selectedProject = projects.FirstOrDefault(p => p.Id == projectId);
+        trainStatusMessage = string.Empty;
+        showTrainModal = true;
+    }
+
+    private async Task TriggerTrain()
+    {
+        if (selectedProject == null) return;
+
+        var exportDir = Path.Combine(Env.WebRootPath, "exports", selectedProject.Name);
+        if (!Directory.Exists(exportDir))
+        {
+            trainStatusMessage = "❌ Export folder not found.";
+            return;
+        }
+
+        var payload = new
+        {
+            project_name = selectedProject.Name,
+            base_dir = exportDir,
+            model_size = trainModelSize
+        };
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("http://localhost:9002/api/train", payload);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ServerResponse>();
+                if (result != null && result.status == "success")
+                {
+                    trainStatusMessage = $"✅ {result.message}";
+                }
+                else
+                {
+                    trainStatusMessage = $"❌ Unexpected response format.";
+                }
+            }
+            else
+            {
+                var result = await response.Content.ReadFromJsonAsync<ServerResponse>();
+                trainStatusMessage = result != null
+                    ? $"❌ {result.message}"
+                    : $"❌ Training failed with status code {response.StatusCode}";
+            }
+        }
+        catch (Exception ex)
+        {
+            trainStatusMessage = $"❌ Failed to contact training server: {ex.Message}";
+        }
+    }
 }
