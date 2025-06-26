@@ -16,8 +16,9 @@
 <h3>Project Manager</h3>
 
 <div class="d-flex gap-2 mb-3">
-    <button @onclick="() => showCreateModal = true" class="btn btn-primary">+ Create New Project</button>
-    <button class="btn btn-outline-success" @onclick="PrepareMerge">🔀 Project Merge</button>
+    <button @onclick="() => showCreateModal = true" class="btn btn-primary"><span class="oi oi-plus"></span> Create New Project</button>
+    <button class="btn btn-success" @onclick="PrepareMerge"><span class="oi oi-transfer"></span> Project Merge</button>
+    <button class="btn btn-danger" @onclick="ConfirmBulkDelete" title="Delete selected projects"><span class="oi oi-trash"></span> Delete Selected</button>
 </div>
 
 @if (projects == null)
@@ -36,12 +37,39 @@ else
             <div class="card" style="width: 320px;">
                 @if (p.Images.Count > 0)
                 {
-                    <img src="@("/" + p.Images.First().RelativePath)" class="card-img-top" style="height: 180px; object-fit: cover; cursor: pointer;" @onclick="() => OpenProject(p.Id)" />
+                    string displayPath;
+
+                    var labeledImage = p.Images.FirstOrDefault(img => img.LabelStatus == "Labeled");
+                    if (labeledImage != null)
+                    {
+                        // 라벨링된 이미지가 존재하면 annotated 폴더 경로 사용
+                        var fileName = Path.GetFileName(labeledImage.RelativePath);
+                        displayPath = $"/datasets/{p.Name}/images_annotated/{fileName}";
+                    }
+                    else
+                    {
+                        // 아니면 기본 images 폴더의 첫 번째 이미지 사용
+                        displayPath = "/" + p.Images.First().RelativePath;
+                    }
+
+                    <img src="@displayPath"
+                         class="card-img-top"
+                         style="height: 180px; object-fit: cover; cursor: pointer;"
+                         @onclick="() => OpenProject(p.Id)" />
                 }
                 <div class="card-body">
                     <h5 class="card-title">
                         <strong>@p.Name</strong>
-                        <span class="text-muted" style="font-size: 1rem;">(@p.Images.Count images)</span>
+                        @{
+                            int labeled = p.Images.Count(img => img.LabelStatus == "Labeled");
+                            int total = p.Images.Count;
+                        }
+                        @if (total > 0)
+                        {
+                            <span class="text-muted" style="font-size: 0.95rem;">
+                                (@labeled labeled / @total images)
+                            </span>
+                        }
                     </h5>
                     <p class="card-text">Labels: @p.Labels</p>
                     @if (isAdmin)
@@ -51,23 +79,31 @@ else
                         </p>
                     }
 
-                    <div class="d-flex flex-column gap-1 mt-2">
-                        <!-- 첫 번째 줄: Edit, Delete, Merge -->
-                        <div class="d-flex gap-2 flex-wrap">
-                            <button class="btn btn-sm btn-info" style="width: 90px;" @onclick="() => OpenEditModal(p)">Edit</button>
-                            <button class="btn btn-sm btn-danger" style="width: 90px;" @onclick="() => PromptDelete(p.Id, p.Name)">Delete</button>
+                    <!-- 카드 우측 상단 Merge 체크박스 -->
+                    <div class="position-absolute top-0 end-0 m-2">
+                        <input type="checkbox" @bind="p.IsSelectedForMerge" class="form-check-input" id="mergeCheck_@p.Id" />
+                    </div>
 
-                            <div class="form-check d-flex align-items-center" style="width: 90px;">
-                                <input type="checkbox" @bind="p.IsSelectedForMerge" class="form-check-input me-1" id="mergeCheck_@p.Id" />
-                                <label class="form-check-label" for="mergeCheck_@p.Id">Merge</label>
-                            </div>
+                    <!-- 버튼 행 -->
+                    <div class="d-flex justify-content-between align-items-center flex-wrap mt-2">
+
+                        <!-- 왼쪽: Edit / Delete (간격 좁게) -->
+                        <div class="d-flex gap-1">
+                            <button class="btn btn-sm btn-info" @onclick="() => OpenEditModal(p)">Edit</button>
+                            <button class="btn btn-sm btn-danger" @onclick="() => PromptDelete(p.Id, p.Name)">Delete</button>
                         </div>
 
-                        <!-- 두 번째 줄: Export, Augment, Train -->
-                        <div class="d-flex gap-2 flex-wrap">
-                            <button class="btn btn-sm btn-outline-primary" style="width: 90px;" @onclick="() => OpenExportModal(p.Id)">Export</button>
-                            <button class="btn btn-sm btn-outline-success" style="width: 90px;" @onclick="() => OpenAugmentModal(p.Id)">Augment</button>
-                            <button class="btn btn-sm btn-outline-danger" style="width: 90px;" @onclick="() => OpenTrainModal(p.Id)">Train</button>
+                        <!-- 오른쪽: Export / Augment / Train (간격 약간, 우측 정렬) -->
+                        <div class="d-flex ms-auto">
+                            <button class="btn btn-sm btn-outline-dark me-1" title="Export" @onclick="() => OpenExportModal(p.Id)">
+                                <span class="oi oi-data-transfer-download"></span>
+                            </button>
+                            <button class="btn btn-sm btn-outline-dark me-1" title="Augment" @onclick="() => OpenAugmentModal(p.Id)">
+                                <span class="oi oi-loop"></span>
+                            </button>
+                            <button class="btn btn-sm btn-outline-dark" title="Train" @onclick="() => OpenTrainModal(p.Id)">
+                                <span class="oi oi-cog"></span>
+                            </button>
                         </div>
                     </div>
 
@@ -203,6 +239,34 @@ else
                 <div class="modal-footer">
                     <button class="btn btn-secondary" @onclick="() => showDeleteConfirm = false">Cancel</button>
                     <button class="btn btn-danger" @onclick="ConfirmDelete">Yes, Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showBulkDeleteConfirm)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Delete Selected Projects</h5>
+                    <button type="button" class="btn-close" @onclick="() => showBulkDeleteConfirm = false"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete the following projects?</p>
+                    <ul>
+                        @foreach (var p in projects.Where(p => p.IsSelectedForMerge))
+                        {
+                            <li>@p.Name</li>
+                        }
+                    </ul>
+                    <p class="text-danger">This will delete all associated images and files permanently.</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showBulkDeleteConfirm = false">Cancel</button>
+                    <button class="btn btn-danger" @onclick="ExecuteBulkDelete">Yes, Delete</button>
                 </div>
             </div>
         </div>
@@ -381,6 +445,9 @@ else
     private int trainEpochs = 300;
     private int trainBatch = 32;
     private int? trainSeed = null;
+
+    private bool showBulkDeleteConfirm = false;
+
 
     [JSInvokable]
     public async Task UpdateTrainStatus(string message)
@@ -1096,5 +1163,59 @@ else
             trainStatusMessage = $"❌ Failed to contact training server: {ex.Message}";
         }
     }
+
+
+    private void ConfirmBulkDelete()
+    {
+        var selected = projects.Where(p => p.IsSelectedForMerge).ToList();
+        if (selected.Count == 0)
+        {
+            JS.InvokeVoidAsync("alert", "⚠️ Please select at least one project to delete.");
+            return;
+        }
+
+        showBulkDeleteConfirm = true;
+    }
+
+    private async Task ExecuteBulkDelete()
+    {
+        var selectedProjects = projects.Where(p => p.IsSelectedForMerge).ToList();
+
+        foreach (var p in selectedProjects)
+        {
+            var project = await Db.Projects.FindAsync(p.Id);
+            if (project == null) continue;
+
+            var images = Db.Images.Where(i => i.ProjectId == project.Id);
+            Db.Images.RemoveRange(images);
+            Db.Projects.Remove(project);
+
+            var folder = Path.Combine(Env.WebRootPath, "datasets", project.Name);
+            if (Directory.Exists(folder))
+                Directory.Delete(folder, true);
+        }
+
+        await Db.SaveChangesAsync();
+
+        showBulkDeleteConfirm = false;
+
+        // UI 갱신
+        var updated = isAdmin
+            ? await ProjectService.GetAllProjects()
+            : await ProjectService.GetUserProjects(userId);
+
+        projects = updated.Select(p => new ProjectViewModel
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Labels = p.Labels,
+                CreatorUserId = p.CreatorUserId,
+                CreatedAt = p.CreatedAt,
+                ImageCount = p.ImageCount,
+                Images = p.Images,
+                IsSelectedForMerge = false
+            }).ToList();
+    }
+
 
 }
