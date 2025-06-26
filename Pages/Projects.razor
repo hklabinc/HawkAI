@@ -277,7 +277,7 @@ else
                     }
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="() => showAugmentModel = false">Cancel</button>
+                    <button class="btn btn-secondary" @onclick="() => showAugmentModel = false">Close</button>
                     <button class="btn btn-success" @onclick="TriggerAugment">Start Augmentation</button>
                 </div>
             </div>
@@ -323,7 +323,7 @@ else
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="() => showTrainModal = false">Cancel</button>
+                    <button class="btn btn-secondary" @onclick="() => showTrainModal = false">Close</button>
                     <button class="btn btn-success" @onclick="TriggerTrain">Start Training</button>
                 </div>
             </div>
@@ -406,17 +406,19 @@ else
             : await ProjectService.GetUserProjects(userId);
 
         // ✅ ViewModel로 변환
-        projects = rawProjects.Select(p => new ProjectViewModel
-            {
-                Id = p.Id,
-                Name = p.Name,
-                Labels = p.Labels,
-                CreatorUserId = p.CreatorUserId,
-                CreatedAt = p.CreatedAt,
-                ImageCount = p.ImageCount,
-                Images = p.Images,
-                IsSelectedForMerge = false
-            }).ToList();
+        projects = rawProjects
+            .OrderBy(p => p.CreatorUserId) // 알파벳 순 정렬
+            .Select(p => new ProjectViewModel
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Labels = p.Labels,
+                    CreatorUserId = p.CreatorUserId,
+                    CreatedAt = p.CreatedAt,
+                    ImageCount = p.ImageCount,
+                    Images = p.Images,
+                    IsSelectedForMerge = false
+                }).ToList();
     }
 
     private async Task CreateProject()
