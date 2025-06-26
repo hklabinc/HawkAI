@@ -58,7 +58,7 @@ else
                          @onclick="() => OpenProject(p.Id)" />
                 }
                 <div class="card-body">
-                    <h5 class="card-title">
+                    <h5 class="card-title mb-1">
                         <strong>@p.Name</strong>
                         @{
                             int labeled = p.Images.Count(img => img.LabelStatus == "Labeled");
@@ -71,13 +71,16 @@ else
                             </span>
                         }
                     </h5>
-                    <p class="card-text">Labels: @p.Labels</p>
-                    @if (isAdmin)
-                    {
-                        <p class="card-text text-muted" style="font-size: 0.85rem;">
-                            Created @GetRelativeTime(p.CreatedAt) by @p.CreatorUserId
-                        </p>
-                    }
+                    <p class="card-text mb-0">Labels: @p.Labels</p>
+
+                    <p class="card-text text-muted" style="font-size: 0.85rem;">
+                        Created @GetRelativeTime(p.CreatedAt)
+                        @if (isAdmin)
+                        {
+                            <text> by @p.CreatorUserId</text>
+                        }
+                    </p>
+                    
 
                     <!-- 카드 우측 상단 Merge 체크박스 -->
                     <div class="position-absolute top-0 end-0 m-2">
@@ -89,8 +92,8 @@ else
 
                         <!-- 왼쪽: Edit / Delete (간격 좁게) -->
                         <div class="d-flex gap-1">
-                            <button class="btn btn-sm btn-info" @onclick="() => OpenEditModal(p)">Edit</button>
-                            <button class="btn btn-sm btn-danger" @onclick="() => PromptDelete(p.Id, p.Name)">Delete</button>
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenEditModal(p)">Edit</button>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => PromptDelete(p.Id, p.Name)">Delete</button>
                         </div>
 
                         <!-- 오른쪽: Export / Augment / Train (간격 약간, 우측 정렬) -->
