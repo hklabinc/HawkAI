@@ -257,17 +257,20 @@ else
 @if (showLabelingModal)
 {
     <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.6);">
-        <div class="modal-dialog modal-xl">
-            <div class="modal-content">
+        <div class="modal-dialog modal-xl" style="max-height: 95vh;">
+            <div class="modal-content" style="max-height: 95vh; display: flex; flex-direction: column;">
                 <div class="modal-header">
                     <h5 class="modal-title">Label Image</h5>
                     <button type="button" class="btn-close" @onclick="() => showLabelingModal = false"></button>
                 </div>
-                <div class="modal-body">
-                    <div style="position: relative;">
-                        <img id="targetImage" src="@selectedImagePath" style="width: 100%; display: block;" />
-                        <canvas id="labelCanvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></canvas>
-                    </div>                    
+                <div class="modal-body" style="overflow: auto; max-height: 80vh;">
+                    <div style="position: relative; width: 100%; max-height: 100%;">
+                        <img id="targetImage"
+                             src="@selectedImagePath"
+                             style="width: 100%; height: auto; max-height: 100%; display: block; object-fit: contain;" />
+                        <canvas id="labelCanvas"
+                                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></canvas>
+                    </div>
                 </div>
 
                 <div class="modal-footer d-flex justify-content-between align-items-center flex-wrap">
