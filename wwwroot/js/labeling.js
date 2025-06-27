@@ -3,11 +3,14 @@
 
     let boxes = []; 
     let history = [];           // ✅ 박스 상태 히스토리 저장
-    let selectedBoxIndex = -1; // ✅ 선택된 박스 인덱스
+    let redoStack = [];         // ✅ 복원할 미래 상태를 저장
+    let selectedBoxIndex = -1;  // ✅ 선택된 박스 인덱스
     let draggingHandle = null;
     let startX, startY, isDrawing = false;
     let lastMouseX = null;
     let lastMouseY = null;
+    let isMovingBox = false;
+    let copiedBox = null;
 
     const HANDLE_SIZE = 8;
     const canvas = document.getElementById('labelCanvas');
@@ -65,6 +68,10 @@
                     selectedBoxIndex = i;
                     draggingHandle = key;
 
+                    // ✅ 상태 저장 (히스토리)
+                    redoStack = [];
+                    history.push(JSON.parse(JSON.stringify(boxes)));
+
                     // ✅ 마우스 현재 좌표 저장 (정밀한 이동 계산용)
                     lastMouseX = e.offsetX;
                     lastMouseY = e.offsetY;
@@ -88,6 +95,14 @@
 
             if (onLeftEdge || onRightEdge || onTopEdge || onBottomEdge) {
                 selectedBoxIndex = i;
+
+                // ✅ 박스 이동 시작 - 상태 저장
+                redoStack = [];
+                history.push(JSON.parse(JSON.stringify(boxes)));
+
+                isMovingBox = true;
+                lastMouseX = e.offsetX;
+                lastMouseY = e.offsetY;
                 redraw();
                 return;
             }
@@ -115,6 +130,11 @@
     });
 
     canvas.addEventListener('mouseup', (e) => {
+        if (isMovingBox) {
+            isMovingBox = false;
+            return;
+        }
+
         if (draggingHandle) {
             draggingHandle = null;
             return;
@@ -148,6 +168,7 @@
 
         // ✅ w와 h가 0 이상일 때만 박스 추가
         if (correctedBox.w !== 0 && correctedBox.h !== 0) {
+            redoStack = [];  // ⬅️ redo 비움
             history.push(JSON.parse(JSON.stringify(boxes)));
             boxes.push(correctedBox);
             selectedBoxIndex = boxes.length - 1;
@@ -267,11 +288,25 @@
             redraw();
             const tempW = moveX - startX;
             const tempH = moveY - startY;
-            ctx.strokeStyle = 'yellow';
+            ctx.strokeStyle = '#505050';  // 진한 회색
             ctx.setLineDash([5, 3]);
             ctx.lineWidth = 1;
             ctx.strokeRect(startX, startY, tempW, tempH);
             ctx.setLineDash([]);
+        }
+        // ✅ 박스 이동 중일 때
+        else if (isMovingBox && selectedBoxIndex !== -1) {
+            const { scaleX, scaleY } = getScaleFactors();
+            const deltaX = (moveX - lastMouseX) * scaleX;
+            const deltaY = (moveY - lastMouseY) * scaleY;
+
+            boxes[selectedBoxIndex].x += deltaX;
+            boxes[selectedBoxIndex].y += deltaY;
+
+            lastMouseX = moveX;
+            lastMouseY = moveY;
+
+            redraw();
         }
     });
 
@@ -279,20 +314,137 @@
     // ✅ Delete 키 이벤트 등록
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Delete' && selectedBoxIndex !== -1) {
+            redoStack = [];
+            history.push(JSON.parse(JSON.stringify(boxes)));
             boxes.splice(selectedBoxIndex, 1);
             selectedBoxIndex = -1;
+            draggingHandle = null;
+            isMovingBox = false;
+            isDrawing = false;
             redraw();
+            e.preventDefault();
         }
 
-        if (e.key === 'z' && (e.ctrlKey || e.metaKey)) {
-            // Ctrl+Z 또는 Cmd+Z
+        if (e.key.toLowerCase() === 'z' && (e.ctrlKey || e.metaKey)) {
             if (history.length > 0) {
-                boxes = history.pop(); // 마지막 상태 복원
+                redoStack.push(JSON.parse(JSON.stringify(boxes)));  // 👉 현재 상태를 redo로 저장
+                boxes = history.pop();  // 이전 상태 복원
                 selectedBoxIndex = -1;
                 redraw();
             }
-            e.preventDefault(); // 브라우저 기본 동작 방지
+            e.preventDefault();
         }
+
+        if (e.key.toLowerCase() === 'y' && (e.ctrlKey || e.metaKey)) {
+            if (redoStack.length > 0) {
+                history.push(JSON.parse(JSON.stringify(boxes)));  // 👉 현재 상태를 다시 undo로 저장
+                boxes = redoStack.pop();  // 👉 redo 스택에서 복원
+                selectedBoxIndex = -1;
+                redraw();
+            }
+            e.preventDefault();
+        }
+
+        // ✅ Ctrl+C 또는 Cmd+C (복사)
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+            if (selectedBoxIndex !== -1) {
+                copiedBox = JSON.parse(JSON.stringify(boxes[selectedBoxIndex]));
+                console.log('📋 Box copied:', copiedBox);
+            }
+            e.preventDefault(); // 브라우저 기본 복사 방지
+        }
+
+        // ✅ Ctrl+V 또는 Cmd+V (붙여넣기)
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+            if (copiedBox) {
+                if (!copiedBox._pasteCount) copiedBox._pasteCount = 1;
+                else copiedBox._pasteCount += 1;
+
+                const OFFSET = 10;
+                const newBox = {
+                    ...copiedBox,
+                    x: copiedBox.x + OFFSET * copiedBox._pasteCount,
+                    y: copiedBox.y + OFFSET * copiedBox._pasteCount
+                };
+
+                redoStack = [];
+                history.push(JSON.parse(JSON.stringify(boxes)));
+                boxes.push(newBox);
+                selectedBoxIndex = boxes.length - 1;
+                redraw();
+            }
+            e.preventDefault();
+        }
+
+        // ✅ Ctrl+X 또는 Cmd+X (잘라내기)
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'x') {
+            if (selectedBoxIndex !== -1) {
+                copiedBox = JSON.parse(JSON.stringify(boxes[selectedBoxIndex]));
+                redoStack = [];
+                history.push(JSON.parse(JSON.stringify(boxes)));
+                boxes.splice(selectedBoxIndex, 1);
+                selectedBoxIndex = -1;
+                redraw();
+            }
+            e.preventDefault();
+        }
+
+        // ✅ Shift + 방향키로 크기 조절
+        if (selectedBoxIndex !== -1 && e.shiftKey && !e.ctrlKey && !e.metaKey) {
+            const box = boxes[selectedBoxIndex];
+            redoStack = [];
+            history.push(JSON.parse(JSON.stringify(boxes)));
+
+            switch (e.key) {
+                case 'ArrowRight':
+                    box.w += 1; break;
+                case 'ArrowLeft':
+                    box.w = Math.max(1, box.w - 1); break;
+                case 'ArrowDown':
+                    box.h += 1; break;
+                case 'ArrowUp':
+                    box.h = Math.max(1, box.h - 1); break;
+            }
+
+            redraw();
+            e.preventDefault();
+            return;
+        }
+
+        // ✅ 방향키로 박스 이동 (선택된 박스가 있을 경우)
+        if (selectedBoxIndex !== -1 && !e.ctrlKey && !e.metaKey) {
+            const moveAmount = 1;
+            const box = boxes[selectedBoxIndex];
+
+            // 👉 이동 전에 저장
+            redoStack = [];
+            history.push(JSON.parse(JSON.stringify(boxes)));
+
+            switch (e.key) {
+                case 'ArrowLeft':
+                    box.x -= moveAmount;
+                    e.preventDefault();
+                    break;
+                case 'ArrowRight':
+                    box.x += moveAmount;
+                    e.preventDefault();
+                    break;
+                case 'ArrowUp':
+                    box.y -= moveAmount;
+                    e.preventDefault();
+                    break;
+                case 'ArrowDown':
+                    box.y += moveAmount;
+                    e.preventDefault();
+                    break;
+            }
+
+            if (box.x < 0) box.x = 0;
+            if (box.y < 0) box.y = 0;
+
+            redraw();
+        }
+
     });
 
     function getHandles(box) {
@@ -323,10 +475,10 @@
             const drawW = box.w * inverseScaleX;
             const drawH = box.h * inverseScaleY;
 
-            ctx.strokeStyle = getColorForLabel(box.label);
+            ctx.strokeStyle = (i === selectedBoxIndex) ? '#505050' : getColorForLabel(box.label);
             ctx.lineWidth = 1.5;
             ctx.strokeRect(drawX, drawY, drawW, drawH);
-            ctx.fillStyle = ctx.strokeStyle;
+            ctx.fillStyle = getColorForLabel(box.label);  // 라벨 색상은 항상 원래 색
             ctx.font = '16px Arial';
             ctx.fillText(box.label, drawX + 2, drawY - 4);
 
