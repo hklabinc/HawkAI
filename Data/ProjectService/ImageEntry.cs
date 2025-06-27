@@ -1,4 +1,6 @@
-﻿namespace HawkAI.Data.ProjectService
+﻿using System.ComponentModel.DataAnnotations.Schema;
+
+namespace HawkAI.Data.ProjectService
 {
     public class ImageEntry
     {
@@ -20,5 +22,9 @@
         public string LabelStatus { get; set; } = "Unlabeled";
 
         public string UploadedByUserId { get; set; } = string.Empty;
+
+
+        [NotMapped]
+        public bool IsSelected { get; set; } = false;
     }
 }

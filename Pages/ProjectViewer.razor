@@ -14,6 +14,151 @@
 @using SixLabors.ImageSharp.Drawing;
 @using System.Runtime.InteropServices;
 
+
+@if (isLoading)
+{
+    <p><em>Loading project...</em></p>
+}
+else if (project == null)
+{
+    <p class="text-danger">Project not found.</p>
+}
+else
+{
+    <div class="mb-3" style="max-width: 1000px;">
+        <!-- 이름 및 통계 -->
+        <p class="card-text mb-2">
+            <strong style="font-size: 1.5rem;">@project.Name</strong>
+            @{
+                int labeledCount = images.Count(i => i.LabelStatus == "Labeled");
+            }
+            <span class="text-muted ms-2" style="font-size: 0.95rem;">
+                (@labeledCount labeled / @images.Count images) |
+                Labels: @project.Labels |
+                Created at @project.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
+            </span>
+        </p>
+
+        <!-- 다음 줄 왼쪽에 Delete 버튼 -->
+        <div class="mt-1">
+            <button class="btn btn-danger" @onclick="ConfirmBulkDeleteImages">
+                <span class="oi oi-trash"></span> Delete Selected
+            </button>
+        </div>
+    </div>
+
+
+
+    @if (images.Count == 0)
+    {
+        <p>No images uploaded for this project.</p>
+    }
+    else
+    {
+        <div class="d-flex flex-wrap gap-3">
+            @foreach (var image in images)
+            {
+                <div class="card position-relative" style="width: 320px;">
+                    <!-- ✅ 체크박스 오른쪽 위에 표시 -->
+                    <input type="checkbox"
+                           class="form-check-input position-absolute top-0 end-0 m-2"
+                           @bind="image.IsSelected"
+                           style="z-index: 1;" />
+
+                    @if (image.LabelStatus == "Labeled")
+                    {
+                        <span class="badge bg-success position-absolute top-0 start-0 m-2" style="z-index: 1;">
+                            ✔ Labeled
+                        </span>
+                    }
+
+                    <img class="card-img-top"
+                         src="@GetDisplayImagePath(image)"
+                         @onclick="() => OpenLabelingModal(image.RelativePath, image.Id)"
+                         style="cursor: pointer; width: 320px; height: 240px; object-fit: contain;" />
+
+                    <div class="card-body">
+                        <p class="card-text">
+                            @image.FileName <span class="text-muted" style="font-size: 0.75rem;">(@image.Width x @image.Height)</span>
+                        </p>
+                    </div>
+                </div>
+            }
+
+        </div>
+    }
+}
+
+@if (showLabelingModal)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.6);">
+        <div class="modal-dialog modal-xl" style="max-height: 95vh;">
+            <div class="modal-content" style="max-height: 95vh; display: flex; flex-direction: column;">
+                <div class="modal-header">
+                    <h5 class="modal-title">Label Image</h5>
+                    <button type="button" class="btn-close" @onclick="() => showLabelingModal = false"></button>
+                </div>
+                <div class="modal-body" style="overflow: auto; max-height: 80vh;">
+                    <div style="position: relative; width: 100%; max-height: 100%;">
+                        <img id="targetImage"
+                             src="@selectedImagePath"
+                             style="width: 100%; height: auto; max-height: 100%; display: block; object-fit: contain;" />
+                        <canvas id="labelCanvas"
+                                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></canvas>
+                    </div>
+                </div>
+
+                <div class="modal-footer d-flex justify-content-between align-items-center flex-wrap">
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="btn btn-danger" onclick="clearBoxes()"><span class="oi oi-trash"></span> Clear Boxes</button>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 flex-grow-1 justify-content-center">
+                        <label for="labelSelector" class="form-label mb-0">Select label:</label>
+                        <select id="labelSelector" class="form-select" style="max-width: 120px;">
+                            @foreach (var label in selectedLabels.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                            {
+                                <option value="@label.Trim()">@label.Trim()</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-secondary" @onclick="() => showLabelingModal = false">Close</button>
+                        <button class="btn btn-primary" onclick="saveLabelData()">Save Labels</button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+}
+
+@if (showDeleteConfirm)
+{
+    <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Delete Selected Images</h5>
+                    <button type="button" class="btn-close" @onclick="() => showDeleteConfirm = false"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete the selected images?</p>
+                    <p class="text-danger">This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showDeleteConfirm = false">Cancel</button>
+                    <button class="btn btn-danger" @onclick="ExecuteBulkDeleteImages">Yes, Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+
+
+
+
+
 @code {
     [Parameter] public int projectId { get; set; }
 
@@ -26,6 +171,7 @@
     private string selectedLabels = string.Empty;
     private bool pendingInitJS = false;
     private DotNetObjectReference<ProjectViewer>? dotNetRef;
+
 
     protected override async Task OnInitializedAsync()
     {
@@ -92,7 +238,7 @@
         image.LabelStatus = string.IsNullOrWhiteSpace(labelJson) || labelJson == "[]" ? "Unlabeled" : "Labeled";
         await Db.SaveChangesAsync();
 
-        var sourcePath = System.IO.Path.Combine(Env.WebRootPath, image.RelativePath);        
+        var sourcePath = System.IO.Path.Combine(Env.WebRootPath, image.RelativePath);
         var imagesFolder = System.IO.Path.GetDirectoryName(sourcePath)!;
         var parentFolder = System.IO.Path.GetDirectoryName(imagesFolder)!;
         var annotatedFolder = System.IO.Path.Combine(parentFolder, "images_annotated");
@@ -118,7 +264,7 @@
                     var y = (float)box.GetProperty("y").GetDouble();
                     var w = (float)box.GetProperty("w").GetDouble();
                     var h = (float)box.GetProperty("h").GetDouble();
-                    var label = box.GetProperty("label").GetString() ?? "";                    
+                    var label = box.GetProperty("label").GetString() ?? "";
                     Console.WriteLine($"[📦] Box: x={x}, y={y}, w={w}, h={h} (label={label})");
 
                     var index = labelList.IndexOf(label);
@@ -201,99 +347,52 @@
         }
     }
 
-}
+    private bool showDeleteConfirm = false;
 
-
-
-
-@if (isLoading)
-{
-    <p><em>Loading project...</em></p>
-}
-else if (project == null)
-{
-    <p class="text-danger">Project not found.</p>
-}
-else
-{
-    <h5 class="card-title">
-        <strong>@project.Name</strong>
-        <span class="text-muted" style="font-size: 1rem;">(@images.Count images)</span>
-    </h5>
-    <p class="card-text">Labels: @project.Labels | Created at @project.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</p>
-
-    @if (images.Count == 0)
+    private void ConfirmBulkDeleteImages()
     {
-        <p>No images uploaded for this project.</p>
+        var selected = images.Where(i => i.IsSelected).ToList();
+        if (selected.Count == 0)
+        {
+            JS.InvokeVoidAsync("alert", "⚠️ Please select at least one image to delete.");
+            return;
+        }
+
+        showDeleteConfirm = true;
     }
-    else
+
+    private async Task ExecuteBulkDeleteImages()
     {
-        <div class="d-flex flex-wrap gap-3">
-            @foreach (var image in images)
+        var selectedImages = images.Where(i => i.IsSelected).ToList();
+
+        foreach (var image in selectedImages)
+        {
+            try
             {
-                <div class="card" style="width: 320px;">
-                    @if (image.LabelStatus == "Labeled")
-                    {
-                        <span class="badge bg-success position-absolute top-0 start-0 m-2" style="z-index: 1;">
-                            ✔ Labeled
-                        </span>
-                    }
-                    <img class="card-img-top"
-                         src="@GetDisplayImagePath(image)"
-                         @onclick="() => OpenLabelingModal(image.RelativePath, image.Id)"
-                         style="cursor: pointer; width: 320px; height: 240px; object-fit: contain;" />
+                var sourcePath = System.IO.Path.Combine(Env.WebRootPath, image.RelativePath);
+                var imagesFolder = System.IO.Path.GetDirectoryName(sourcePath)!;
+                var parentFolder = System.IO.Path.GetDirectoryName(imagesFolder)!;
+                var annotatedPath = System.IO.Path.Combine(parentFolder, "images_annotated", image.FileName);
 
-                    <div class="card-body">
-                        <p class="card-text">
-                            @image.FileName <span class="text-muted" style="font-size: 0.75rem;">(@image.Width x @image.Height)</span>
-                        </p>
-                    </div>
-                </div>
+                if (File.Exists(sourcePath))
+                    File.Delete(sourcePath);
+                if (File.Exists(annotatedPath))
+                    File.Delete(annotatedPath);
+
+                Db.Images.Remove(image);
             }
-        </div>
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[❌] Failed to delete image {image.FileName}: {ex.Message}");
+            }
+        }
+
+        await Db.SaveChangesAsync();
+
+        showDeleteConfirm = false;
+        await LoadImages();
+
+        project.ImageCount = await Db.Images.CountAsync(i => i.ProjectId == projectId);
+        await Db.SaveChangesAsync();
     }
-}
-
-@if (showLabelingModal)
-{
-    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.6);">
-        <div class="modal-dialog modal-xl" style="max-height: 95vh;">
-            <div class="modal-content" style="max-height: 95vh; display: flex; flex-direction: column;">
-                <div class="modal-header">
-                    <h5 class="modal-title">Label Image</h5>
-                    <button type="button" class="btn-close" @onclick="() => showLabelingModal = false"></button>
-                </div>
-                <div class="modal-body" style="overflow: auto; max-height: 80vh;">
-                    <div style="position: relative; width: 100%; max-height: 100%;">
-                        <img id="targetImage"
-                             src="@selectedImagePath"
-                             style="width: 100%; height: auto; max-height: 100%; display: block; object-fit: contain;" />
-                        <canvas id="labelCanvas"
-                                style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></canvas>
-                    </div>
-                </div>
-
-                <div class="modal-footer d-flex justify-content-between align-items-center flex-wrap">
-                    <div class="d-flex align-items-center gap-2">
-                        <button class="btn btn-danger" @onclick="DeleteCurrentImage">Delete</button>
-                    </div>
-                    <div class="d-flex align-items-center gap-2 flex-grow-1 justify-content-center">
-                        <label for="labelSelector" class="form-label mb-0">Select label:</label>
-                        <select id="labelSelector" class="form-select" style="max-width: 120px;">
-                            @foreach (var label in selectedLabels.Split(',', StringSplitOptions.RemoveEmptyEntries))
-                            {
-                                <option value="@label.Trim()">@label.Trim()</option>
-                            }
-                        </select>
-                        <button class="btn btn-outline-danger btn-sm" onclick="clearBoxes()">Clear Boxes</button>
-                    </div>
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-secondary" @onclick="() => showLabelingModal = false">Close</button>
-                        <button class="btn btn-primary" onclick="saveLabelData()">Save Labels</button>
-                    </div>
-                </div>
-
-            </div>
-        </div>
-    </div>
 }

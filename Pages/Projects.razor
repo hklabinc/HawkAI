@@ -12,8 +12,7 @@
 @using SixLabors.ImageSharp.PixelFormats
 @using SixLabors.ImageSharp.Processing
 
-
-<h3>Project Manager</h3>
+<h4>AI Model Manager</h4>
 
 <div class="d-flex gap-2 mb-3">
     <button @onclick="() => showCreateModal = true" class="btn btn-primary"><span class="oi oi-plus"></span> Create New Project</button>
@@ -93,7 +92,6 @@ else
                         <!-- 왼쪽: Edit / Delete (간격 좁게) -->
                         <div class="d-flex gap-1">
                             <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenEditModal(p)">Edit</button>
-                            <button class="btn btn-sm btn-outline-danger" @onclick="() => PromptDelete(p.Id, p.Name)">Delete</button>
                         </div>
 
                         <!-- 오른쪽: Export / Augment / Train (간격 약간, 우측 정렬) -->
@@ -220,28 +218,6 @@ else
                 <div class="modal-footer">
                     <button class="btn btn-secondary" @onclick="() => showMergeModal = false">Cancel</button>
                     <button class="btn btn-primary" @onclick="ExecuteMerge">Merge</button>
-                </div>
-            </div>
-        </div>
-    </div>
-}
-
-@if (showDeleteConfirm)
-{
-    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header bg-danger text-white">
-                    <h5 class="modal-title">Delete Project</h5>
-                    <button type="button" class="btn-close" @onclick="() => showDeleteConfirm = false"></button>
-                </div>
-                <div class="modal-body">
-                    <p>Are you sure you want to delete project '<strong>@projectToDeleteName</strong>'?</p>
-                    <p class="text-danger">This will also delete all associated images and files.</p>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="() => showDeleteConfirm = false">Cancel</button>
-                    <button class="btn btn-danger" @onclick="ConfirmDelete">Yes, Delete</button>
                 </div>
             </div>
         </div>
@@ -569,43 +545,6 @@ else
                 Images = p.Images,
                 IsSelectedForMerge = false
             }).ToList();
-    }
-
-    private async Task ConfirmDelete()
-    {
-        var project = await Db.Projects.FindAsync(projectToDeleteId);
-        if (project == null) return;
-
-        var images = Db.Images.Where(i => i.ProjectId == project.Id);
-        Db.Images.RemoveRange(images);
-        Db.Projects.Remove(project);
-        await Db.SaveChangesAsync();
-
-        var path = Path.Combine(Env.WebRootPath, "datasets", project.Name);
-        if (Directory.Exists(path)) Directory.Delete(path, true);
-
-        showDeleteConfirm = false;
-        var result = isAdmin
-            ? await ProjectService.GetAllProjects()
-            : await ProjectService.GetUserProjects(userId);
-        projects = result.Select(p => new ProjectViewModel
-            {
-                Id = p.Id,
-                Name = p.Name,
-                Labels = p.Labels,
-                CreatorUserId = p.CreatorUserId,
-                CreatedAt = p.CreatedAt,
-                ImageCount = p.ImageCount,
-                Images = p.Images,
-                IsSelectedForMerge = false
-            }).ToList();
-    }
-
-    private void PromptDelete(int id, string name)
-    {
-        projectToDeleteId = id;
-        projectToDeleteName = name;
-        showDeleteConfirm = true;
     }
 
     private void OpenProject(int id)
