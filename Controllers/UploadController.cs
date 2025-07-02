@@ -196,11 +196,20 @@ namespace HawkAI.Controllers
             {
                 var txtFileName = Path.GetFileNameWithoutExtension(file.FileName); // 예: abc123
                 var labelText = await new StreamReader(file.OpenReadStream()).ReadToEndAsync();
+                labelText = labelText.Trim(); // 공백 제거
 
                 if (imageEntries.TryGetValue(txtFileName, out var imageEntry))
                 {
-                    imageEntry.LabelData = labelText;
-                    imageEntry.LabelStatus = "Labeled";
+                    if (string.IsNullOrEmpty(labelText) || labelText == "[]")
+                    {
+                        imageEntry.LabelData = "{}";
+                        imageEntry.LabelStatus = "Unlabeled";
+                    }
+                    else
+                    {
+                        imageEntry.LabelData = labelText;
+                        imageEntry.LabelStatus = "Labeled";
+                    }
                 }
             }
 
