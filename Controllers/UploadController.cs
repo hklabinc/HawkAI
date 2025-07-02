@@ -50,6 +50,7 @@ namespace HawkAI.Controllers
             _db.Projects.Add(project);
             await _db.SaveChangesAsync(); // Save to get project.Id
 
+            var projectDir = Path.Combine(_env.WebRootPath, "datasets", request.Name);
             var imageDir = Path.Combine(_env.WebRootPath, "datasets", request.Name, "images");
             Directory.CreateDirectory(imageDir);
 
@@ -73,6 +74,14 @@ namespace HawkAI.Controllers
                     LabelStatus = "Unlabeled",
                     LabelData = "{}"
                 });
+            }
+
+            // ✅ camera.json 처리
+            if (Request.Form.Files.FirstOrDefault(f => f.Name == "CameraFile") is IFormFile cameraFile)
+            {
+                var jsonPath = Path.Combine(projectDir, "camera.json");
+                await using var jsonStream = new FileStream(jsonPath, FileMode.Create);
+                await cameraFile.CopyToAsync(jsonStream);
             }
 
             await _db.SaveChangesAsync();
@@ -172,6 +181,14 @@ namespace HawkAI.Controllers
                     imageEntries[nameWithoutExt] = entry;
                     imageCount++;
                 }
+            }
+
+            // ✅ camera.json 처리
+            if (files.FirstOrDefault(f => f.Name == "CameraFile") is IFormFile cameraFile)
+            {
+                var jsonPath = Path.Combine(rootPath, "camera.json");
+                await using var jsonStream = new FileStream(jsonPath, FileMode.Create);
+                await cameraFile.CopyToAsync(jsonStream);
             }
 
             // .txt 파일에서 레이블 데이터를 읽어 ImageEntry에 반영
