@@ -50,8 +50,8 @@ namespace HawkAI.Controllers
             _db.Projects.Add(project);
             await _db.SaveChangesAsync(); // Save to get project.Id
 
-            var projectDir = Path.Combine(_env.WebRootPath, "datasets", request.Name);
-            var imageDir = Path.Combine(_env.WebRootPath, "datasets", request.Name, "images");
+            var projectDir = Path.Combine(_env.WebRootPath, "datasets", name);  
+            var imageDir = Path.Combine(projectDir, "images");
             Directory.CreateDirectory(imageDir);
 
             foreach (var file in request.Files)
