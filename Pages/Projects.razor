@@ -92,6 +92,10 @@ else
                         <!-- 왼쪽: Edit / Delete (간격 좁게) -->
                         <div class="d-flex gap-1">
                             <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenEditModal(p)">Edit</button>
+                            @if (HasCameraInfo(p.Name))
+                            {
+                                <button class="btn btn-sm btn-warning" @onclick="() => ShowCameraInfo(p.Name)">Cam Info</button>
+                            }
                         </div>
 
                         <!-- 오른쪽: Export / Augment / Train (간격 약간, 우측 정렬) -->
@@ -374,6 +378,27 @@ else
     </div>
 }
 
+@if (showCameraModal)
+{
+    <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title">Camera Info - @cameraProjectName</h5>
+                    <button type="button" class="btn-close" @onclick="() => showCameraModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    <pre style="white-space: pre-wrap;">@cameraJsonContent</pre>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showCameraModal = false">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+
 
 
 @code {
@@ -426,6 +451,10 @@ else
     private int? trainSeed = null;
 
     private bool showBulkDeleteConfirm = false;
+
+    private bool showCameraModal = false;
+    private string cameraJsonContent = string.Empty;
+    private string cameraProjectName = string.Empty;
 
 
     [JSInvokable]
@@ -1159,5 +1188,22 @@ else
             }).ToList();
     }
 
+    private void ShowCameraInfo(string projectName)
+    {
+        var jsonPath = Path.Combine(Env.WebRootPath, "datasets", projectName, "camera.json");
+
+        if (File.Exists(jsonPath))
+        {
+            cameraJsonContent = File.ReadAllText(jsonPath);
+            cameraProjectName = projectName;
+            showCameraModal = true;
+        }
+    }
+
+    private bool HasCameraInfo(string projectName)
+    {
+        var jsonPath = Path.Combine(Env.WebRootPath, "datasets", projectName, "camera.json");
+        return File.Exists(jsonPath);
+    }
 
 }
