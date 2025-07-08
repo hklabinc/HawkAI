@@ -143,3 +143,8 @@ input:checked + .slider:before {
 #labelCanvas {
     pointer-events: auto !important;
 }
+
+/* Added by hhchoi for removing Recoonect Message */
+#components-reconnect-modal {
+    display: none;
+}
