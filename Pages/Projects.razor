@@ -1159,6 +1159,7 @@ else
         {
             if (!string.IsNullOrEmpty(SessionId))
             {
+                Console.WriteLine($"Training session {SessionId}");
                 try
                 {
                     var statusText = await Http.GetStringAsync($"http://localhost:9002/api/progress_status/{SessionId}");
