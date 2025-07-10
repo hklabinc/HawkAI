@@ -2,32 +2,49 @@
     source: null,
 
     start: function (sessionId, dotNetHelper) {
+        console.log("🚀 [SSE] Starting new stream for session:", sessionId);
+
+        // 이전 소스가 있다면 종료
         if (this.source) {
+            console.log("🔁 [SSE] Existing stream found, closing it first.");
             this.source.close();
         }
 
-        // Flask 서버로 직접 연결 (필수)
-        this.source = new EventSource(`http://localhost:9002/api/progress/${sessionId}`);
+        const url = `http://localhost:9002/api/progress/${sessionId}`;
+        console.log("🌐 [SSE] Connecting to:", url);
+        this.source = new EventSource(url);
 
-        this.source.onmessage = function (event) {
-            console.log("📢 SSE:", event.data);
-            dotNetHelper.invokeMethodAsync("UpdateTrainStatus", event.data);
+        this.source.onopen = function () {
+            console.log("✅ [SSE] Connection opened.");
         };
 
-        this.source.onerror = () => {
-            console.error("❌ SSE error, closing.");
+        this.source.onmessage = function (event) {
+            console.log("📢 [SSE] Message received:", event.data);
+            dotNetHelper.invokeMethodAsync("UpdateTrainStatus", event.data)
+                .then(() => {
+                    console.log("✅ [Blazor] UpdateTrainStatus invoked successfully.");
+                })
+                .catch(err => {
+                    console.error("❌ [Blazor] Failed to invoke UpdateTrainStatus:", err);
+                });
+        };
+
+        this.source.onerror = (e) => {
+            console.error("❌ [SSE] Error occurred:", e);
             window.trainStatusStream.stop();
         };
     },
 
     stop: function () {
         if (this.source) {
+            console.log("🛑 [SSE] Stopping stream.");
             this.source.close();
             this.source = null;
+        } else {
+            console.log("⚠️ [SSE] No active stream to stop.");
         }
     }
 };
-
 
 
 
