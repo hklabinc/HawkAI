@@ -6,14 +6,17 @@
             this.source.close();
         }
 
-        this.source = new EventSource(`/api/progress/${sessionId}`);
+        // Flask 서버로 직접 연결 (필수)
+        this.source = new EventSource(`http://localhost:9002/api/progress/${sessionId}`);
+
         this.source.onmessage = function (event) {
             console.log("📢 SSE:", event.data);
             dotNetHelper.invokeMethodAsync("UpdateTrainStatus", event.data);
         };
-        this.source.onerror = function () {
+
+        this.source.onerror = () => {
             console.error("❌ SSE error, closing.");
-            this.source?.close();
+            window.trainStatusStream.stop();
         };
     },
 
@@ -24,6 +27,7 @@
         }
     }
 };
+
 
 
 

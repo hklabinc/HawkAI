@@ -460,9 +460,11 @@ else
     [JSInvokable]
     public async Task UpdateTrainStatus(string message)
     {
+        Console.WriteLine("📡 Received from SSE: " + message);
         trainStatusMessage = message;
-        StateHasChanged(); // ✅ UI 실시간 갱신
+        StateHasChanged();  // UI 업데이트
     }
+
 
     public void Dispose()
     {
