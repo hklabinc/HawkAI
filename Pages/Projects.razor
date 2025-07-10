@@ -372,6 +372,16 @@ else
                         <label class="form-label">Seed (Optional)</label>
                         <input type="number" class="form-control" @bind="trainSeed" placeholder="e.g. 42" />
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label">Training Server</label>
+                        <select class="form-select" @bind="selectedTrainServer">
+                            <option value="http://localhost:9002">HawkAI</option>
+                            <option value="http://ictrobot.hknu.ac.kr:9002">ICTRobot</option>
+                            <option value="http://sons.hknu.ac.kr:9003">Com3090</option>
+                            <option value="http://sons.hknu.ac.kr:9002">Com4090</option>
+                        </select>
+                    </div>
+
                     <div class="alert alert-info" role="alert">
                         @trainStatusMessage
                     </div>
@@ -465,6 +475,7 @@ else
     private string SessionId;    
     private System.Timers.Timer PollTimer;
     private bool isAugmenting = false;
+    private string selectedTrainServer = "http://localhost:9002";
 
 
     public void Dispose()
@@ -1140,7 +1151,7 @@ else
 
         try
         {
-            var response = await Http.PostAsJsonAsync("http://localhost:9002/api/train", payload);
+            var response = await Http.PostAsJsonAsync($"{selectedTrainServer}/api/train", payload);
 
             if (!response.IsSuccessStatusCode)
             {
@@ -1182,7 +1193,7 @@ else
             {
                 try
                 {
-                    var result = await Http.GetFromJsonAsync<ProgressStatus>($"http://localhost:9002/api/progress_status/{SessionId}");
+                    var result = await Http.GetFromJsonAsync<ProgressStatus>($"{selectedTrainServer}/api/progress_status/{SessionId}");
                     var statusText = result?.status ?? "⚠️ No status";
 
                     if (statusText != trainStatusMessage)
