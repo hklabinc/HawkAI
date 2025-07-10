@@ -456,7 +456,7 @@ else
     private string cameraJsonContent = string.Empty;
     private string cameraProjectName = string.Empty;
 
-    private System.Timers.Timer PollTimer;
+    // private System.Timers.Timer PollTimer;
     private string SessionId;
     // private string trainStatusMessage = "";
 
@@ -1148,7 +1148,7 @@ else
 
             if (result?.status == "success" && !string.IsNullOrWhiteSpace(result.session_id))
             {
-                var sessionId = result.session_id;
+                SessionId = result.session_id;
                 StartPolling();  // 여기에서 시작
 
                 // Start SSE for progress updates
@@ -1167,6 +1167,9 @@ else
     }
 
 
+    private System.Timers.Timer PollTimer;
+    private string StatusMessage { get; set; } = string.Empty;
+
     private void StartPolling()
     {
         PollTimer?.Stop();
@@ -1177,14 +1180,14 @@ else
             {
                 try
                 {
-                    var result = await Http.GetFromJsonAsync<ProgressStatus>($"http://localhost:9002/api/progress_status/{SessionId}");
-                    if (result?.status != StatusMessage)
+                    var statusText = await Http.GetStringAsync($"http://localhost:9002/api/progress_status/{SessionId}");
+                    if (statusText != StatusMessage)
                     {
-                        StatusMessage = result.status;
+                        StatusMessage = statusText;
                         InvokeAsync(StateHasChanged);
                     }
 
-                    if (result?.status.StartsWith("✅") == true || result?.status.StartsWith("❌") == true)
+                    if (statusText.StartsWith("✅") || statusText.StartsWith("❌"))
                     {
                         PollTimer?.Stop();
                     }
