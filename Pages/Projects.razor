@@ -1154,7 +1154,7 @@ else
     private void StartPolling()
     {
         PollTimer?.Stop();
-        PollTimer = new System.Timers.Timer(5000); // 5초마다 polling
+        PollTimer = new System.Timers.Timer(1000); // 5초마다 polling
         PollTimer.Elapsed += async (_, _) =>
         {
             if (!string.IsNullOrEmpty(SessionId))
