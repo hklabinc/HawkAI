@@ -456,6 +456,7 @@ else
     private string cameraJsonContent = string.Empty;
     private string cameraProjectName = string.Empty;
     private string SessionId;    
+    private System.Timers.Timer PollTimer;
 
     public void Dispose()
     {
@@ -1150,8 +1151,6 @@ else
     }
 
 
-    private System.Timers.Timer PollTimer;
-
     public class ProgressStatus
     {
         public string status { get; set; }
@@ -1160,23 +1159,18 @@ else
     private void StartPolling()
     {
         PollTimer?.Stop();
-        PollTimer = new System.Timers.Timer(1000); // 1초마다 polling
+        PollTimer = new System.Timers.Timer(5000); // 1초마다 polling
         PollTimer.Elapsed += async (_, _) =>
         {
             if (!string.IsNullOrEmpty(SessionId))
             {
-                Console.WriteLine($"Polling training status for session {SessionId}...");
                 try
                 {
                     var result = await Http.GetFromJsonAsync<ProgressStatus>($"http://localhost:9002/api/progress_status/{SessionId}");
                     var statusText = result?.status ?? "⚠️ No status";
 
-                    Console.WriteLine($"Received status: {statusText}");
-
                     if (statusText != trainStatusMessage)
                     {
-                        Console.WriteLine($"Training status updated: {statusText}");
-
                         // UI 업데이트는 Dispatcher 스레드에서 수행해야 함
                         await InvokeAsync(() =>
                         {
@@ -1193,8 +1187,6 @@ else
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error during polling: {ex.Message}");
-
                     await InvokeAsync(() =>
                     {
                         trainStatusMessage = "⚠️ Error during polling";
@@ -1205,14 +1197,9 @@ else
                 }
             }
         };
-        Console.WriteLine("Starting polling timer...");
         PollTimer.AutoReset = true;
         PollTimer.Start();
     }
-
-
-
-
 
 
 
