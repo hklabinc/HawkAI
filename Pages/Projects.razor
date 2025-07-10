@@ -1176,8 +1176,13 @@ else
                     if (statusText != trainStatusMessage)
                     {
                         Console.WriteLine($"Training status updated: {statusText}");
-                        trainStatusMessage = statusText;
-                        StateHasChanged();  // UI 업데이트
+
+                        // UI 업데이트는 Dispatcher 스레드에서 수행해야 함
+                        await InvokeAsync(() =>
+                        {
+                            trainStatusMessage = statusText;
+                            StateHasChanged();  // UI 리렌더링
+                        });
                     }
 
                     if (statusText.StartsWith("✅") || statusText.StartsWith("❌"))
@@ -1189,7 +1194,13 @@ else
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Error during polling: {ex.Message}");
-                    trainStatusMessage = "⚠️ Error during polling";
+
+                    await InvokeAsync(() =>
+                    {
+                        trainStatusMessage = "⚠️ Error during polling";
+                        StateHasChanged();
+                    });
+
                     PollTimer?.Stop();
                 }
             }
@@ -1198,6 +1209,7 @@ else
         PollTimer.AutoReset = true;
         PollTimer.Start();
     }
+
 
 
 
