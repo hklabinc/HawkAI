@@ -96,6 +96,10 @@ else
                             {
                                 <button class="btn btn-sm btn-outline-warning" @onclick="() => ShowCameraInfo(p.Name)">Cam Info</button>
                             }
+                            @if (projectHasModelMap.TryGetValue(p.Name, out var hasModels) && hasModels)
+                            {
+                                <button class="btn btn-sm btn-outline-success" @onclick="() => ShowModelFolders(p.Name)">Models</button>
+                            }
                         </div>
 
                         <!-- 오른쪽: Export / Augment / Train (간격 약간, 우측 정렬) -->
@@ -369,17 +373,17 @@ else
                         <input type="number" class="form-control" @bind="trainBatch" min="1" max="128" />
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Seed (Optional)</label>
-                        <input type="number" class="form-control" @bind="trainSeed" placeholder="e.g. 42" />
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Training Server</label>
+                        <label class="form-label">Server</label>
                         <select class="form-select" @bind="selectedTrainServer">
                             <option value="http://localhost:9002">HawkAI</option>
-                            <option value="http://ictrobot.hknu.ac.kr:9002">ICTRobot</option>
-                            <option value="http://sons.hknu.ac.kr:9003">Com3090</option>
-                            <option value="http://sons.hknu.ac.kr:9002">Com4090</option>
+                            <option value="http://ictrobot.hknu.ac.kr:9002" disabled>ICTRobot</option>
+                            <option value="http://sons.hknu.ac.kr:9003" disabled>Com3090</option>
+                            <option value="http://sons.hknu.ac.kr:9002" disabled>Com4090</option>
                         </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Seed (Optional)</label>
+                        <input type="number" class="form-control" @bind="trainSeed" placeholder="e.g. 42" />
                     </div>
 
                     <div class="alert alert-info" role="alert">
@@ -415,11 +419,45 @@ else
     </div>
 }
 
+@if (showModelModal)
+{
+    <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">Model Folders - @modelProjectName</h5>
+                    <button type="button" class="btn-close" @onclick="() => showModelModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    @if (modelFolderNames.Count == 0)
+                    {
+                        <p>No model folders found for this project.</p>
+                    }
+                    else
+                    {
+                        <ul>
+                            @foreach (var folder in modelFolderNames)
+                            {
+                                <li>@folder</li>
+                            }
+                        </ul>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showModelModal = false">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 
 
 
 @code {
     private List<ProjectViewModel> projects = new();
+    private Dictionary<string, bool> projectHasModelMap = new();
+
     private string newProjectName = string.Empty;
     private string labelInput = string.Empty;
     private bool showCreateModal = false;
@@ -477,6 +515,10 @@ else
     private bool isAugmenting = false;
     private string selectedTrainServer = "http://localhost:9002";
 
+    private bool showModelModal = false;
+    private string modelProjectName = string.Empty;
+    private List<string> modelFolderNames = new();
+
 
     public void Dispose()
     {
@@ -508,6 +550,17 @@ else
                     Images = p.Images,
                     IsSelectedForMerge = false
                 }).ToList();
+
+        // 모델 폴더가 있는지 확인
+        var runDir = Path.Combine(Env.WebRootPath, "runs");
+        var runFolders = Directory.Exists(runDir)
+            ? Directory.GetDirectories(runDir).Select(Path.GetFileName).ToList()
+            : new List<string>();
+
+        projectHasModelMap = projects.ToDictionary(
+            p => p.Name,
+            p => runFolders.Any(f => f != null && f.StartsWith(p.Name, StringComparison.OrdinalIgnoreCase))
+        );
     }
 
     private async Task CreateProject()
@@ -723,12 +776,13 @@ else
 
         await File.WriteAllTextAsync(yamlPath, yaml);
 
-        var zipPath = Path.Combine(Env.WebRootPath, "exports", $"{project.Name}_yolo_export.zip");
+        var zipPath = Path.Combine(Env.WebRootPath, "exports", $"{project.Name}.zip");
         if (File.Exists(zipPath)) File.Delete(zipPath);
         ZipFile.CreateFromDirectory(baseDir, zipPath);
 
-        var relativeZip = "/exports/" + Path.GetFileName(zipPath);
-        Navigation.NavigateTo(relativeZip, true);
+        // 브라우저에서 자동 다운로드를 위해
+        // var relativeZip = "/exports/" + Path.GetFileName(zipPath);
+        // Navigation.NavigateTo(relativeZip, true);
     }
 
 
@@ -1300,4 +1354,24 @@ else
         return File.Exists(jsonPath);
     }
 
+
+    private void ShowModelFolders(string projectName)
+    {
+        var runsPath = Path.Combine(Env.WebRootPath, "runs");
+
+        if (!Directory.Exists(runsPath))
+        {
+            modelFolderNames = new();
+        }
+        else
+        {
+            modelFolderNames = Directory.GetDirectories(runsPath)
+                .Select(Path.GetFileName)
+                .Where(name => name != null && name.StartsWith(projectName, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        modelProjectName = projectName;
+        showModelModal = true;
+    }
 }

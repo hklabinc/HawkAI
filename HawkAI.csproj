@@ -32,6 +32,10 @@
     <Folder Include="Migrations\" />
     <Folder Include="wwwroot\cert\" />
     <Folder Include="wwwroot\datasets\" />
+    <Folder Include="wwwroot\runs\YS_bridge_small_123456_000000\" />
+    <Folder Include="wwwroot\runs\YS_top_small_123456_000000\" />
+    <Folder Include="wwwroot\runs\YS_top_123456_789023 - 복사\" />
+    <Folder Include="wwwroot\runs\YS_top_123456_789023\" />
   </ItemGroup>
 
 </Project>
