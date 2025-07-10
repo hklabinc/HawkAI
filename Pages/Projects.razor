@@ -1183,7 +1183,8 @@ else
                     var statusText = await Http.GetStringAsync($"http://localhost:9002/api/progress_status/{SessionId}");
                     if (statusText != StatusMessage)
                     {
-                        StatusMessage = statusText;
+                        // StatusMessage = statusText;
+                        UpdateTrainStatus(statusText);
                         InvokeAsync(StateHasChanged);
                     }
 
