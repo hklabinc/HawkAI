@@ -455,8 +455,6 @@ else
     private bool showCameraModal = false;
     private string cameraJsonContent = string.Empty;
     private string cameraProjectName = string.Empty;
-
-    private System.Timers.Timer PollTimer;
     private string SessionId;    
 
     public void Dispose()
@@ -1151,40 +1149,50 @@ else
         }
     }
 
+
+    private System.Timers.Timer PollTimer;
+
     private void StartPolling()
     {
         PollTimer?.Stop();
-        PollTimer = new System.Timers.Timer(1000); // 5초마다 polling
+        PollTimer = new System.Timers.Timer(1000); // 1초마다 polling
         PollTimer.Elapsed += async (_, _) =>
         {
             if (!string.IsNullOrEmpty(SessionId))
             {
-                Console.WriteLine($"Training session {SessionId}");
+                Console.WriteLine($"Polling training status for session {SessionId}...");
                 try
                 {
                     var statusText = await Http.GetStringAsync($"http://localhost:9002/api/progress_status/{SessionId}");
+                    Console.WriteLine($"Received status: {statusText}");
                     if (statusText != trainStatusMessage)
                     {
+                        Console.WriteLine($"Training status updated: {statusText}");
                         trainStatusMessage = statusText;
                         StateHasChanged();  // UI 업데이트
                     }
 
                     if (statusText.StartsWith("✅") || statusText.StartsWith("❌"))
                     {
-                        Console.WriteLine($"Training session {SessionId} completed with status: {statusText}");
+                        Console.WriteLine("Training completed or failed, stopping polling.");
                         PollTimer?.Stop();
                     }
                 }
                 catch
                 {
+                    Console.WriteLine("Error during polling, stopping timer."); 
                     trainStatusMessage = "⚠️ Error during polling";
                     PollTimer?.Stop();
                 }
             }
         };
+        Console.WriteLine("Starting polling timer...");
         PollTimer.AutoReset = true;
         PollTimer.Start();
     }
+
+
+
 
 
     private void ConfirmBulkDelete()
