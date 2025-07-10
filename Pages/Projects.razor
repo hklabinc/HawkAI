@@ -1193,7 +1193,7 @@ else
             {
                 try
                 {
-                    var result = await Http.GetFromJsonAsync<ProgressStatus>($"{selectedTrainServer}/api/progress_status/{SessionId}");
+                    var result = await Http.GetFromJsonAsync<ProgressStatus>($"{selectedTrainServer}/api/progress/{SessionId}");
                     var statusText = result?.status ?? "⚠️ No status";
 
                     if (statusText != trainStatusMessage)
