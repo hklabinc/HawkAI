@@ -1172,6 +1172,7 @@ else
                     var statusText = result?.status ?? "⚠️ No status";
 
                     Console.WriteLine($"Received status: {statusText}");
+
                     if (statusText != trainStatusMessage)
                     {
                         Console.WriteLine($"Training status updated: {statusText}");
@@ -1185,9 +1186,9 @@ else
                         PollTimer?.Stop();
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    Console.WriteLine("Error during polling, stopping timer."); 
+                    Console.WriteLine($"Error during polling: {ex.Message}");
                     trainStatusMessage = "⚠️ Error during polling";
                     PollTimer?.Stop();
                 }
@@ -1197,6 +1198,7 @@ else
         PollTimer.AutoReset = true;
         PollTimer.Start();
     }
+
 
 
 
