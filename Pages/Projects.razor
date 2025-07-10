@@ -456,6 +456,10 @@ else
     private string cameraJsonContent = string.Empty;
     private string cameraProjectName = string.Empty;
 
+    private System.Timers.Timer PollTimer;
+    private string SessionId;
+    private string trainStatusMessage = "";
+
 
     [JSInvokable]
     public async Task UpdateTrainStatus(string message)
