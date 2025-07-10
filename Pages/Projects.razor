@@ -1152,6 +1152,11 @@ else
 
     private System.Timers.Timer PollTimer;
 
+    public class ProgressStatus
+    {
+        public string status { get; set; }
+    }
+
     private void StartPolling()
     {
         PollTimer?.Stop();
@@ -1163,7 +1168,9 @@ else
                 Console.WriteLine($"Polling training status for session {SessionId}...");
                 try
                 {
-                    var statusText = await Http.GetStringAsync($"http://localhost:9002/api/progress_status/{SessionId}");
+                    var result = await Http.GetFromJsonAsync<ProgressStatus>($"http://localhost:9002/api/progress_status/{SessionId}");
+                    var statusText = result?.status ?? "⚠️ No status";
+
                     Console.WriteLine($"Received status: {statusText}");
                     if (statusText != trainStatusMessage)
                     {
