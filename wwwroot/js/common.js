@@ -10,7 +10,7 @@
             this.source.close();
         }
 
-        const url = `http://localhost:9002/api/progress/${sessionId}`;
+        const url = `http://hawkai.hknu.ac.kr:9002/api/progress/${sessionId}`;
         console.log("🌐 [SSE] Connecting to:", url);
         this.source = new EventSource(url);
 
