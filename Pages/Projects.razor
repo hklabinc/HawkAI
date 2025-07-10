@@ -438,13 +438,35 @@ else
                         <ul>
                             @foreach (var folder in modelFolderNames)
                             {
-                                <li>@folder</li>
+                                <li style="cursor: pointer; color: blue;" @onclick="() => ShowResultsImage(folder)">
+                                    @folder
+                                </li>
                             }
                         </ul>
                     }
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" @onclick="() => showModelModal = false">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showResultsImageModal)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.6);">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title">Results Image</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showResultsImageModal = false"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img src="@resultsImagePath" style="max-width: 100%; height: auto;" alt="Results" />
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showResultsImageModal = false">Close</button>
                 </div>
             </div>
         </div>
@@ -518,6 +540,8 @@ else
     private bool showModelModal = false;
     private string modelProjectName = string.Empty;
     private List<string> modelFolderNames = new();
+    private bool showResultsImageModal = false;
+    private string resultsImagePath = string.Empty;
 
 
     public void Dispose()
@@ -1374,4 +1398,21 @@ else
         modelProjectName = projectName;
         showModelModal = true;
     }
+
+    private void ShowResultsImage(string folderName)
+    {
+        var imagePath = Path.Combine("runs", folderName, "results.png");
+        var fullPath = Path.Combine(Env.WebRootPath, imagePath);
+
+        if (File.Exists(fullPath))
+        {
+            resultsImagePath = "/" + imagePath.Replace("\\", "/"); // 웹 경로로
+            showResultsImageModal = true;
+        }
+        else
+        {
+            JS.InvokeVoidAsync("alert", $"❌ results.png not found in folder: {folderName}");
+        }
+    }
+
 }
