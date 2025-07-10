@@ -456,19 +456,8 @@ else
     private string cameraJsonContent = string.Empty;
     private string cameraProjectName = string.Empty;
 
-    // private System.Timers.Timer PollTimer;
-    private string SessionId;
-    // private string trainStatusMessage = "";
-
-
-    [JSInvokable]
-    public async Task UpdateTrainStatus(string message)
-    {
-        Console.WriteLine("📡 Received from SSE: " + message);
-        trainStatusMessage = message;
-        StateHasChanged();  // UI 업데이트
-    }
-
+    private System.Timers.Timer PollTimer;
+    private string SessionId;    
 
     public void Dispose()
     {
@@ -1150,10 +1139,6 @@ else
             {
                 SessionId = result.session_id;
                 StartPolling();  // 여기에서 시작
-
-                // Start SSE for progress updates
-                // sseRef = DotNetObjectReference.Create(this);
-                // await JS.InvokeVoidAsync("trainStatusStream.start", sessionId, sseRef);
             }
             else
             {
@@ -1166,14 +1151,10 @@ else
         }
     }
 
-
-    private System.Timers.Timer PollTimer;
-    private string StatusMessage { get; set; } = string.Empty;
-
     private void StartPolling()
     {
         PollTimer?.Stop();
-        PollTimer = new System.Timers.Timer(1000); // 1초마다 polling
+        PollTimer = new System.Timers.Timer(5000); // 5초마다 polling
         PollTimer.Elapsed += async (_, _) =>
         {
             if (!string.IsNullOrEmpty(SessionId))
@@ -1181,21 +1162,21 @@ else
                 try
                 {
                     var statusText = await Http.GetStringAsync($"http://localhost:9002/api/progress_status/{SessionId}");
-                    if (statusText != StatusMessage)
+                    if (statusText != trainStatusMessage)
                     {
-                        // StatusMessage = statusText;
-                        UpdateTrainStatus(statusText);
-                        InvokeAsync(StateHasChanged);
+                        trainStatusMessage = statusText;
+                        StateHasChanged();  // UI 업데이트
                     }
 
                     if (statusText.StartsWith("✅") || statusText.StartsWith("❌"))
                     {
+                        Console.WriteLine($"Training session {SessionId} completed with status: {statusText}");
                         PollTimer?.Stop();
                     }
                 }
                 catch
                 {
-                    StatusMessage = "⚠️ Error during polling";
+                    trainStatusMessage = "⚠️ Error during polling";
                     PollTimer?.Stop();
                 }
             }
@@ -1203,9 +1184,6 @@ else
         PollTimer.AutoReset = true;
         PollTimer.Start();
     }
-
-
-
 
 
     private void ConfirmBulkDelete()
