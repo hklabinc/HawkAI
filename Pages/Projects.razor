@@ -1145,10 +1145,11 @@ else
             if (result?.status == "success" && !string.IsNullOrWhiteSpace(result.session_id))
             {
                 var sessionId = result.session_id;
+                StartPolling();  // 여기에서 시작
 
                 // Start SSE for progress updates
-                sseRef = DotNetObjectReference.Create(this);
-                await JS.InvokeVoidAsync("trainStatusStream.start", sessionId, sseRef);
+                // sseRef = DotNetObjectReference.Create(this);
+                // await JS.InvokeVoidAsync("trainStatusStream.start", sessionId, sseRef);
             }
             else
             {
@@ -1160,6 +1161,43 @@ else
             trainStatusMessage = $"❌ Failed to contact training server: {ex.Message}";
         }
     }
+
+
+    private void StartPolling()
+    {
+        PollTimer?.Stop();
+        PollTimer = new System.Timers.Timer(1000); // 1초마다 polling
+        PollTimer.Elapsed += async (_, _) =>
+        {
+            if (!string.IsNullOrEmpty(SessionId))
+            {
+                try
+                {
+                    var result = await Http.GetFromJsonAsync<ProgressStatus>($"https://hawkai.hknu.ac.kr:9002/api/progress_status/{SessionId}");
+                    if (result?.status != StatusMessage)
+                    {
+                        StatusMessage = result.status;
+                        InvokeAsync(StateHasChanged);
+                    }
+
+                    if (result?.status.StartsWith("✅") == true || result?.status.StartsWith("❌") == true)
+                    {
+                        PollTimer?.Stop();
+                    }
+                }
+                catch
+                {
+                    StatusMessage = "⚠️ Error during polling";
+                    PollTimer?.Stop();
+                }
+            }
+        };
+        PollTimer.AutoReset = true;
+        PollTimer.Start();
+    }
+
+
+
 
 
     private void ConfirmBulkDelete()
