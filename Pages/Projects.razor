@@ -1173,7 +1173,7 @@ else
             {
                 try
                 {
-                    var result = await Http.GetFromJsonAsync<ProgressStatus>($"https://hawkai.hknu.ac.kr:9002/api/progress_status/{SessionId}");
+                    var result = await Http.GetFromJsonAsync<ProgressStatus>($"http://localhost:9002/api/progress_status/{SessionId}");
                     if (result?.status != StatusMessage)
                     {
                         StatusMessage = result.status;
