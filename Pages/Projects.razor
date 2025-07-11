@@ -738,7 +738,8 @@ else
 
         var random = new Random();
         var images = project.Images.OrderBy(_ => random.Next()).ToList();
-        int splitIndex = (int)(images.Count * (1 - validRatio));
+        var validRatio_orignalImages = 0.0f;
+        int splitIndex = (int)(images.Count * (1 - validRatio_orignalImages));
         var train = images.Take(splitIndex).ToList();
         var valid = images.Skip(splitIndex).ToList();
 
