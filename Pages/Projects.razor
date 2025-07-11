@@ -715,8 +715,6 @@ else
 
     private async Task Export(int projectId)
     {
-        showExportModal = false;
-
         var exportsRoot = Path.Combine(Env.WebRootPath, "exports");
         if (Directory.Exists(exportsRoot))
         {
