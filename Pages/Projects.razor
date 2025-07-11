@@ -51,6 +51,14 @@ else
                         displayPath = "/" + p.Images.First().RelativePath;
                     }
 
+                    int labeled = p.Images.Count(img => img.LabelStatus == "Labeled");
+                    int total = p.Images.Count;
+                    int percent = (int)Math.Round((double)labeled / total * 100);
+
+                    <span class="@((percent == 100 ? "badge bg-success" : "badge border border-success text-success bg-white")) position-absolute top-0 start-0 m-2" style="z-index: 1;">
+                        @percent%
+                    </span>
+
                     <img src="@displayPath"
                          class="card-img-top"
                          style="height: 180px; object-fit: cover; cursor: pointer;"
@@ -59,16 +67,9 @@ else
                 <div class="card-body">
                     <h5 class="card-title mb-1">
                         <strong>@p.Name</strong>
-                        @{
-                            int labeled = p.Images.Count(img => img.LabelStatus == "Labeled");
-                            int total = p.Images.Count;
-                        }
-                        @if (total > 0)
-                        {
-                            <span class="text-muted" style="font-size: 0.95rem;">
-                                (@labeled labeled / @total images)
-                            </span>
-                        }
+                        <span class="text-muted" style="font-size: 0.95rem;">
+                            (@p.Images.Count images)
+                        </span>
                     </h5>
                     <p class="card-text mb-0">Labels: @p.Labels</p>
 
