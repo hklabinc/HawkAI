@@ -1,7 +1,6 @@
 ﻿@page "/projects"
 @inject HawkAI.Data.ProjectService.IProjectService ProjectService
 @inject AuthenticationStateProvider AuthenticationStateProvider
-@inject NavigationManager Navigation
 @inject IWebHostEnvironment Env
 @inject DataDbContext Db
 @inject IJSRuntime JS
@@ -68,7 +67,7 @@ else
                     <h5 class="card-title mb-1">
                         <strong>@p.Name</strong>
                         <span class="text-muted" style="font-size: 0.95rem;">
-                            (@p.Images.Count images)
+                            (@p.Images.Count)
                         </span>
                     </h5>
                     <p class="card-text mb-0">Labels: @p.Labels</p>
@@ -107,9 +106,6 @@ else
                         <div class="d-flex ms-auto">
                             <button class="btn btn-sm btn-outline-dark me-1" title="Export" @onclick="() => OpenExportModal(p.Id)">
                                 <span class="oi oi-data-transfer-download"></span>
-                            </button>
-                            <button class="btn btn-sm btn-outline-dark me-1" title="Augment" @onclick="() => OpenAugmentModal(p.Id)">
-                                <span class="oi oi-loop"></span>
                             </button>
                             <button class="btn btn-sm btn-outline-dark" title="Train" @onclick="() => OpenTrainModal(p.Id)">
                                 <span class="oi oi-cog"></span>
@@ -272,7 +268,7 @@ else
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Export Image Size</label>
+                        <label class="form-label">Image Size</label>
                         <select class="form-select" @bind="selectedImageSize">
                             <option value="640">640 x 640</option>
                             <option value="512">512 x 512</option>
@@ -280,64 +276,46 @@ else
                             <option value="320">320 x 320</option>
                         </select>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Validation Ratio: @($"{selectedValidRatio:P0}")</label>
-                        <input type="range" class="form-range" min="0" max="100" step="5" @bind="sliderValue">
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="() => showExportModal = false">Cancel</button>
-                    <button class="btn btn-primary" @onclick="() => Export(exportProjectId)">Export</button>
-                </div>
-            </div>
-        </div>
-    </div>
-}
 
-@if (showAugmentModel)
-{
-    <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Augment Model for '@selectedProject?.Name'</h5>
-                    <button type="button" class="btn-close" @onclick="() => showAugmentModel = false"></button>
-                </div>
-                <div class="modal-body">
-                    <p><strong>Image Count:</strong> @selectedProject?.ImageCount</p>
+                    <!-- ✅ Validation Ratio -->
                     <div class="mb-3">
-                        <label class="form-label">Validation Ratio: @($"{validRatio * 100:F0}%")</label>
+                        <label class="form-label">Validation Ratio: @($"{validRatioInt}%")</label>
                         <input type="range" class="form-range" min="10" max="50" step="5" @bind="validRatioInt" />
                     </div>
+
+                    <!-- ✅ Augmentation Multiplier -->
                     <div class="mb-3">
                         <label class="form-label">
-                            Augmentation Multiplier 
+                            Augmentation Multiplier
                             @if (selectedProject?.ImageCount > 0)
                             {
                                 <span class="text-muted">(recommended ≥ @recommendedAugMultiplier)</span>
                             }
                         </label>
-                        <input type="number" class="form-control" @bind="augMultiplier" min="1" max="10" />
+                        <input type="number" class="form-control" @bind="augMultiplier" min="1" max="40" />
                     </div>
+
+                    <!-- ✅ Seed -->
                     <div class="mb-3">
                         <label class="form-label">Seed Value (optional)</label>
                         <input type="number" class="form-control" @bind="augmentSeed" placeholder="e.g. 42" />
                     </div>
-                    @if (isAugmenting)
-                    {
-                        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-                        background: rgba(255,255,255,0.7); display: flex; justify-content: center; align-items: center; z-index: 9999;">
-                            <img src="/img/loading.gif" alt="Loading..." style="width: 80px; height: 80px;" />
-                        </div>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(augmentStatusMessage))
-                    {
-                        <div class="alert alert-info">@augmentStatusMessage</div>
-                    }
                 </div>
+
+                @if (isAugmenting)
+                {
+                    <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(255,255,255,0.7); display: flex; justify-content: center; align-items: center; z-index: 9999;">
+                        <img src="/img/loading.gif" alt="Loading..." style="width: 80px; height: 80px;" />
+                    </div>
+                }
+                @if (!string.IsNullOrWhiteSpace(augmentStatusMessage))
+                {
+                    <div class="alert alert-info">@augmentStatusMessage</div>
+                }
                 <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="() => showAugmentModel = false">Close</button>
-                    <button class="btn btn-success" @onclick="TriggerAugment">Start Augmentation</button>
+                    <button class="btn btn-secondary" @onclick="() => showExportModal = false">Cancel</button>
+                    <button class="btn btn-primary" @onclick="() => Export(exportProjectId)">Export</button>
                 </div>
             </div>
         </div>
@@ -478,6 +456,9 @@ else
 
 
 @code {
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private HttpClient Http { get; set; } = default!;
+
     private List<ProjectViewModel> projects = new();
     private Dictionary<string, bool> projectHasModelMap = new();
 
@@ -497,8 +478,6 @@ else
     private bool showExportModal = false;
     private int exportProjectId;
     private int selectedImageSize = 640;
-    private int sliderValue = 0; // percentage from 0 to 100
-    private float selectedValidRatio => sliderValue / 100f;
 
     private bool showEditModal = false;
     private Project editingProject = new();
@@ -509,12 +488,12 @@ else
     private string mergeProjectName = string.Empty;
     private string mergeLabels = string.Empty;
 
-    private bool showAugmentModel = false;
+    private int validRatioInt = 30;  // 기본값 30%
+    private float validRatio => validRatioInt / 100f;
+
     private Project? selectedProject = null;
     private int augMultiplier = 3;
     private string augmentStatusMessage = string.Empty;
-    private int validRatioInt = 30; // 30% 기본값
-    private float validRatio => validRatioInt / 100f;
     private int? augmentSeed = null;
     private int recommendedAugMultiplier => selectedProject?.ImageCount > 0
         ? (int)Math.Ceiling(10000.0 / (56 * selectedProject.ImageCount) - 1)
@@ -725,6 +704,11 @@ else
     private void OpenExportModal(int projectId)
     {
         exportProjectId = projectId;
+        selectedProject = projects.FirstOrDefault(p => p.Id == projectId);
+        validRatioInt = 30;
+        augMultiplier = recommendedAugMultiplier;
+        augmentStatusMessage = string.Empty;
+        isAugmenting = false;
         showExportModal = true;
     }
 
@@ -755,7 +739,7 @@ else
 
         var random = new Random();
         var images = project.Images.OrderBy(_ => random.Next()).ToList();
-        int splitIndex = (int)(images.Count * (1 - selectedValidRatio));
+        int splitIndex = (int)(images.Count * (1 - validRatio));
         var train = images.Take(splitIndex).ToList();
         var valid = images.Skip(splitIndex).ToList();
 
@@ -806,7 +790,7 @@ else
             $"hklab:\n" +
             $"  project: {project.Name.ToLower().Replace(" ", "-")}\n" +
             $"  version: 1\n" +
-            $"  ratioOfValid: {selectedValidRatio}\n" +
+            $"  ratioOfValid: {validRatio}\n" +
             $"  url: https://hawkai.hknu.ac.kr/projects/{projectId}\n";
 
         await File.WriteAllTextAsync(yamlPath, yaml);
@@ -815,10 +799,66 @@ else
         if (File.Exists(zipPath)) File.Delete(zipPath);
         ZipFile.CreateFromDirectory(baseDir, zipPath);
 
+        // ✅ Export 완료 후 Augment 수행
+        await TriggerAugmentAfterExport(exportProjectId, exportDir: baseDir);
+
         // 브라우저에서 자동 다운로드를 위해
         // var relativeZip = "/exports/" + Path.GetFileName(zipPath);
         // Navigation.NavigateTo(relativeZip, true);
     }
+
+    private async Task TriggerAugmentAfterExport(int projectId, string exportDir)
+    {
+        if (selectedProject == null || selectedProject.Id != projectId)
+        {
+            augmentStatusMessage = "❌ No project selected.";
+            return;
+        }
+
+        isAugmenting = true;
+        StateHasChanged();
+
+        var payload = new Dictionary<string, object>
+            {
+                { "project_name", selectedProject.Name },
+                { "base_dir", exportDir },
+                { "valid_ratio", validRatio },  // 고정값 or 필요시 추후 설정
+                { "n", augMultiplier }
+            };
+
+        if (augmentSeed.HasValue)
+        {
+            payload["seed"] = augmentSeed.Value;
+        }
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync("http://localhost:9001/api/augment", payload);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<ServerResponse>();
+                augmentStatusMessage = result?.status == "success"
+                    ? $"✅ {result.message}"
+                    : $"❌ Unexpected response format.";
+            }
+            else
+            {
+                var result = await response.Content.ReadFromJsonAsync<ServerResponse>();
+                augmentStatusMessage = result != null
+                    ? $"❌ {result.message}"
+                    : $"❌ Augmentation failed with status code {response.StatusCode}";
+            }
+        }
+        catch (Exception ex)
+        {
+            augmentStatusMessage = $"❌ Failed to contact augmentation server: {ex.Message}";
+        }
+
+        isAugmenting = false;
+        StateHasChanged();
+    }
+
 
 
     private void OpenEditModal(Project project)
@@ -1118,77 +1158,68 @@ else
         return createdAt.ToString("yyyy-MM-dd");
     }
 
-
-    private void OpenAugmentModal(int projectId)
-    {
-        selectedProject = projects.FirstOrDefault(p => p.Id == projectId);
-        augmentStatusMessage = string.Empty;
-        showAugmentModel = true;
-    }
-
     public class ServerResponse
     {
         public string status { get; set; } = "";
         public string session_id { get; set; } = "";
         public string message { get; set; } = "";
     }
+        
+    // private async Task TriggerAugment()
+    // {
+    //     if (selectedProject == null) return;
 
-    [Inject] private HttpClient Http { get; set; } = default!;
-    private async Task TriggerAugment()
-    {
-        if (selectedProject == null) return;
+    //     var exportDir = Path.Combine(Env.WebRootPath, "exports", selectedProject.Name);
+    //     if (!Directory.Exists(exportDir))
+    //     {
+    //         augmentStatusMessage = "❌ Export folder not found.";
+    //         return;
+    //     }
 
-        var exportDir = Path.Combine(Env.WebRootPath, "exports", selectedProject.Name);
-        if (!Directory.Exists(exportDir))
-        {
-            augmentStatusMessage = "❌ Export folder not found.";
-            return;
-        }
+    //     isAugmenting = true; // 👉 로딩 시작
+    //     augmentStatusMessage = string.Empty;
+    //     StateHasChanged();   // UI 갱신
 
-        isAugmenting = true; // 👉 로딩 시작
-        augmentStatusMessage = string.Empty;
-        StateHasChanged();   // UI 갱신
+    //     var payload = new Dictionary<string, object>
+    //     {
+    //         { "project_name", selectedProject.Name },
+    //         { "base_dir", exportDir },
+    //         { "valid_ratio", validRatio },
+    //         { "n", augMultiplier }
+    //     };
 
-        var payload = new Dictionary<string, object>
-        {
-            { "project_name", selectedProject.Name },
-            { "base_dir", exportDir },
-            { "valid_ratio", validRatio },
-            { "n", augMultiplier }
-        };
+    //     if (augmentSeed.HasValue)
+    //     {
+    //         payload["seed"] = augmentSeed.Value;
+    //     }
 
-        if (augmentSeed.HasValue)
-        {
-            payload["seed"] = augmentSeed.Value;
-        }
+    //     try
+    //     {
+    //         var response = await Http.PostAsJsonAsync("http://localhost:9001/api/augment", payload);
 
-        try
-        {
-            var response = await Http.PostAsJsonAsync("http://localhost:9001/api/augment", payload);
+    //         if (response.IsSuccessStatusCode)
+    //         {
+    //             var result = await response.Content.ReadFromJsonAsync<ServerResponse>();
+    //             augmentStatusMessage = result?.status == "success"
+    //                 ? $"✅ {result.message}"
+    //                 : $"❌ Unexpected response format.";
+    //         }
+    //         else
+    //         {
+    //             var result = await response.Content.ReadFromJsonAsync<ServerResponse>();
+    //             augmentStatusMessage = result != null
+    //                 ? $"❌ {result.message}"
+    //                 : $"❌ Augmentation failed with status code {response.StatusCode}";
+    //         }
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         augmentStatusMessage = $"❌ Failed to contact augmentation server: {ex.Message}";
+    //     }
 
-            if (response.IsSuccessStatusCode)
-            {
-                var result = await response.Content.ReadFromJsonAsync<ServerResponse>();
-                augmentStatusMessage = result?.status == "success"
-                    ? $"✅ {result.message}"
-                    : $"❌ Unexpected response format.";
-            }
-            else
-            {
-                var result = await response.Content.ReadFromJsonAsync<ServerResponse>();
-                augmentStatusMessage = result != null
-                    ? $"❌ {result.message}"
-                    : $"❌ Augmentation failed with status code {response.StatusCode}";
-            }
-        }
-        catch (Exception ex)
-        {
-            augmentStatusMessage = $"❌ Failed to contact augmentation server: {ex.Message}";
-        }
-
-        isAugmenting = false; // 👉 로딩 종료
-        StateHasChanged();    // UI 갱신
-    }
+    //     isAugmenting = false; // 👉 로딩 종료
+    //     StateHasChanged();    // UI 갱신
+    // }
 
 
     private void OpenTrainModal(int projectId)
