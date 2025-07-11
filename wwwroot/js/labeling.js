@@ -33,8 +33,7 @@
 
     const resizeCanvas = () => {
         canvas.width = img.clientWidth;
-        canvas.height = img.clientHeight;
-        console.log(`[hhchoi] Canvas: ${canvas.width}x${canvas.height}, Image: ${img.naturalWidth}x${img.naturalHeight}`);
+        canvas.height = img.clientHeight;        
         redraw();
     };
 
@@ -348,8 +347,7 @@
         // ✅ Ctrl+C 또는 Cmd+C (복사)
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
             if (selectedBoxIndex !== -1) {
-                copiedBox = JSON.parse(JSON.stringify(boxes[selectedBoxIndex]));
-                console.log('📋 Box copied:', copiedBox);
+                copiedBox = JSON.parse(JSON.stringify(boxes[selectedBoxIndex]));                
             }
             e.preventDefault(); // 브라우저 기본 복사 방지
         }

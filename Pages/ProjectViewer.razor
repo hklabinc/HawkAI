@@ -265,8 +265,6 @@ else
                     var w = (float)box.GetProperty("w").GetDouble();
                     var h = (float)box.GetProperty("h").GetDouble();
                     var label = box.GetProperty("label").GetString() ?? "";
-                    Console.WriteLine($"[📦] Box: x={x}, y={y}, w={w}, h={h} (label={label})");
-
                     var index = labelList.IndexOf(label);
                     var labelColor = colorMap[index % colorMap.Length];
 
@@ -279,12 +277,10 @@ else
                 }
 
                 await srcImage.SaveAsJpegAsync(annotatedPath);
-                Console.WriteLine($"[✔] Annotated image saved: {annotatedPath}");
             }
             else if (File.Exists(annotatedPath))
             {
                 File.Delete(annotatedPath);
-                Console.WriteLine($"[🗑️] Deleted annotated image: {annotatedPath}");
             }
         }
         catch (Exception ex)
@@ -319,14 +315,12 @@ else
             if (File.Exists(sourcePath))
             {
                 File.Delete(sourcePath);
-                Console.WriteLine($"[🗑️] Deleted image: {sourcePath}");
             }
 
             // 어노테이션 이미지 삭제
             if (File.Exists(annotatedPath))
             {
                 File.Delete(annotatedPath);
-                Console.WriteLine($"[🗑️] Deleted annotated image: {annotatedPath}");
             }
 
             // DB에서 삭제
