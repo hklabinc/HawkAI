@@ -563,6 +563,7 @@ else
         // ✅ ViewModel로 변환
         projects = rawProjects
             .OrderBy(p => p.CreatorUserId) // 알파벳 순 정렬
+            .ThenBy(p => p.Name)
             .Select(p => new ProjectViewModel
                 {
                     Id = p.Id,
@@ -651,10 +652,24 @@ else
         showCreateModal = false;
         createUploadedFiles.Clear();
 
+        await ReloadProjects();
+    }
+
+    private void OpenProject(int id)
+    {
+        Navigation.NavigateTo($"/projects/{id}");
+    }
+
+    private async Task ReloadProjects()
+    {
         var updated = isAdmin
             ? await ProjectService.GetAllProjects()
             : await ProjectService.GetUserProjects(userId);
-        projects = updated.Select(p => new ProjectViewModel
+
+        projects = updated
+            .OrderBy(p => p.CreatorUserId)
+            .ThenBy(p => p.Name)
+            .Select(p => new ProjectViewModel
             {
                 Id = p.Id,
                 Name = p.Name,
@@ -665,11 +680,6 @@ else
                 Images = p.Images,
                 IsSelectedForMerge = false
             }).ToList();
-    }
-
-    private void OpenProject(int id)
-    {
-        Navigation.NavigateTo($"/projects/{id}");
     }
 
     private void HandleImageUpload(InputFileChangeEventArgs e)
@@ -929,7 +939,7 @@ else
         }
 
         showEditModal = false;
-        await ProjectService.LoadProjects();
+        await ReloadProjects();
     }
 
 
@@ -1065,20 +1075,7 @@ else
 
         // ✅ 8. 병합 후 상태 업데이트
         showMergeModal = false;
-        var updated = isAdmin
-            ? await ProjectService.GetAllProjects()
-            : await ProjectService.GetUserProjects(userId);
-        projects = updated.Select(p => new ProjectViewModel
-            {
-                Id = p.Id,
-                Name = p.Name,
-                Labels = p.Labels,
-                CreatorUserId = p.CreatorUserId,
-                CreatedAt = p.CreatedAt,
-                ImageCount = p.ImageCount,
-                Images = p.Images,
-                IsSelectedForMerge = false
-            }).ToList();
+        await ReloadProjects();
 
         // ✅ 9. 중복된 파일 경고
         if (skippedFiles.Any() || cameraJsonCandidates.Count > 1)
@@ -1343,21 +1340,7 @@ else
         showBulkDeleteConfirm = false;
 
         // UI 갱신
-        var updated = isAdmin
-            ? await ProjectService.GetAllProjects()
-            : await ProjectService.GetUserProjects(userId);
-
-        projects = updated.Select(p => new ProjectViewModel
-            {
-                Id = p.Id,
-                Name = p.Name,
-                Labels = p.Labels,
-                CreatorUserId = p.CreatorUserId,
-                CreatedAt = p.CreatedAt,
-                ImageCount = p.ImageCount,
-                Images = p.Images,
-                IsSelectedForMerge = false
-            }).ToList();
+        await ReloadProjects();
     }
 
     private void ShowCameraInfo(string projectName)
