@@ -94,11 +94,11 @@ else
                             <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenEditModal(p)">Edit</button>
                             @if (HasCameraInfo(p.Name))
                             {
-                                <button class="btn btn-sm btn-outline-warning" @onclick="() => ShowCameraInfo(p.Name)">Cam Info</button>
+                                <button class="btn btn-sm btn-outline-warning px-0" @onclick="() => ShowCameraInfo(p.Name)">Cam Info</button>
                             }
                             @if (projectHasModelMap.TryGetValue(p.Name, out var hasModels) && hasModels)
                             {
-                                <button class="btn btn-sm btn-outline-success" @onclick="() => ShowModelFolders(p.Name)">Models</button>
+                                <button class="btn btn-sm btn-outline-success px-1" @onclick="() => ShowModelFolders(p.Name)">Models</button>
                             }
                         </div>
 
