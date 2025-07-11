@@ -300,6 +300,13 @@ else
                         <label class="form-label">Seed Value (optional)</label>
                         <input type="number" class="form-control" @bind="augmentSeed" placeholder="e.g. 42" />
                     </div>
+
+                    <div class="form-check mt-2">
+                        <input class="form-check-input" type="checkbox" id="autoDownload" @bind="enableAutoDownload" />
+                        <label class="form-check-label" for="autoDownload">
+                            Automatically download ZIP after export
+                        </label>
+                    </div>
                 </div>
 
                 @if (isAugmenting)
@@ -524,6 +531,7 @@ else
     private bool showResultsImageModal = false;
     private string resultsImagePath = string.Empty;
 
+    private bool enableAutoDownload = false;
 
     public void Dispose()
     {
@@ -738,7 +746,7 @@ else
 
         var random = new Random();
         var images = project.Images.OrderBy(_ => random.Next()).ToList();
-        var validRatio_orignalImages = 0.0f;
+        float validRatio_orignalImages = 0.0f;
         int splitIndex = (int)(images.Count * (1 - validRatio_orignalImages));
         var train = images.Take(splitIndex).ToList();
         var valid = images.Skip(splitIndex).ToList();
@@ -795,16 +803,20 @@ else
 
         await File.WriteAllTextAsync(yamlPath, yaml);
 
+        // ✅ Export 완료 후 Augment 수행
+        await TriggerAugmentAfterExport(exportProjectId, exportDir: baseDir);
+
+
         var zipPath = Path.Combine(Env.WebRootPath, "exports", $"{project.Name}.zip");
         if (File.Exists(zipPath)) File.Delete(zipPath);
         ZipFile.CreateFromDirectory(baseDir, zipPath);
 
-        // ✅ Export 완료 후 Augment 수행
-        await TriggerAugmentAfterExport(exportProjectId, exportDir: baseDir);
-
         // 브라우저에서 자동 다운로드를 위해
-        // var relativeZip = "/exports/" + Path.GetFileName(zipPath);
-        // Navigation.NavigateTo(relativeZip, true);
+        if (enableAutoDownload)
+        {
+            var relativeZip = "/exports/" + Path.GetFileName(zipPath);
+            Navigation.NavigateTo(relativeZip, true);
+        }
     }
 
     private async Task TriggerAugmentAfterExport(int projectId, string exportDir)
