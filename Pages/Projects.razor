@@ -309,6 +309,16 @@ else
                             Automatically download ZIP after export
                         </label>
                     </div>
+
+                    @if (augmentLogs.Count > 0)
+                    {
+                        <div class="alert alert-info" style="white-space: pre-line;">
+                            @foreach (var log in augmentLogs)
+                            {
+                                <div>@log</div>
+                            }
+                        </div>
+                    }
                 </div>
 
                 @if (isAugmenting)
@@ -318,16 +328,6 @@ else
                     </div> *@
                     <div class="alert alert-warning text-center">
                         🔄 Augmentation in progress...
-                    </div>
-                }
-
-                @if (augmentLogs.Count > 0)
-                {
-                    <div class="alert alert-info" style="white-space: pre-line;">
-                        @foreach (var log in augmentLogs)
-                        {
-                            <div>@log</div>
-                        }
                     </div>
                 }
 
@@ -854,6 +854,8 @@ else
         await File.WriteAllTextAsync(yamlPath, yaml);
 
         // ✅ Export 완료 후 Augment 수행
+        augmentLogs.Clear();
+        augmentStatusMessage = string.Empty;
         await TriggerAugmentAfterExport(exportProjectId, exportDir: baseDir);
 
 
