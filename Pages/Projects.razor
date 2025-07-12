@@ -125,7 +125,7 @@ else
     <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header">
+                <div class="modal-header bg-primary text-white">
                     <h5 class="modal-title">Create New Project</h5>
                     <button type="button" class="btn-close" @onclick="() => showCreateModal = false"></button>
                 </div>
@@ -170,8 +170,8 @@ else
     <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Edit Project</h5>
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Edit Project - @selectedProject?.Name</h5>
                     <button type="button" class="btn-close" @onclick="() => showEditModal = false"></button>
                 </div>
                 <div class="modal-body">
@@ -206,7 +206,7 @@ else
     <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header">
+                <div class="modal-header bg-success text-white">
                     <h5 class="modal-title">Merge Selected Projects</h5>
                     <button type="button" class="btn-close" @onclick="() => showMergeModal = false"></button>
                 </div>
@@ -262,9 +262,9 @@ else
     <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Export Options</h5>
-                    <button type="button" class="btn-close" @onclick="() => showExportModal = false"></button>
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title">Export and Augmentation - @selectedProject?.Name</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showExportModal = false"></button>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
@@ -322,7 +322,7 @@ else
                 }
 
                 <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="() => showExportModal = false">Cancel</button>
+                    <button class="btn btn-secondary" @onclick="() => showExportModal = false">Close</button>
                     <button class="btn btn-primary" @onclick="() => Export(exportProjectId)">Export</button>
                 </div>
             </div>
@@ -335,9 +335,9 @@ else
     <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Train Model for '@selectedProject?.Name'</h5>
-                    <button type="button" class="btn-close" @onclick="() => showTrainModal = false"></button>
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title">Train Model - @selectedProject?.Name</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showTrainModal = false"></button>
                 </div>
                 <div class="modal-body">
                     <p><strong>Export Path:</strong> /exports/@selectedProject?.Name</p>
@@ -379,7 +379,7 @@ else
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" @onclick="() => showTrainModal = false">Close</button>
-                    <button class="btn btn-success" @onclick="TriggerTrain">Start Training</button>
+                    <button class="btn btn-primary" @onclick="TriggerTrain">Start Training</button>
                 </div>
             </div>
         </div>
@@ -412,7 +412,7 @@ else
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title">Model Folders - @modelProjectName</h5>
+                    <h5 class="modal-title">Model Info - @modelProjectName</h5>
                     <button type="button" class="btn-close" @onclick="() => showModelModal = false"></button>
                 </div>
                 <div class="modal-body">
