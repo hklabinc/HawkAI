@@ -4,7 +4,9 @@
 @inject IWebHostEnvironment Env
 @inject DataDbContext Db
 @inject IJSRuntime JS
+@implements IAsyncDisposable
 @using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.SignalR.Client;
 @using System.Text.Json
 @using System.IO.Compression
 @using SixLabors.ImageSharp
@@ -311,8 +313,11 @@ else
 
                 @if (isAugmenting)
                 {
-                    <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.7); display: flex; justify-content: center; align-items: center; z-index: 9999;">
+                    @* <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.7); display: flex; justify-content: center; align-items: center; z-index: 9999;">
                         <img src="/img/loading.gif" alt="Loading..." style="width: 80px; height: 80px;" />
+                    </div> *@
+                    <div class="alert alert-warning text-center">
+                        🔄 Augmentation in progress...
                     </div>
                 }
 
@@ -533,6 +538,10 @@ else
 
     private bool enableAutoDownload = false;
 
+    private HubConnection? hubConnection;
+    private string sessionId = Guid.NewGuid().ToString();  // 새 세션 ID
+
+
     public void Dispose()
     {
         sseRef?.Dispose();
@@ -575,6 +584,26 @@ else
             p => p.Name,
             p => runFolders.Any(f => f != null && f.StartsWith(p.Name, StringComparison.OrdinalIgnoreCase))
         );
+
+        // Hub 연결 설정
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri($"/augmentHub?sessionId={sessionId}"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On<string>("ReceiveAugmentStatus", (msg) =>
+        {
+            augmentStatusMessage = msg;
+            StateHasChanged();
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection != null)
+            await hubConnection.DisposeAsync();
     }
 
     private async Task CreateProject()
@@ -715,7 +744,7 @@ else
         exportProjectId = projectId;
         selectedProject = projects.FirstOrDefault(p => p.Id == projectId);
         validRatioInt = 30;
-        augMultiplier = recommendedAugMultiplier;
+        augMultiplier = Math.Min(recommendedAugMultiplier, 40); // 최대 40으로 제한
         augmentStatusMessage = string.Empty;
         isAugmenting = false;
         showExportModal = true;
@@ -836,7 +865,8 @@ else
                 { "project_name", selectedProject.Name },
                 { "base_dir", exportDir },
                 { "valid_ratio", validRatio },  // 고정값 or 필요시 추후 설정
-                { "n", augMultiplier }
+                { "n", augMultiplier },
+                { "session_id", sessionId }     // session ID 추가
             };
 
         if (augmentSeed.HasValue)
