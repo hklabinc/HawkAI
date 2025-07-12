@@ -321,10 +321,21 @@ else
                     </div>
                 }
 
-                @if (!string.IsNullOrWhiteSpace(augmentStatusMessage))
+                @if (augmentLogs.Count > 0)
+                {
+                    <div class="alert alert-info" style="white-space: pre-line;">
+                        @foreach (var log in augmentLogs)
+                        {
+                            <div>@log</div>
+                        }
+                    </div>
+                }
+
+
+                @* @if (!string.IsNullOrWhiteSpace(augmentStatusMessage))
                 {
                     <div class="alert alert-info">@augmentStatusMessage</div>
-                }
+                } *@
 
                 <div class="modal-footer">
                     <button class="btn btn-secondary" @onclick="() => showExportModal = false">Close</button>
@@ -540,6 +551,7 @@ else
 
     private HubConnection? hubConnection;
     private string sessionId = Guid.NewGuid().ToString();  // 새 세션 ID
+    private List<string> augmentLogs = new();
 
 
     public void Dispose()
@@ -594,7 +606,7 @@ else
         hubConnection.On<string>("ReceiveAugmentStatus", (msg) =>
         {
             Console.WriteLine($"[SignalR] ✅ Received message: {msg}");  // ✅ 디버깅 출력 추가
-            augmentStatusMessage = msg;
+            augmentLogs.Add(msg);
             StateHasChanged();
         });
 
