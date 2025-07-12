@@ -19,6 +19,7 @@ namespace HawkAI.Controllers
         [HttpPost("signal")]
         public async Task<IActionResult> ReceiveFromFlask([FromBody] AugmentSignalDto dto)
         {
+            Console.WriteLine($"[SignalR] ▶️ Received from Flask: {dto.SessionId} → {dto.Message}");
             await _hubContext.Clients.Group(dto.SessionId).SendAsync("ReceiveAugmentStatus", dto.Message);
             return Ok();
         }

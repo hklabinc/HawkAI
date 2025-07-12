@@ -593,11 +593,20 @@ else
 
         hubConnection.On<string>("ReceiveAugmentStatus", (msg) =>
         {
+            Console.WriteLine($"[SignalR] ✅ Received message: {msg}");  // ✅ 디버깅 출력 추가
             augmentStatusMessage = msg;
             StateHasChanged();
         });
 
-        await hubConnection.StartAsync();
+        try
+        {
+            await hubConnection.StartAsync();
+            Console.WriteLine($"[SignalR] 🔗 Connected to augmentHub with sessionId={sessionId}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SignalR] ❌ Connection failed: {ex.Message}");
+        }
     }
 
     public async ValueTask DisposeAsync()
