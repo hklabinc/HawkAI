@@ -781,18 +781,14 @@ else
 
         var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
         var exportFolderName = $"{project.Name}_{timestamp}";
-        var exportsRoot = Path.Combine(Env.WebRootPath, "exports", exportFolderName);
-        if (Directory.Exists(exportsRoot))
-        {
-            Directory.Delete(exportsRoot, recursive: true);
-        }
-        Directory.CreateDirectory(exportsRoot);
+        var exportDir = Path.Combine(Env.WebRootPath, "exports", exportFolderName);  // 최종 저장 경로
+        Directory.CreateDirectory(exportDir);
 
-        var baseDir = Path.Combine(exportsRoot, project.Name);
-        var trainImg = Path.Combine(baseDir, "train", "images");
-        var trainLbl = Path.Combine(baseDir, "train", "labels");
-        var validImg = Path.Combine(baseDir, "valid", "images");
-        var validLbl = Path.Combine(baseDir, "valid", "labels");
+        // 📌 중첩 폴더 없이 바로 exportDir 밑에 train/valid 생성
+        var trainImg = Path.Combine(exportDir, "train", "images");
+        var trainLbl = Path.Combine(exportDir, "train", "labels");
+        var validImg = Path.Combine(exportDir, "valid", "images");
+        var validLbl = Path.Combine(exportDir, "valid", "labels");
 
         Directory.CreateDirectory(trainImg);
         Directory.CreateDirectory(trainLbl);
@@ -809,7 +805,7 @@ else
         foreach (var image in train.Concat(valid))
         {
             var folderType = train.Contains(image) ? "train" : "valid";
-            var imgDest = Path.Combine(baseDir, folderType, "images", image.FileName);
+            var imgDest = Path.Combine(exportDir, folderType, "images", image.FileName);
             var srcImg = Path.Combine(Env.WebRootPath, image.RelativePath);
 
             if (File.Exists(srcImg))
@@ -819,7 +815,7 @@ else
                 await img.SaveAsJpegAsync(imgDest);
             }
 
-            var labelPath = Path.Combine(baseDir, folderType, "labels", Path.ChangeExtension(image.FileName, ".txt"));
+            var labelPath = Path.Combine(exportDir, folderType, "labels", Path.ChangeExtension(image.FileName, ".txt"));
             if (!string.IsNullOrWhiteSpace(image.LabelData))
             {
                 var labelLines = new List<string>();
@@ -844,7 +840,7 @@ else
             }
         }
 
-        var yamlPath = Path.Combine(baseDir, "data.yaml");
+        var yamlPath = Path.Combine(exportDir, "data.yaml");
         var yaml =
             $"train: train/images\n" +
             $"val: valid/images\n\n" +
@@ -859,12 +855,12 @@ else
         await File.WriteAllTextAsync(yamlPath, yaml);
 
         // ✅ Export 완료 후 Augment 수행
-        await TriggerAugmentAfterExport(exportProjectId, exportDir: baseDir);
+        await TriggerAugmentAfterExport(exportProjectId, exportDir: exportDir);
 
 
         var zipPath = Path.Combine(Env.WebRootPath, "exports", $"{exportFolderName}.zip");
         if (File.Exists(zipPath)) File.Delete(zipPath);
-        ZipFile.CreateFromDirectory(baseDir, zipPath);
+        ZipFile.CreateFromDirectory(exportDir, zipPath);
 
         // 브라우저에서 자동 다운로드를 위해
         if (enableAutoDownload)
