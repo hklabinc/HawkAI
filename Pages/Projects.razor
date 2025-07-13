@@ -609,7 +609,7 @@ else
 
         trainHubConnection.On<string, string>("ReceiveTrainStatus", (sessionId, msg) =>
         {
-            Console.WriteLine($"[SignalR] ▶️ Train: {sessionId} → {msg}");
+            // Console.WriteLine($"[SignalR] ▶️ Train: {sessionId} → {msg}");
             trainStatusMessage = msg;
             InvokeAsync(StateHasChanged);
         });

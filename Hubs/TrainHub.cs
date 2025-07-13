@@ -6,7 +6,7 @@ namespace HawkAI.Hubs
     {
         public async Task SendTrainStatus(string sessionId, string message)
         {
-            Console.WriteLine($"[TrainHub] {sessionId} → {message}");
+            //Console.WriteLine($"[TrainHub] {sessionId} → {message}");
             await Clients.All.SendAsync("ReceiveTrainStatus", sessionId, message);
         }
     }
