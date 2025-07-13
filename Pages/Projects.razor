@@ -919,8 +919,8 @@ else
             $"hklab:\n" +
             $"  project: {project.Name.ToLower().Replace(" ", "-")}\n" +
             $"  version: 1\n" +
-            $"  ratioOfValid: {validRatio}\n" +
-            $"  url: https://hawkai.hknu.ac.kr/projects/{projectId}\n";
+            $"  url: https://hawkai.hknu.ac.kr/projects/{projectId}\n" +
+            $"  ratioOfValid: {validRatio}\n";
 
         await File.WriteAllTextAsync(yamlPath, yaml);
 
@@ -962,6 +962,24 @@ else
                 var result = await response.Content.ReadFromJsonAsync<ServerResponse>();
                 if (result?.status == "success")
                 {
+                    // ✅ train/valid 이미지 수 계산
+                    var trainImageDir = Path.Combine(exportDir, "train", "images");
+                    var validImageDir = Path.Combine(exportDir, "valid", "images");
+
+                    int trainCount = Directory.Exists(trainImageDir)
+                        ? Directory.GetFiles(trainImageDir).Count(f => f.EndsWith(".jpg") || f.EndsWith(".jpeg") || f.EndsWith(".png"))
+                        : 0;
+
+                    int validCount = Directory.Exists(validImageDir)
+                        ? Directory.GetFiles(validImageDir).Count(f => f.EndsWith(".jpg") || f.EndsWith(".jpeg") || f.EndsWith(".png"))
+                        : 0;
+
+                    // ✅ data.yaml에 추가 내용 붙이기
+                    var yamlPath = Path.Combine(exportDir, "data.yaml");
+                    await File.AppendAllTextAsync(yamlPath,
+                        $"  trainCount: {trainCount}\n" +
+                        $"  validCount: {validCount}\n");
+
                     // ✅ augment 성공 후 zip 생성
                     var zipPath = Path.Combine(Env.WebRootPath, "exports", $"{exportFolderName}.zip");
                     if (File.Exists(zipPath)) File.Delete(zipPath);
