@@ -334,7 +334,17 @@ else
                     <button type="button" class="btn-close btn-close-white" @onclick="() => showTrainModal = false"></button>
                 </div>
                 <div class="modal-body">
-                    <p><strong>Export Path:</strong> /exports/@selectedProject?.Name</p>
+                    <p>
+                        <strong>Export Path:</strong>
+                        @if (!string.IsNullOrWhiteSpace(latestExportFolderName))
+                        {
+                            <span class="text-monospace">/exports/@latestExportFolderName</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">No export folder found</span>
+                        }
+                    </p>
                     <div class="mb-3">
                         <label class="form-label">Model Size</label>
                         <select class="form-select" @bind="trainModelSize">
@@ -521,7 +531,7 @@ else
     private List<string> modelFolderNames = new();
     private bool showResultsImageModal = false;
     private string resultsImagePath = string.Empty;
-
+    private string? latestExportFolderName = null;
     private bool enableAutoDownload = false;
 
     private HubConnection? hubConnection;
@@ -855,22 +865,10 @@ else
         await File.WriteAllTextAsync(yamlPath, yaml);
 
         // ✅ Export 완료 후 Augment 수행
-        await TriggerAugmentAfterExport(exportProjectId, exportDir: exportDir);
-
-
-        var zipPath = Path.Combine(Env.WebRootPath, "exports", $"{exportFolderName}.zip");
-        if (File.Exists(zipPath)) File.Delete(zipPath);
-        ZipFile.CreateFromDirectory(exportDir, zipPath);
-
-        // 브라우저에서 자동 다운로드를 위해
-        if (enableAutoDownload)
-        {
-            var relativeZip = "/exports/" + Path.GetFileName(zipPath);
-            Navigation.NavigateTo(relativeZip, true);
-        }
+        await TriggerAugmentAfterExport(projectId, exportDir, exportFolderName);
     }
 
-    private async Task TriggerAugmentAfterExport(int projectId, string exportDir)
+    private async Task TriggerAugmentAfterExport(int projectId, string exportDir, string exportFolderName)
     {
         if (selectedProject == null || selectedProject.Id != projectId)
         {
@@ -905,6 +903,18 @@ else
                 augmentStatusMessage = result?.status == "success"
                     ? $"✅ {result.message}"
                     : $"❌ Unexpected response format.";
+
+                // ✅ augment 성공 후 zip 생성
+                var zipPath = Path.Combine(Env.WebRootPath, "exports", $"{exportFolderName}.zip");
+                if (File.Exists(zipPath)) File.Delete(zipPath);
+                ZipFile.CreateFromDirectory(exportDir, zipPath);
+
+                // 브라우저에서 자동 다운로드를 위해
+                if (enableAutoDownload)
+                {
+                    var relativeZip = "/exports/" + Path.GetFileName(zipPath);
+                    Navigation.NavigateTo(relativeZip, true);
+                }
             }
             else
             {
@@ -1262,6 +1272,7 @@ else
         }
 
         var exportDir = exportFolders.First().FullName;  // 가장 최근 것
+        latestExportFolderName = Path.GetFileName(exportDir);
 
         var payload = new Dictionary<string, object>
         {
