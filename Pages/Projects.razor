@@ -876,9 +876,6 @@ else
             return;
         }
 
-        augmentStatusMessage = string.Empty;
-        StateHasChanged();
-
         var payload = new Dictionary<string, object>
             {
                 { "project_name", selectedProject.Name },
@@ -900,28 +897,30 @@ else
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<ServerResponse>();
-                augmentStatusMessage = result?.status == "success"
-                    ? $"✅ {result.message}"
-                    : $"❌ Unexpected response format.";
-
-                // ✅ augment 성공 후 zip 생성
-                var zipPath = Path.Combine(Env.WebRootPath, "exports", $"{exportFolderName}.zip");
-                if (File.Exists(zipPath)) File.Delete(zipPath);
-                ZipFile.CreateFromDirectory(exportDir, zipPath);
-
-                // 브라우저에서 자동 다운로드를 위해
-                if (enableAutoDownload)
+                if (result?.status != "success")
                 {
-                    var relativeZip = "/exports/" + Path.GetFileName(zipPath);
-                    Navigation.NavigateTo(relativeZip, true);
+                    // ✅ augment 성공 후 zip 생성
+                    var zipPath = Path.Combine(Env.WebRootPath, "exports", $"{exportFolderName}.zip");
+                    if (File.Exists(zipPath)) File.Delete(zipPath);
+                    ZipFile.CreateFromDirectory(exportDir, zipPath);
+
+                    // 브라우저에서 자동 다운로드를 위해
+                    if (enableAutoDownload)
+                    {
+                        var relativeZip = "/exports/" + Path.GetFileName(zipPath);
+                        Navigation.NavigateTo(relativeZip, true);
+                    }
+                }
+                else
+                {
+                    augmentStatusMessage = "❌ Unexpected response format.";
                 }
             }
             else
             {
                 var result = await response.Content.ReadFromJsonAsync<ServerResponse>();
-                augmentStatusMessage = result != null
-                    ? $"❌ {result.message}"
-                    : $"❌ Augmentation failed with status code {response.StatusCode}";
+                if (result == null)
+                    augmentStatusMessage = $"❌ Augmentation failed with status code {response.StatusCode}";
             }
         }
         catch (Exception ex)
