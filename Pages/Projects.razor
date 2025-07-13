@@ -309,10 +309,10 @@ else
                             Automatically download ZIP after export
                         </label>
                     </div>
-                </div>
 
-                <div class="alert alert-info" role="alert">
-                    @augmentStatusMessage
+                    <div class="alert alert-info" role="alert">
+                        @augmentStatusMessage
+                    </div>
                 </div>
 
                 <div class="modal-footer">
@@ -527,6 +527,7 @@ else
     private bool enableAutoDownload = false;
 
     private HubConnection? hubConnection;
+    HubConnection trainHubConnection;
     private string sessionId = Guid.NewGuid().ToString();  // 새 세션 ID
 
 
@@ -573,7 +574,7 @@ else
             p => runFolders.Any(f => f != null && f.StartsWith(p.Name, StringComparison.OrdinalIgnoreCase))
         );
 
-        // Hub 연결 설정
+        // Augment Hub 연결 설정
         hubConnection = new HubConnectionBuilder()
             .WithUrl(Navigation.ToAbsoluteUri($"/augmentHub?sessionId={sessionId}"))
             .WithAutomaticReconnect()
@@ -600,6 +601,22 @@ else
         {
             Console.WriteLine($"[SignalR] ❌ Connection failed: {ex.Message}");
         }
+
+
+        // Train Hub 연결 설정
+        trainHubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/trainHub"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        trainHubConnection.On<string, string>("ReceiveTrainStatus", (sessionId, msg) =>
+        {
+            Console.WriteLine($"[SignalR] ▶️ Train: {sessionId} → {msg}");
+            trainStatusMessage = msg;
+            InvokeAsync(StateHasChanged);
+        });
+
+        await trainHubConnection.StartAsync();
     }
 
     public async ValueTask DisposeAsync()
@@ -1254,7 +1271,7 @@ else
             if (result?.status == "success" && !string.IsNullOrWhiteSpace(result.session_id))
             {
                 SessionId = result.session_id;
-                StartPolling();  // 여기에서 시작
+                //StartPolling();  // 여기에서 시작
             }
             else
             {

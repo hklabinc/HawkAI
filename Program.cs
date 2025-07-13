@@ -164,7 +164,7 @@ app.MapHub<ChatHub>("/chathub", options =>      // Server에서 메시지 사이즈 관련
 });
 
 app.MapHub<AugmentHub>("/augmentHub");
-
+app.MapHub<TrainHub>("/trainHub");
 
 app.MapControllers();
 
