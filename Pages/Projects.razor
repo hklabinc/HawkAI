@@ -593,7 +593,12 @@ else
             Console.WriteLine($"[SignalR] ✅ Received message: {msg}");  // ✅ 디버깅 출력 추가
             augmentStatusMessage = msg; // 덮어쓰기
             // augmentLogs.Add(msg);
-            StateHasChanged();
+                                        
+            // ✅ 모달이 열려 있는 경우에만 UI 업데이트
+            if (showExportModal)
+            {
+                InvokeAsync(StateHasChanged); // 안전한 쓰레드 전환
+            }
         });
 
         try
