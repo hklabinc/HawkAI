@@ -315,6 +315,14 @@ else
                     </div>
                 </div>
 
+                @if (isExporting)
+                {
+                    <div class="text-center my-3">
+                        <img src="/images/loading.gif" alt="Loading..." style="height: 60px;" />
+                        <p class="text-muted mt-2">Exporting and augmenting, please wait...</p>
+                    </div>
+                }
+
                 <div class="modal-footer">
                     <button class="btn btn-secondary" @onclick="() => showExportModal = false">Close</button>
                     <button class="btn btn-primary" @onclick="() => Export(exportProjectId)">Export</button>
@@ -537,6 +545,8 @@ else
     private HubConnection? hubConnection;
     private HubConnection? trainHubConnection;     // TrainHub
     private string sessionId = Guid.NewGuid().ToString();  // 새 세션 ID
+
+    private bool isExporting = false;
 
 
     public void Dispose()
@@ -786,6 +796,9 @@ else
 
     private async Task Export(int projectId)
     {
+        isExporting = true;
+        StateHasChanged();
+
         var project = await Db.Projects.Include(p => p.Images).FirstOrDefaultAsync(p => p.Id == projectId);
         if (project == null || project.Images.Count == 0) return;
 
@@ -866,6 +879,9 @@ else
 
         // ✅ Export 완료 후 Augment 수행
         await TriggerAugmentAfterExport(projectId, exportDir, exportFolderName);
+
+        isExporting = false;
+        StateHasChanged();
     }
 
     private async Task TriggerAugmentAfterExport(int projectId, string exportDir, string exportFolderName)
