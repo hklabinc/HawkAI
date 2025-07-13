@@ -776,15 +776,17 @@ else
 
     private async Task Export(int projectId)
     {
-        var exportsRoot = Path.Combine(Env.WebRootPath, "exports");
+        var project = await Db.Projects.Include(p => p.Images).FirstOrDefaultAsync(p => p.Id == projectId);
+        if (project == null || project.Images.Count == 0) return;
+
+        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        var exportFolderName = $"{project.Name}_{timestamp}";
+        var exportsRoot = Path.Combine(Env.WebRootPath, "exports", exportFolderName);
         if (Directory.Exists(exportsRoot))
         {
             Directory.Delete(exportsRoot, recursive: true);
         }
         Directory.CreateDirectory(exportsRoot);
-
-        var project = await Db.Projects.Include(p => p.Images).FirstOrDefaultAsync(p => p.Id == projectId);
-        if (project == null || project.Images.Count == 0) return;
 
         var baseDir = Path.Combine(exportsRoot, project.Name);
         var trainImg = Path.Combine(baseDir, "train", "images");
@@ -860,7 +862,7 @@ else
         await TriggerAugmentAfterExport(exportProjectId, exportDir: baseDir);
 
 
-        var zipPath = Path.Combine(Env.WebRootPath, "exports", $"{project.Name}.zip");
+        var zipPath = Path.Combine(Env.WebRootPath, "exports", $"{exportFolderName}.zip");
         if (File.Exists(zipPath)) File.Delete(zipPath);
         ZipFile.CreateFromDirectory(baseDir, zipPath);
 
@@ -1243,12 +1245,27 @@ else
             return;
         }
 
-        var exportDir = Path.Combine(Env.WebRootPath, "exports", selectedProject.Name);
-        if (!Directory.Exists(exportDir))
+        var exportsRoot = Path.Combine(Env.WebRootPath, "exports");
+        if (!Directory.Exists(exportsRoot))
         {
-            trainStatusMessage = $"❌ Export folder not found: {exportDir}";
+            trainStatusMessage = "❌ No exports directory found.";
             return;
         }
+
+        // 프로젝트 이름으로 시작하는 폴더 중 가장 최근 것 선택
+        var exportFolders = Directory.GetDirectories(exportsRoot)
+            .Where(d => Path.GetFileName(d).StartsWith(selectedProject.Name + "_"))
+            .Select(d => new DirectoryInfo(d))
+            .OrderByDescending(d => d.LastWriteTime)
+            .ToList();
+
+        if (exportFolders.Count == 0)
+        {
+            trainStatusMessage = $"❌ No export folders found for project: {selectedProject.Name}";
+            return;
+        }
+
+        var exportDir = exportFolders.First().FullName;  // 가장 최근 것
 
         var payload = new Dictionary<string, object>
         {
