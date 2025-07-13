@@ -268,60 +268,76 @@ else
                     <h5 class="modal-title">Export and Augmentation - @selectedProject?.Name</h5>
                     <button type="button" class="btn-close btn-close-white" @onclick="() => showExportModal = false"></button>
                 </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">Image Size</label>
-                        <select class="form-select" @bind="selectedImageSize">
-                            <option value="640">640 x 640</option>
-                            <option value="512">512 x 512</option>
-                            <option value="416">416 x 416</option>
-                            <option value="320">320 x 320</option>
-                        </select>
-                    </div>
 
-                    <!-- ✅ Validation Ratio -->
-                    <div class="mb-3">
-                        <label class="form-label">Validation Ratio: @($"{validRatioInt}%")</label>
-                        <input type="range" class="form-range" min="10" max="50" step="5" @bind="validRatioInt" />
-                    </div>
+                <div class="modal-body position-relative">
 
-                    <!-- ✅ Augmentation Multiplier -->
-                    <div class="mb-3">
-                        <label class="form-label">
-                            Augmentation Multiplier
-                            @if (selectedProject?.ImageCount > 0)
-                            {
-                                <span class="text-muted">(recommended ≥ @recommendedAugMultiplier)</span>
-                            }
-                        </label>
-                        <input type="number" class="form-control" @bind="augMultiplier" min="1" max="40" />
-                    </div>
+                    @* ✅ 로딩 중일 때 덮는 오버레이 *@
+                    @if (isExporting)
+                    {
+                        <div style="
+                    position: absolute;
+                    top: 0; left: 0;
+                    width: 100%; height: 100%;
+                    background: rgba(255,255,255,0.5);
+                    z-index: 10;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;">
+                            <img src="/img/loading.gif" alt="Loading..." style="height: 60px;" />
+                        </div>
+                    }
 
-                    <!-- ✅ Seed -->
-                    <div class="mb-3">
-                        <label class="form-label">Seed Value (optional)</label>
-                        <input type="number" class="form-control" @bind="augmentSeed" placeholder="e.g. 42" />
-                    </div>
+                    @* ✅ 실제 입력 폼 내용 (로딩 시 반투명 처리) *@
+                    <div style="position: relative; z-index: 1; opacity:@(isExporting ? "0.3" : "1")">
 
-                    <div class="form-check mt-2">
-                        <input class="form-check-input" type="checkbox" id="autoDownload" @bind="enableAutoDownload" />
-                        <label class="form-check-label" for="autoDownload">
-                            Automatically download ZIP after export
-                        </label>
-                    </div>
+                        <div class="mb-3">
+                            <label class="form-label">Image Size</label>
+                            <select class="form-select" @bind="selectedImageSize" disabled="@isExporting">
+                                <option value="640">640 x 640</option>
+                                <option value="512">512 x 512</option>
+                                <option value="416">416 x 416</option>
+                                <option value="320">320 x 320</option>
+                            </select>
+                        </div>
 
+                        <div class="mb-3">
+                            <label class="form-label">Validation Ratio: @($"{validRatioInt}%")</label>
+                            <input type="range" class="form-range" min="10" max="50" step="5" @bind="validRatioInt" disabled="@isExporting" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">
+                                Augmentation Multiplier
+                                @if (selectedProject?.ImageCount > 0)
+                                {
+                                    <span class="text-muted">(recommended ≥ @recommendedAugMultiplier)</span>
+                                }
+                            </label>
+                            <input type="number" class="form-control" @bind="augMultiplier" min="1" max="40" disabled="@isExporting" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Seed Value (optional)</label>
+                            <input type="number" class="form-control" @bind="augmentSeed" placeholder="e.g. 42" disabled="@isExporting" />
+                        </div>
+
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="autoDownload" @bind="enableAutoDownload" disabled="@isExporting" />
+                            <label class="form-check-label" for="autoDownload">
+                                Automatically download ZIP after export
+                            </label>
+                        </div>
+
+                    </div>
+                </div>
+
+                @* ✅ 상태 메시지는 항상 바깥에 보여줌 *@
+                <div class="px-3 pt-2">
                     <div class="alert alert-info" role="alert">
                         @augmentStatusMessage
                     </div>
                 </div>
 
-                @if (isExporting)
-                {
-                    <div class="text-center my-3">
-                        <img src="/images/loading.gif" alt="Loading..." style="height: 60px;" />
-                        <p class="text-muted mt-2">Exporting and augmenting, please wait...</p>
-                    </div>
-                }
 
                 <div class="modal-footer">
                     <button class="btn btn-secondary" @onclick="() => showExportModal = false">Close</button>
