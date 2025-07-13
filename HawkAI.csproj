@@ -8,6 +8,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="wwwroot\runs\YS_top_123456_789023 - 복사\**" />
+    <Content Remove="wwwroot\runs\YS_top_123456_789023 - 복사\**" />
+    <EmbeddedResource Remove="wwwroot\runs\YS_top_123456_789023 - 복사\**" />
+    <None Remove="wwwroot\runs\YS_top_123456_789023 - 복사\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="FirebaseAdmin" Version="2.3.0" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="8.0.6" />
     <PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="8.0.6" />
@@ -34,7 +41,6 @@
     <Folder Include="wwwroot\datasets\" />
     <Folder Include="wwwroot\runs\YS_bridge_small_123456_000000\" />
     <Folder Include="wwwroot\runs\YS_top_small_123456_000000\" />
-    <Folder Include="wwwroot\runs\YS_top_123456_789023 - 복사\" />
     <Folder Include="wwwroot\runs\YS_top_123456_789023\" />
   </ItemGroup>
 

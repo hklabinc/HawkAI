@@ -14,6 +14,7 @@ else
     <table class="table table-hover table-bordered">
         <thead>
             <tr>
+                <th>No</th>
                 @foreach (var col in Columns)
                 {
                     <th @onclick="() => SortBy(col)">
@@ -28,9 +29,11 @@ else
             </tr>
         </thead>
         <tbody>
-            @foreach (var row in SortedRows)
+            @for (int i = 0; i < SortedRows.Count(); i++)
             {
+                var row = SortedRows.ElementAt(i);
                 <tr>
+                    <td>@(i + 1)</td>
                     <td>@row["모델명"]</td>
                     <td>@row["사이즈"]</td>
                     <td>@row["만든날짜"]</td>
@@ -50,6 +53,37 @@ else
     </table>
 }
 
+<br />
+<h3>Exported Datasets</h3>
+<table class="table table-bordered table-hover">
+    <thead>
+        <tr>
+            <th>No</th>
+            <th>모델명</th>
+            <th>만든날짜</th>
+            <th>Train Count</th>
+            <th>Valid Count</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        @for (int i = 0; i < exportInfos.Count; i++)
+        {
+            var row = exportInfos[i];
+            <tr>
+                <td>@(i + 1)</td>
+                <td>@row.ModelName</td>
+                <td>@row.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                <td>@row.TrainCount</td>
+                <td>@row.ValidCount</td>
+                <td>
+                    <button class="btn btn-sm btn-danger" @onclick="() => ConfirmDeleteExport(row.FolderName)">삭제</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
 @code {
     List<Dictionary<string, string>> modelRows;
     string sortColumn = "모델명";
@@ -66,9 +100,21 @@ else
             ? modelRows.OrderBy(row => row[sortColumn], StringComparer.CurrentCulture)
             : modelRows.OrderByDescending(row => row[sortColumn], StringComparer.CurrentCulture);
 
+    class ExportRow
+    {
+        public string ModelName { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public int TrainCount { get; set; }
+        public int ValidCount { get; set; }
+        public string FolderName { get; set; }
+    }
+
+    List<ExportRow> exportInfos = new();
+
     protected override void OnInitialized()
     {
         LoadModelInfo();
+        LoadExportInfo();
     }
 
     void SortBy(string column)
@@ -140,13 +186,39 @@ else
         }
     }
 
-    string ParseDate(string input)
+    void LoadExportInfo()
     {
-        if (DateTime.TryParseExact(input, "yyyyMMdd_HHmmss", null, DateTimeStyles.None, out var dt))
+        var expDir = Path.Combine(Env.WebRootPath, "exports");
+        if (!Directory.Exists(expDir)) return;
+
+        var folders = Directory.GetDirectories(expDir);
+        foreach (var folder in folders)
         {
-            return dt.ToString("yyyy-MM-dd HH:mm:ss");
+            var yaml = Path.Combine(folder, "data.yaml");
+            if (!File.Exists(yaml)) continue;
+
+            string folderName = Path.GetFileName(folder);
+            string modelName = folderName;
+            int train = 0, valid = 0;
+
+            var lines = File.ReadAllLines(yaml);
+            foreach (var line in lines)
+            {
+                if (line.Contains("trainCount"))
+                    train = int.Parse(line.Split(':')[1].Trim());
+                if (line.Contains("validCount"))
+                    valid = int.Parse(line.Split(':')[1].Trim());
+            }
+
+            exportInfos.Add(new ExportRow
+            {
+                ModelName = modelName,
+                CreatedAt = Directory.GetCreationTime(folder),
+                TrainCount = train,
+                ValidCount = valid,
+                FolderName = folderName
+            });
         }
-        return input;
     }
 
     async Task ConfirmDelete(Dictionary<string, string> row)
@@ -167,5 +239,41 @@ else
                 }
             }
         }
+    }
+
+    async Task ConfirmDeleteExport(string folderName)
+    {
+        var folder = Path.Combine(Env.WebRootPath, "exports", folderName);
+        var zipFile = Path.Combine(Env.WebRootPath, "exports", folderName + ".zip");
+
+        if (Directory.Exists(folder))
+        {
+            if (await JS.InvokeAsync<bool>("confirm", $"Export 폴더를 삭제할까요?\n{folderName}"))
+            {
+                try
+                {
+                    Directory.Delete(folder, true);
+                    if (File.Exists(zipFile))
+                    {
+                        File.Delete(zipFile);
+                    }
+                    exportInfos.RemoveAll(x => x.FolderName == folderName);
+                }
+                catch (Exception ex)
+                {
+                    await JS.InvokeVoidAsync("alert", $"삭제 실패: {ex.Message}");
+                }
+            }
+        }
+    }
+
+
+    string ParseDate(string input)
+    {
+        if (DateTime.TryParseExact(input, "yyyyMMdd_HHmmss", null, DateTimeStyles.None, out var dt))
+        {
+            return dt.ToString("yyyy-MM-dd HH:mm:ss");
+        }
+        return input;
     }
 }
