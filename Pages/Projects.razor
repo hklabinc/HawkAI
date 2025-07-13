@@ -310,26 +310,11 @@ else
                         </label>
                     </div>
 
-                    @if (augmentLogs.Count > 0)
+                    @if (!string.IsNullOrWhiteSpace(augmentStatusMessage))
                     {
-                        <div class="alert alert-info" style="white-space: pre-line;">
-                            @foreach (var log in augmentLogs)
-                            {
-                                <div>@log</div>
-                            }
-                        </div>
+                        <div class="alert alert-info mt-2">@augmentStatusMessage</div>
                     }
                 </div>
-
-                @if (isAugmenting)
-                {
-                    @* <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.7); display: flex; justify-content: center; align-items: center; z-index: 9999;">
-                        <img src="/img/loading.gif" alt="Loading..." style="width: 80px; height: 80px;" />
-                    </div> *@
-                    <div class="alert alert-warning text-center">
-                        🔄 Augmentation in progress...
-                    </div>
-                }
 
 
                 @* @if (!string.IsNullOrWhiteSpace(augmentStatusMessage))
