@@ -897,7 +897,7 @@ else
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<ServerResponse>();
-                if (result?.status != "success")
+                if (result?.status == "success")
                 {
                     // ✅ augment 성공 후 zip 생성
                     var zipPath = Path.Combine(Env.WebRootPath, "exports", $"{exportFolderName}.zip");
