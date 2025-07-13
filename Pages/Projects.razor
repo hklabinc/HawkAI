@@ -514,8 +514,6 @@ else
     private bool showCameraModal = false;
     private string cameraJsonContent = string.Empty;
     private string cameraProjectName = string.Empty;
-    private string SessionId;    
-    private System.Timers.Timer PollTimer;
     private string selectedTrainServer = "http://localhost:9002";
 
     private bool showModelModal = false;
@@ -1278,8 +1276,7 @@ else
 
             if (result?.status == "success" && !string.IsNullOrWhiteSpace(result.session_id))
             {
-                SessionId = result.session_id;
-                //StartPolling();  // 여기에서 시작
+                sessionId = result.session_id;
             }
             else
             {
@@ -1291,59 +1288,6 @@ else
             trainStatusMessage = $"❌ Failed to contact training server: {ex.Message}";
         }
     }
-
-
-    public class ProgressStatus
-    {
-        public string status { get; set; }
-    }
-
-    private void StartPolling()
-    {
-        PollTimer?.Stop();
-        PollTimer = new System.Timers.Timer(5000); // 1초마다 polling
-        PollTimer.Elapsed += async (_, _) =>
-        {
-            if (!string.IsNullOrEmpty(SessionId))
-            {
-                try
-                {
-                    var result = await Http.GetFromJsonAsync<ProgressStatus>($"{selectedTrainServer}/api/progress/{SessionId}");
-                    var statusText = result?.status ?? "⚠️ No status";
-
-                    if (statusText != trainStatusMessage)
-                    {
-                        // UI 업데이트는 Dispatcher 스레드에서 수행해야 함
-                        await InvokeAsync(() =>
-                        {
-                            trainStatusMessage = statusText;
-                            StateHasChanged();  // UI 리렌더링
-                        });
-                    }
-
-                    if (statusText.StartsWith("✅") || statusText.StartsWith("❌"))
-                    {
-                        Console.WriteLine("Training completed or failed, stopping polling.");
-                        PollTimer?.Stop();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    await InvokeAsync(() =>
-                    {
-                        trainStatusMessage = "⚠️ Error during polling";
-                        StateHasChanged();
-                    });
-
-                    PollTimer?.Stop();
-                }
-            }
-        };
-        PollTimer.AutoReset = true;
-        PollTimer.Start();
-    }
-
-
 
     private void ConfirmBulkDelete()
     {
