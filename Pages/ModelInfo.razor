@@ -45,6 +45,7 @@ else
                     <td>@row["ValBoxLoss"]</td>
                     <td>@row["ValClsLoss"]</td>
                     <td>
+                        <button class="btn btn-sm btn-info me-1" @onclick="() => ShowResultsImage(row)">보기</button>
                         <button class="btn btn-sm btn-danger" @onclick="() => ConfirmDelete(row)">삭제</button>
                     </td>
                 </tr>
@@ -84,10 +85,36 @@ else
     </tbody>
 </table>
 
+
+@if (showResultsImageModal)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.6);">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title">Results Image</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showResultsImageModal = false"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img src="@resultsImagePath" style="max-width: 100%; height: auto;" alt="Results" />
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showResultsImageModal = false">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+
+
 @code {
     List<Dictionary<string, string>> modelRows;
     string sortColumn = "모델명";
     bool sortAscending = true;
+    
+    string resultsImagePath = "";
+    bool showResultsImageModal = false;
 
     string[] Columns = new[] {
         "모델명", "사이즈", "만든날짜", "Epoch",
@@ -275,5 +302,23 @@ else
             return dt.ToString("yyyy-MM-dd HH:mm:ss");
         }
         return input;
+    }
+
+
+    void ShowResultsImage(Dictionary<string, string> row)
+    {
+        var folderName = row["폴더명"];
+        var imagePath = Path.Combine("runs", folderName, "results.png");
+        var fullPath = Path.Combine(Env.WebRootPath, imagePath);
+
+        if (File.Exists(fullPath))
+        {
+            resultsImagePath = "/" + imagePath.Replace("\\", "/");
+            showResultsImageModal = true;
+        }
+        else
+        {
+            JS.InvokeVoidAsync("alert", $"❌ results.png not found in folder: {folderName}");
+        }
     }
 }
