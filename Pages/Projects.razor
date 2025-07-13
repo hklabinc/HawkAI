@@ -527,7 +527,7 @@ else
     private bool enableAutoDownload = false;
 
     private HubConnection? hubConnection;
-    HubConnection trainHubConnection;
+    private HubConnection? trainHubConnection;     // TrainHub
     private string sessionId = Guid.NewGuid().ToString();  // 새 세션 ID
 
 
@@ -616,7 +616,15 @@ else
             InvokeAsync(StateHasChanged);
         });
 
-        await trainHubConnection.StartAsync();
+        try
+        {
+            await trainHubConnection.StartAsync();
+            Console.WriteLine($"[SignalR] 🔗 Connected to trainHub with sessionId={sessionId}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SignalR] ❌ TrainHub connection failed: {ex.Message}");
+        }
     }
 
     public async ValueTask DisposeAsync()
