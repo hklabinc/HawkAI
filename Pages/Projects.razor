@@ -591,7 +591,8 @@ else
         hubConnection.On<string>("ReceiveAugmentStatus", (msg) =>
         {
             Console.WriteLine($"[SignalR] ✅ Received message: {msg}");  // ✅ 디버깅 출력 추가
-            augmentLogs.Add(msg);
+            augmentStatusMessage = msg; // 덮어쓰기
+            // augmentLogs.Add(msg);
             StateHasChanged();
         });
 
