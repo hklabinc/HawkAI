@@ -1,0 +1,166 @@
+﻿@page "/model-info"
+@inject IWebHostEnvironment Env
+@inject IJSRuntime JS
+@using System.Text.Json
+
+
+<h3>모델 정보</h3>
+
+@if (modelRows == null)
+{
+    <p><em>모델 정보를 불러오는 중입니다...</em></p>
+}
+else if (modelRows.Count == 0)
+{
+    <p><strong>모델 정보가 없습니다.</strong></p>
+}
+else
+{
+    <table class="table table-striped table-bordered">
+        <thead class="table-light">
+            <tr>
+                <th>모델명</th>
+                <th>사이즈</th>
+                <th>만든날짜</th>
+                <th>Epoch</th>
+                <th>Precision</th>
+                <th>Recall</th>
+                <th>mAP50</th>
+                <th>mAP50-95</th>
+                <th>ValBoxLoss</th>
+                <th>ValClsLoss</th>
+                <th>카메라정보</th>
+                <th>삭제</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in modelRows)
+            {
+                <tr>
+                    @foreach (var col in row.Values)
+                    {
+                        <td>@col</td>
+                    }
+                    <td>
+                        <button class="btn btn-sm btn-danger" @onclick="@(() => ConfirmDelete(row["폴더명"]))">삭제</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<Dictionary<string, string>> modelRows = new();
+
+    protected override void OnInitialized()
+    {
+        LoadModelInfo();
+    }
+
+    private void LoadModelInfo()
+    {
+        var runsDir = Path.Combine(Env.WebRootPath, "runs");
+        if (!Directory.Exists(runsDir))
+            return;
+
+        var folders = Directory.GetDirectories(runsDir);
+        var localOS = System.Runtime.InteropServices.RuntimeInformation.OSDescription;
+
+        foreach (var folder in folders)
+        {
+            var folderName = Path.GetFileName(folder);
+            var parts = folderName.Split("_");
+            if (parts.Length < 4) continue;
+
+            var modelName = string.Join("_", parts[..^3]);
+            var size = parts[^3];
+            var timestampStr = $"{parts[^2]}_{parts[^1]}";
+
+            string formattedDate;
+            if (DateTime.TryParseExact(timestampStr, "yyyyMMdd_HHmmss", null, System.Globalization.DateTimeStyles.None, out var dt))
+                formattedDate = dt.ToString("yyyy-MM-dd HH:mm:ss");
+            else
+                formattedDate = timestampStr;
+
+            // results.csv
+            var resultPath = Path.Combine(folder, "results.csv");
+            string epoch = "-", precision = "-", recall = "-", map50 = "-", map95 = "-", valBox = "-", valCls = "-";
+
+            if (File.Exists(resultPath))
+            {
+                try
+                {
+                    var lines = File.ReadAllLines(resultPath);
+                    if (lines.Length > 1)
+                    {
+                        var last = lines[^1].Split(',');
+                        epoch = last[0];
+                        precision = last[5];
+                        recall = last[6];
+                        map50 = last[7];
+                        map95 = last[8];
+                        valBox = last[9];
+                        valCls = last[10];
+                    }
+                }
+                catch { }
+            }
+
+            // camera.json
+            string cameraInfo = "";
+            var camPath = Path.Combine(folder, "camera.json");
+            if (File.Exists(camPath))
+            {
+                try
+                {
+                    var json = File.ReadAllText(camPath);
+                    var obj = JsonDocument.Parse(json);
+                    if (obj.RootElement.TryGetProperty("os", out var osProp) &&
+                        localOS.Contains(osProp.GetString() ?? "", StringComparison.OrdinalIgnoreCase))
+                    {
+                        cameraInfo = "있음";
+                    }
+                }
+                catch { }
+            }
+
+            modelRows.Add(new Dictionary<string, string>
+            {
+                { "모델명", modelName },
+                { "사이즈", size },
+                { "만든날짜", formattedDate },
+                { "Epoch", epoch },
+                { "Precision", precision },
+                { "Recall", recall },
+                { "mAP50", map50 },
+                { "mAP50-95", map95 },
+                { "ValBoxLoss", valBox },
+                { "ValClsLoss", valCls },
+                { "카메라정보", cameraInfo },
+                { "폴더명", folderName }
+            });
+        }
+    }
+
+    private async Task ConfirmDelete(string folderName)
+    {
+        bool confirm = await JS.InvokeAsync<bool>("confirm", $"정말 삭제하시겠습니까?\n{folderName}");
+        if (!confirm) return;
+
+        try
+        {
+            var path = Path.Combine(Env.WebRootPath, "runs", folderName);
+            if (Directory.Exists(path))
+            {
+                Directory.Delete(path, true);
+                modelRows.RemoveAll(r => r["폴더명"] == folderName);
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"삭제 중 오류 발생:\n{ex.Message}");
+        }
+    }
+}
