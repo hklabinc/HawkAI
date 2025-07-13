@@ -9,12 +9,12 @@ namespace HawkAI.Hubs
         {
             var httpContext = Context.GetHttpContext();
             var sessionId = httpContext?.Request.Query["sessionId"];
-            Console.WriteLine($"[Hub] ▶️ Client connected. SessionId: {sessionId}");
+            //Console.WriteLine($"[Hub] ▶️ Client connected. SessionId: {sessionId}");
 
             if (!string.IsNullOrWhiteSpace(sessionId))
             {
                 await Groups.AddToGroupAsync(Context.ConnectionId, sessionId);
-                Console.WriteLine($"[Hub] ✅ Added to group: {sessionId}");
+                //Console.WriteLine($"[Hub] ✅ Added to group: {sessionId}");
             }
 
             await base.OnConnectedAsync();
