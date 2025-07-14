@@ -2,6 +2,8 @@
 @using System.Globalization
 @inject IWebHostEnvironment Env
 @inject IJSRuntime JS
+@inject HawkAI.Data.ProjectService.IProjectService ProjectService
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <h3>Model Info</h3>
 
@@ -112,6 +114,8 @@ else
     List<Dictionary<string, string>> modelRows;
     string sortColumn = "모델명";
     bool sortAscending = true;
+
+    List<string> userProjectNames = new();
     
     string resultsImagePath = "";
     bool showResultsImageModal = false;
@@ -138,8 +142,15 @@ else
 
     List<ExportRow> exportInfos = new();
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        var userId = user.Identity?.Name ?? "unknown";
+
+        var rawProjects = await ProjectService.GetUserProjects(userId);
+        userProjectNames = rawProjects.Select(p => p.Name).ToList();
+
         LoadModelInfo();
         LoadExportInfo();
     }
@@ -170,6 +181,8 @@ else
             if (parts.Length < 4) continue;
 
             var modelName = string.Join('_', parts[..^3]);
+            if (!userProjectNames.Contains(modelName)) continue; // ❗ 사용자 프로젝트 필터링
+
             var size = parts[^3];
             var created = ParseDate(parts[^2] + "_" + parts[^1]);
 
@@ -221,13 +234,14 @@ else
         var folders = Directory.GetDirectories(expDir);
         foreach (var folder in folders)
         {
+            var folderName = Path.GetFileName(folder);
+            var modelName = folderName.Split('_').FirstOrDefault();
+            if (string.IsNullOrEmpty(modelName) || !userProjectNames.Contains(modelName)) continue;
+
             var yaml = Path.Combine(folder, "data.yaml");
             if (!File.Exists(yaml)) continue;
 
-            string folderName = Path.GetFileName(folder);
-            string modelName = folderName;
             int train = 0, valid = 0;
-
             var lines = File.ReadAllLines(yaml);
             foreach (var line in lines)
             {

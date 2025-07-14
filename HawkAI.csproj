@@ -8,10 +8,18 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="wwwroot\cert\**" />
     <Compile Remove="wwwroot\runs\YS_top_123456_789023 - 복사\**" />
+    <Compile Remove="wwwroot\runs\YS_top_123456_789023\**" />
+    <Content Remove="wwwroot\cert\**" />
     <Content Remove="wwwroot\runs\YS_top_123456_789023 - 복사\**" />
+    <Content Remove="wwwroot\runs\YS_top_123456_789023\**" />
+    <EmbeddedResource Remove="wwwroot\cert\**" />
     <EmbeddedResource Remove="wwwroot\runs\YS_top_123456_789023 - 복사\**" />
+    <EmbeddedResource Remove="wwwroot\runs\YS_top_123456_789023\**" />
+    <None Remove="wwwroot\cert\**" />
     <None Remove="wwwroot\runs\YS_top_123456_789023 - 복사\**" />
+    <None Remove="wwwroot\runs\YS_top_123456_789023\**" />
   </ItemGroup>
 
   <ItemGroup>
@@ -37,11 +45,9 @@
 
   <ItemGroup>
     <Folder Include="Migrations\" />
-    <Folder Include="wwwroot\cert\" />
     <Folder Include="wwwroot\datasets\" />
     <Folder Include="wwwroot\runs\YS_bridge_small_123456_000000\" />
     <Folder Include="wwwroot\runs\YS_top_small_123456_000000\" />
-    <Folder Include="wwwroot\runs\YS_top_123456_789023\" />
   </ItemGroup>
 
 </Project>
