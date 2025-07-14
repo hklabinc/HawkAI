@@ -62,17 +62,41 @@ else
     <thead>
         <tr>
             <th>No</th>
-            <th>모델명</th>
-            <th>만든날짜</th>
-            <th>Train Count</th>
-            <th>Valid Count</th>
+            <th @onclick="() => SortExportBy(nameof(ExportRow.ModelName))">
+                모델명
+                @if (exportSortColumn == nameof(ExportRow.ModelName))
+                {
+                    <span>@(exportSortAscending ? "▲" : "▼")</span>
+                }
+            </th>
+            <th @onclick="() => SortExportBy(nameof(ExportRow.CreatedAt))">
+                만든날짜
+                @if (exportSortColumn == nameof(ExportRow.CreatedAt))
+                {
+                    <span>@(exportSortAscending ? "▲" : "▼")</span>
+                }
+            </th>
+            <th @onclick="() => SortExportBy(nameof(ExportRow.TrainCount))">
+                Train Count
+                @if (exportSortColumn == nameof(ExportRow.TrainCount))
+                {
+                    <span>@(exportSortAscending ? "▲" : "▼")</span>
+                }
+            </th>
+            <th @onclick="() => SortExportBy(nameof(ExportRow.ValidCount))">
+                Valid Count
+                @if (exportSortColumn == nameof(ExportRow.ValidCount))
+                {
+                    <span>@(exportSortAscending ? "▲" : "▼")</span>
+                }
+            </th>
             <th>Action</th>
         </tr>
     </thead>
     <tbody>
-        @for (int i = 0; i < exportInfos.Count; i++)
+        @for (int i = 0; i < SortedExportInfos.Count(); i++)
         {
-            var row = exportInfos[i];
+            var row = SortedExportInfos.ElementAt(i);
             <tr>
                 <td>@(i + 1)</td>
                 <td>@row.ModelName</td>
@@ -86,6 +110,7 @@ else
         }
     </tbody>
 </table>
+
 
 
 @if (showResultsImageModal)
@@ -114,6 +139,8 @@ else
     List<Dictionary<string, string>> modelRows;
     string sortColumn = "모델명";
     bool sortAscending = true;
+    string exportSortColumn = "ModelName";
+    bool exportSortAscending = true;
 
     List<string> userProjectNames = new();
     bool isAdmin = false;
@@ -131,6 +158,12 @@ else
         sortAscending
             ? modelRows.OrderBy(row => row[sortColumn], StringComparer.CurrentCulture)
             : modelRows.OrderByDescending(row => row[sortColumn], StringComparer.CurrentCulture);
+
+    IEnumerable<ExportRow> SortedExportInfos =>
+    exportSortAscending
+        ? exportInfos.OrderBy(e => e.GetType().GetProperty(exportSortColumn)?.GetValue(e, null))
+        : exportInfos.OrderByDescending(e => e.GetType().GetProperty(exportSortColumn)?.GetValue(e, null));
+
 
     class ExportRow
     {
@@ -228,6 +261,17 @@ else
             }
 
             modelRows.Add(row);
+        }
+    }
+
+    void SortExportBy(string column)
+    {
+        if (exportSortColumn == column)
+            exportSortAscending = !exportSortAscending;
+        else
+        {
+            exportSortColumn = column;
+            exportSortAscending = true;
         }
     }
 
