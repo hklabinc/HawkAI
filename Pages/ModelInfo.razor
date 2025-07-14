@@ -116,7 +116,8 @@ else
     bool sortAscending = true;
 
     List<string> userProjectNames = new();
-    
+    bool isAdmin = false;
+
     string resultsImagePath = "";
     bool showResultsImageModal = false;
 
@@ -147,9 +148,13 @@ else
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
         var userId = user.Identity?.Name ?? "unknown";
+        isAdmin = user.IsInRole("Admin");
 
-        var rawProjects = await ProjectService.GetUserProjects(userId);
-        userProjectNames = rawProjects.Select(p => p.Name).ToList();
+        if (!isAdmin)
+        {
+            var rawProjects = await ProjectService.GetUserProjects(userId);
+            userProjectNames = rawProjects.Select(p => p.Name).ToList();
+        }
 
         LoadModelInfo();
         LoadExportInfo();
@@ -181,7 +186,7 @@ else
             if (parts.Length < 4) continue;
 
             var modelName = string.Join('_', parts[..^3]);
-            if (!userProjectNames.Contains(modelName)) continue; // ❗ 사용자 프로젝트 필터링
+            if (!isAdmin && !userProjectNames.Contains(modelName)) continue;
 
             var size = parts[^3];
             var created = ParseDate(parts[^2] + "_" + parts[^1]);
@@ -232,11 +237,19 @@ else
         if (!Directory.Exists(expDir)) return;
 
         var folders = Directory.GetDirectories(expDir);
+        exportInfos.Clear();
+
         foreach (var folder in folders)
         {
             var folderName = Path.GetFileName(folder);
-            var modelName = folderName.Split('_').FirstOrDefault();
-            if (string.IsNullOrEmpty(modelName) || !userProjectNames.Contains(modelName)) continue;
+            var parts = folderName.Split('_');
+            if (parts.Length < 3) continue;
+
+            var modelName = string.Join('_', parts[..^2]);
+
+            // ✅ Admin이 아니면 사용자 프로젝트 prefix와 일치하는지 검사
+            if (!isAdmin && !userProjectNames.Any(p => modelName.Equals(p, StringComparison.OrdinalIgnoreCase)))
+                continue;
 
             var yaml = Path.Combine(folder, "data.yaml");
             if (!File.Exists(yaml)) continue;
@@ -253,7 +266,7 @@ else
 
             exportInfos.Add(new ExportRow
             {
-                ModelName = modelName,
+                ModelName = folderName,
                 CreatedAt = Directory.GetCreationTime(folder),
                 TrainCount = train,
                 ValidCount = valid,
@@ -261,6 +274,7 @@ else
             });
         }
     }
+
 
     async Task ConfirmDelete(Dictionary<string, string> row)
     {
