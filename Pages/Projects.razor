@@ -12,6 +12,7 @@
 @using SixLabors.ImageSharp
 @using SixLabors.ImageSharp.PixelFormats
 @using SixLabors.ImageSharp.Processing
+@using HawkAI.Services
 
 <h4>Project Manager (@projects.Count)</h4>
 
@@ -524,6 +525,7 @@ else
 @code {
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private HttpClient Http { get; set; } = default!;
+    [Inject] private EmailService EmailService { get; set; } = default!;
 
     private List<ProjectViewModel> projects = new();
     private Dictionary<string, bool> projectHasModelMap = new();
@@ -1389,7 +1391,23 @@ else
 
             if (result?.status == "success" && !string.IsNullOrWhiteSpace(result.session_id))
             {
-                sessionId = result.session_id;                
+                sessionId = result.session_id;         
+                
+                // ✅ 자동 이메일 전송
+                var emailSubject = $"[HawkAI] Training Completed - {selectedProject.Name}";
+                var emailBody =
+                    $"Project '{selectedProject.Name}' training has started successfully.\n\n" +
+                    $"Session ID: {sessionId}\n" +
+                    $"Model Size: {trainModelSize}\n" +
+                    $"Epochs: {trainEpochs}\n" +
+                    $"You can monitor the progress at: https://hawkai.hknu.ac.kr/runs/{selectedProject.Name}/results.png"; 
+                var recipientEmail = "hhchoi@hknu.ac.kr"; // 또는 userId와 연계해 사용자 이메일을 구할 수 있다면 동적으로 설정
+
+                var emailSent = await EmailService.SendEmailAsync(recipientEmail, emailSubject, emailBody);
+                if (!emailSent)
+                {
+                    trainStatusMessage += "\n⚠️ Failed to send confirmation email.";
+                }
             }
             else
             {
