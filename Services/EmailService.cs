@@ -1,6 +1,7 @@
-﻿using System.Net;
-using System.Net.Mail;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
+using MailKit.Net.Smtp;
+using MailKit.Security;
+using MimeKit;
 
 namespace HawkAI.Services
 {
@@ -19,25 +20,24 @@ namespace HawkAI.Services
         {
             try
             {
-                var mail = new MailMessage();
-                mail.From = new MailAddress(senderEmail);
-                mail.To.Add(recipientEmail);
-                mail.Subject = subject;
-                mail.Body = body;
-                mail.IsBodyHtml = false;
-
-                var smtp = new SmtpClient("smtp.gmail.com", 587)
+                var message = new MimeMessage();
+                message.From.Add(new MailboxAddress("보내는 이름", senderEmail));
+                message.To.Add(MailboxAddress.Parse(recipientEmail));
+                message.Subject = subject;
+                message.Body = new TextPart("plain")
                 {
-                    EnableSsl = true,
-                    UseDefaultCredentials = false,
-                    Credentials = new NetworkCredential(senderEmail, senderPassword),
-                    DeliveryMethod = SmtpDeliveryMethod.Network
+                    Text = body
                 };
 
-                await smtp.SendMailAsync(mail);
+                using var client = new SmtpClient();
+                await client.ConnectAsync("smtp.gmail.com", 465, SecureSocketOptions.SslOnConnect);
+                await client.AuthenticateAsync(senderEmail, senderPassword);
+                await client.SendAsync(message);
+                await client.DisconnectAsync(true);
+
                 return true;
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Console.WriteLine($"❌ Email send error: {ex.Message}");
                 return false;
