@@ -18,21 +18,86 @@
 
 <p><b>Status:</b> @statusMessage</p>
 
-@if (downloadedFiles.Count > 0)
+<br />
+
+@if (mp3Files.Count > 0)
 {
-    <h5>📁 Downloaded Files:</h5>
-    <ul>
-        @foreach (var file in downloadedFiles)
-        {
-            <li><a href="@($"download/{file}")" download>@file</a></li>
-        }
-    </ul>
+    <h5>🎵 Downloaded MP3</h5>
+    @RenderFileTable(mp3Files)
 }
+
+@if (mp4Files.Count > 0)
+{
+    <h5>🎞️ Downloaded MP4</h5>
+    @RenderFileTable(mp4Files)
+}
+
+@functions {
+    RenderFragment RenderFileTable(List<FileInfo> files) => @<table class="table table-bordered table-hover">
+    <thead>
+        <tr style="background-color: #f8f9fa;">
+            <th @onclick="() => SortBy(nameof(FileInfo.Name))" style="cursor:pointer">File Name</th>
+            <th @onclick="() => SortBy(nameof(FileInfo.Length))" style="cursor:pointer">Size</th>
+            <th @onclick="() => SortBy(nameof(FileInfo.CreationTime))" style="cursor:pointer">Created</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var file in files)
+                {
+        <tr>
+            <td>
+                <a href="@($"download/{file.Name}")" download>@file.Name</a>
+            </td>
+            <td>@($"{file.Length / 1024.0:F1} KB")</td>
+            <td>@file.CreationTime.ToString("yyyy-MM-dd HH:mm")</td>
+            <td class="d-flex gap-1">
+                <a class="btn btn-sm btn-primary" href="@($"download/{file.Name}")" target="_blank">Play</a>
+                <button class="btn btn-sm btn-success" @onclick="() => ShowRenameModal(file.Name)">Edit</button>
+                <button class="btn btn-sm btn-danger" @onclick="() => ConfirmDelete(file.Name)">Delete</button>
+            </td>
+        </tr>
+                }
+    </tbody>
+</table>;
+}
+
+@if (showRenameModal)
+{
+    <div class="modal show d-block" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">Rename File</h5>
+                    <button class="btn-close" @onclick="() => showRenameModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    <label>New Name (without extension):</label>
+                    <input class="form-control" @bind="newFileName" />
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showRenameModal = false">Cancel</button>
+                    <button class="btn btn-success" @onclick="RenameFile">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+
 
 @code {
     private string youtubeUrl = "";
     private string statusMessage = "";
-    private List<string> downloadedFiles = new();
+    private List<FileInfo> fileInfos = new();
+    private string currentSort = nameof(FileInfo.CreationTime);
+    private bool sortAscending = false;
+    private string renameTarget = "";
+    private string newFileName = "";
+    private bool showRenameModal = false;
+
+    private List<FileInfo> mp3Files = new();
+    private List<FileInfo> mp4Files = new();
 
     private async Task Download(string type)
     {
@@ -123,21 +188,122 @@
         try
         {
             string path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "wwwroot", "download");
-            downloadedFiles = Directory.Exists(path)
-                ? Directory.GetFiles(path)
-                    .Select(Path.GetFileName)
-                    .OrderByDescending(f => File.GetLastWriteTime(Path.Combine(path, f)))
-                    .ToList()
-                : new List<string>();
+            if (Directory.Exists(path))
+            {
+                var all = new DirectoryInfo(path).GetFiles();
+                mp3Files = all.Where(f => f.Extension.ToLower() == ".mp3").ToList();
+                mp4Files = all.Where(f => f.Extension.ToLower() == ".mp4").ToList();
+
+                // 정렬 적용
+                mp3Files = ApplySort(mp3Files).ToList();
+                mp4Files = ApplySort(mp4Files).ToList();
+            }
         }
         catch
         {
-            downloadedFiles = new();
+            mp3Files = new();
+            mp4Files = new();
         }
+    }
+
+
+    private string GetFileTypeEmoji(string extension)
+    {
+        extension = extension.ToLower();
+        return extension switch
+        {
+            ".mp3" or ".wav" or ".aac" => "🎵",
+            ".mp4" or ".avi" or ".mov" or ".mkv" => "🎞️",
+            _ => "📄"
+        };
+    }
+
+    private IEnumerable<FileInfo> ApplySort(IEnumerable<FileInfo> list) =>
+    currentSort switch
+    {
+        nameof(FileInfo.Name) => sortAscending ? list.OrderBy(f => f.Name) : list.OrderByDescending(f => f.Name),
+        nameof(FileInfo.Length) => sortAscending ? list.OrderBy(f => f.Length) : list.OrderByDescending(f => f.Length),
+        nameof(FileInfo.CreationTime) => sortAscending ? list.OrderBy(f => f.CreationTime) : list.OrderByDescending(f => f.CreationTime),
+        _ => list
+    };
+
+    private void SortBy(string column)
+    {
+        if (currentSort == column)
+            sortAscending = !sortAscending;
+        else
+        {
+            currentSort = column;
+            sortAscending = true;
+        }
+
+        mp3Files = ApplySort(mp3Files).ToList();
+        mp4Files = ApplySort(mp4Files).ToList();
+    }
+
+    private void DeleteFile(string fileName)
+    {
+        try
+        {
+            string filePath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "wwwroot", "download", fileName);
+            if (System.IO.File.Exists(filePath))
+            {
+                System.IO.File.Delete(filePath);
+                statusMessage = $"🗑️ Deleted: {fileName}";
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"❌ Failed to delete: {ex.Message}";
+        }
+
+        LoadDownloadList();
     }
 
     protected override void OnInitialized()
     {
+        LoadDownloadList();
+    }
+
+    private async Task ConfirmDelete(string fileName)
+    {
+        bool confirmed = await JS.InvokeAsync<bool>("confirm", $"Are you sure you want to delete '{fileName}'?");
+        if (confirmed)
+            DeleteFile(fileName);
+    }
+
+    private void ShowRenameModal(string fileName)
+    {
+        renameTarget = fileName;
+        newFileName = Path.GetFileNameWithoutExtension(fileName); // 기본 이름
+        showRenameModal = true;
+    }
+
+    private void RenameFile()
+    {
+        try
+        {
+            string dir = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "wwwroot", "download");
+            string oldPath = Path.Combine(dir, renameTarget);
+            string newNameWithExt = newFileName + Path.GetExtension(renameTarget);
+            string newPath = Path.Combine(dir, newNameWithExt);
+
+            if (System.IO.File.Exists(oldPath) && !System.IO.File.Exists(newPath))
+            {
+                System.IO.File.Move(oldPath, newPath);
+                statusMessage = $"✏️ Renamed to: {newNameWithExt}";
+            }
+            else
+            {
+                statusMessage = $"⚠️ File already exists or not found.";
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"❌ Rename error: {ex.Message}";
+        }
+
+        showRenameModal = false;
         LoadDownloadList();
     }
 }
