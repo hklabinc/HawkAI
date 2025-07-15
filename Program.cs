@@ -1,22 +1,23 @@
 using HawkAI.Areas.Identity;
 using HawkAI.Data;
-using HawkAI.Data.SuperHeroService;
-using HawkAI.Data.GameService;
 using HawkAI.Data.CameraService;
 using HawkAI.Data.EventService;
+using HawkAI.Data.GameService;
 using HawkAI.Data.ProjectService;
+using HawkAI.Data.SuperHeroService;
+using HawkAI.Hubs;
+using HawkAI.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.AspNetCore.Http.Connections;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI;
-using Microsoft.EntityFrameworkCore;
-using MQTTnet;
-using HawkAI.Hubs;
-using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
-using Microsoft.AspNetCore.Http.Features;
+using MQTTnet;
 using System.Net.Http;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -114,6 +115,15 @@ builder.Services.AddScoped(sp => new HttpClient
 { 
     BaseAddress = new Uri(builder.Configuration["BaseAddress"] ?? "http://localhost:5001/") 
 });
+
+
+
+/************ 이메일 발송 관련 ************/
+var email = builder.Configuration["Email:Sender"];
+var pw = builder.Configuration["Email:AppPassword"];
+builder.Services.AddSingleton(new EmailService(email, pw));
+
+
 
 
 

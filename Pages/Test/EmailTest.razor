@@ -1,0 +1,46 @@
+﻿@page "/test/email-test"
+@using HawkAI.Services
+@inject EmailService EmailService
+
+<h3>📧 Gmail 이메일 보내기</h3>
+
+<div class="mb-3">
+    <label>받는 사람 이메일</label>
+    <input class="form-control" @bind="recipientEmail" placeholder="example@domain.com" />
+</div>
+
+<div class="mb-3">
+    <label>제목</label>
+    <input class="form-control" @bind="subject" placeholder="이메일 제목 입력" />
+</div>
+
+<div class="mb-3">
+    <label>내용</label>
+    <textarea class="form-control" rows="6" @bind="body" placeholder="이메일 본문 입력"></textarea>
+</div>
+
+<button class="btn btn-primary" @onclick="SendEmail">메일 보내기</button>
+
+@if (!string.IsNullOrEmpty(status))
+{
+    <p class="mt-3">@status</p>
+}
+
+@code {
+    private string recipientEmail = "";
+    private string subject = "";
+    private string body = "";
+    private string status = "";
+
+    private async Task SendEmail()
+    {
+        if (string.IsNullOrWhiteSpace(recipientEmail) || string.IsNullOrWhiteSpace(subject) || string.IsNullOrWhiteSpace(body))
+        {
+            status = "❌ 모든 항목을 입력해주세요.";
+            return;
+        }
+
+        var success = await EmailService.SendEmailAsync(recipientEmail, subject, body);
+        status = success ? "✅ 메일 전송 성공!" : "❌ 메일 전송 실패!";
+    }
+}
