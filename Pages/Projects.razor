@@ -13,6 +13,7 @@
 @using SixLabors.ImageSharp.PixelFormats
 @using SixLabors.ImageSharp.Processing
 @using HawkAI.Services
+@using System.Text.RegularExpressions;
 
 <h4>Project Manager (@projects.Count)</h4>
 
@@ -426,6 +427,11 @@ else
                             <label class="form-label">Seed (Optional)</label>
                             <input type="number" class="form-control" @bind="trainSeed" placeholder="e.g. 42" disabled="@isTraining" />
                         </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Notification Email(s)</label>
+                            <input class="form-control" @bind="recipientEmails" placeholder="e.g. user1@example.com, user2@example.com" disabled="@isTraining" />                            
+                        </div>
                     </div>
                 </div>
 
@@ -597,6 +603,7 @@ else
 
     private bool isExporting = false;
     private bool isTraining = false;
+    private string recipientEmails = string.Empty;  // 사용자 입력 이메일 저장용
 
 
     public void Dispose()
@@ -1341,6 +1348,13 @@ else
         showTrainModal = true;
     }
 
+    bool IsValidEmail(string email)
+    {
+        return Regex.IsMatch(email,
+            @"^[^@\s]+@[^@\s]+\.[^@\s]+$",
+            RegexOptions.IgnoreCase);
+    }
+
     private async Task TriggerTrain(string exportFolderName)
     {
         if (selectedProject == null)
@@ -1391,23 +1405,58 @@ else
 
             if (result?.status == "success" && !string.IsNullOrWhiteSpace(result.session_id))
             {
-                sessionId = result.session_id;         
-                
-                // ✅ 자동 이메일 전송
+                sessionId = result.session_id;
+
+                // ✅ result.message에서 Output 디렉토리 이름 추출
+                string sessionFolder = null;
+                var match = Regex.Match(result.message, @"Output:\s*runs/([^\s]+)");
+                if (match.Success)
+                {
+                    sessionFolder = match.Groups[1].Value;
+                }
+
+                // ✅ 이메일 본문 작성
                 var emailSubject = $"[HawkAI] Training Completed - {selectedProject.Name}";
                 var emailBody =
-                    $"Project '{selectedProject.Name}' training has started successfully.\n\n" +
-                    $"Session ID: {sessionId}\n" +
-                    $"Model Size: {trainModelSize}\n" +
-                    $"Epochs: {trainEpochs}\n" +
-                    $"You can monitor the progress at: https://hawkai.hknu.ac.kr/runs/{selectedProject.Name}/results.png"; 
-                var recipientEmail = "hhchoi@hknu.ac.kr"; // 또는 userId와 연계해 사용자 이메일을 구할 수 있다면 동적으로 설정
+                    $"Project '{selectedProject.Name}' training has completed successfully.\n\n" +
+                    $"{result.message}\n\n";
 
-                var emailSent = await EmailService.SendEmailAsync(recipientEmail, emailSubject, emailBody);
-                if (!emailSent)
+                if (!string.IsNullOrWhiteSpace(sessionFolder))
                 {
-                    trainStatusMessage += "\n⚠️ Failed to send confirmation email.";
+                    emailBody += $"View results: https://hawkai.hknu.ac.kr/runs/{sessionFolder}/results.png";
                 }
+
+                // ✅ 사용자 입력 이메일 유효성 확인 후 전송
+                if (!string.IsNullOrWhiteSpace(recipientEmails))
+                {
+                    var emailList = recipientEmails
+                        .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Select(email => email.Trim())
+                        .Where(IsValidEmail)
+                        .Distinct()
+                        .ToList();
+
+                    if (emailList.Count > 0)
+                    {
+                        foreach (var email in emailList)
+                        {
+                            var sent = await EmailService.SendEmailAsync(email, emailSubject, emailBody);
+                            if (!sent)
+                            {
+                                trainStatusMessage += $"\n⚠️ Failed to send email to {email}";
+                            }
+                        }
+                    }
+                    else
+                    {
+                        trainStatusMessage += "\n⚠️ No valid recipient email(s) provided.";
+                    }
+                }
+                else
+                {
+                    trainStatusMessage += "\n⚠️ Recipient email input is empty.";
+                }
+
             }
             else
             {
