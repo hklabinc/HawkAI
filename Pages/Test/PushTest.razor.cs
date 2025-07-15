@@ -6,8 +6,8 @@ public class PushTestBase : ComponentBase
     [Inject] protected HttpClient Http { get; set; } = default!;
     [Inject] protected IConfiguration Configuration { get; set; } = default!;
 
-    protected string pushTitle = "✅ YOLO 학습 완료";
-    protected string pushBody = "모델 학습이 모두 끝났습니다!";
+    protected string pushTitle = "✅ Test Email";
+    protected string pushBody = "테스트 이메일 입니다!";
     protected string customTokens = ""; // 사용자가 입력한 토큰들
     protected string statusMessage = "";
     protected bool isSending = false;

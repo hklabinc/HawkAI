@@ -1,6 +1,9 @@
 ﻿@page "/youtube-downloader"
-@using System.Diagnostics
 @inject NavigationManager Nav
+@inject IJSRuntime JS
+@using System.Diagnostics
+@using System.Text
+
 
 <h3>YouTube Downloader</h3>
 
@@ -39,9 +42,21 @@
             return;
         }
 
+        if (!youtubeUrl.Contains("youtube.com") && !youtubeUrl.Contains("youtu.be"))
+        {
+            statusMessage = "❌ Invalid YouTube URL.";
+            return;
+        }
+
         try
         {
+            // ✅ 기존 메시지 지우기 (중요!)
+            statusMessage = "";
+            StateHasChanged();
+
             statusMessage = $"🔄 Downloading {type.ToUpper()}...";
+            StateHasChanged();
+            await Task.Delay(1);
 
             string projectRoot = Path.Combine(AppContext.BaseDirectory, "..", "..", "..");
             string scriptPath = Path.Combine(projectRoot, "PythonScripts");
@@ -58,24 +73,40 @@
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
-                CreateNoWindow = true
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8
             };
 
-            using var process = Process.Start(startInfo);
-            string output = await process.StandardOutput.ReadToEndAsync();
-            string error = await process.StandardError.ReadToEndAsync();
-            process.WaitForExit();
+            var process = new Process { StartInfo = startInfo };
+            process.Start();
 
-            if (process.ExitCode == 0 && !string.IsNullOrWhiteSpace(output))
+            string finalFilename = null;
+
+            while (!process.StandardOutput.EndOfStream)
             {
-                string filename = output.Trim();
-                statusMessage = $"✅ {type.ToUpper()} downloaded: {filename}";
+                string line = await process.StandardOutput.ReadLineAsync();
+                if (!string.IsNullOrWhiteSpace(line))
+                {
+                    // ✅ 진행 메시지 갱신
+                    statusMessage = line;
+                    StateHasChanged();
 
-                // 자동 다운로드 (새 창 없이)
-                //Nav.NavigateTo($"/download/{Uri.EscapeDataString(filename)}", forceLoad: false);
+                    if (line.EndsWith(".mp3") || line.EndsWith(".mp4"))
+                        finalFilename = line.Trim();
+                }
+            }
+
+            await process.WaitForExitAsync();
+
+            if (process.ExitCode == 0 && finalFilename != null)
+            {
+                statusMessage = $"✅ Downloaded: {finalFilename}";
+                // await JS.InvokeVoidAsync("triggerFileDownload", $"/download/{Uri.EscapeDataString(finalFilename)}");
             }
             else
             {
+                string error = await process.StandardError.ReadToEndAsync();
                 statusMessage = $"❌ Error: {error}";
             }
         }

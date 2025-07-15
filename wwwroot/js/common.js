@@ -1,4 +1,14 @@
 ﻿/* Gobally 사용을 위하여 아래 window.를 붙임 */
+window.triggerFileDownload = (fileUrl) => {
+    const a = document.createElement('a');
+    a.href = fileUrl;
+    a.download = '';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+};
+
 window.ShowToastr = (type, message) => {
     if (type === "success") {        
         //confirm(message);
