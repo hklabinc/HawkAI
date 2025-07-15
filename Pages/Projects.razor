@@ -403,15 +403,21 @@ else
                             </select>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Epochs</label>
-                            <input type="number" class="form-control" @bind="trainEpochs" min="1" max="1000" disabled="@isTraining" />
+                        <div class="row mb-3">
+                            <div class="col">
+                                <label class="form-label">Epochs</label>
+                                <input type="number" class="form-control" @bind="trainEpochs" min="1" max="1000" disabled="@isTraining" />
+                            </div>
+                            <div class="col">
+                                <label class="form-label">Batch Size</label>
+                                <input type="number" class="form-control" @bind="trainBatch" min="1" max="128" disabled="@isTraining" />
+                            </div>
+                            <div class="col">
+                                <label class="form-label">Seed (Optional)</label>
+                                <input type="number" class="form-control" @bind="trainSeed" placeholder="e.g. 42" disabled="@isTraining" />
+                            </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Batch Size</label>
-                            <input type="number" class="form-control" @bind="trainBatch" min="1" max="128" disabled="@isTraining" />
-                        </div>
 
                         <div class="mb-3">
                             <label class="form-label">Server</label>
@@ -421,11 +427,6 @@ else
                                 <option value="http://sons.hknu.ac.kr:9003" disabled>Com3090</option>
                                 <option value="http://sons.hknu.ac.kr:9002" disabled>Com4090</option>
                             </select>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Seed (Optional)</label>
-                            <input type="number" class="form-control" @bind="trainSeed" placeholder="e.g. 42" disabled="@isTraining" />
                         </div>
 
                         <div class="mb-3">

@@ -1,0 +1,112 @@
+﻿@page "/youtube-downloader"
+@using System.Diagnostics
+@inject NavigationManager Nav
+
+<h3>YouTube Downloader</h3>
+
+<div class="mb-3">
+    <input class="form-control" @bind="youtubeUrl" placeholder="Enter YouTube URL..." />
+</div>
+
+<div class="mb-3 d-flex gap-2">
+    <button class="btn btn-success" @onclick="@(() => Download("mp3"))">Download MP3</button>
+    <button class="btn btn-primary" @onclick="@(() => Download("mp4"))">Download MP4</button>
+</div>
+
+<p><b>Status:</b> @statusMessage</p>
+
+@if (downloadedFiles.Count > 0)
+{
+    <h5>📁 Downloaded Files:</h5>
+    <ul>
+        @foreach (var file in downloadedFiles)
+        {
+            <li><a href="@($"download/{file}")" download>@file</a></li>
+        }
+    </ul>
+}
+
+@code {
+    private string youtubeUrl = "";
+    private string statusMessage = "";
+    private List<string> downloadedFiles = new();
+
+    private async Task Download(string type)
+    {
+        if (string.IsNullOrWhiteSpace(youtubeUrl))
+        {
+            statusMessage = "❌ Please enter a URL.";
+            return;
+        }
+
+        try
+        {
+            statusMessage = $"🔄 Downloading {type.ToUpper()}...";
+
+            string projectRoot = Path.Combine(AppContext.BaseDirectory, "..", "..", "..");
+            string scriptPath = Path.Combine(projectRoot, "PythonScripts");
+            string outputPath = Path.Combine(projectRoot, "wwwroot", "download");
+
+            if (!Directory.Exists(outputPath))
+                Directory.CreateDirectory(outputPath);
+
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = "python",
+                Arguments = $"youtube_download.py \"{youtubeUrl}\" \"{outputPath}\" \"{type}\"",
+                WorkingDirectory = scriptPath,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = Process.Start(startInfo);
+            string output = await process.StandardOutput.ReadToEndAsync();
+            string error = await process.StandardError.ReadToEndAsync();
+            process.WaitForExit();
+
+            if (process.ExitCode == 0 && !string.IsNullOrWhiteSpace(output))
+            {
+                string filename = output.Trim();
+                statusMessage = $"✅ {type.ToUpper()} downloaded: {filename}";
+
+                // 자동 다운로드 (새 창 없이)
+                //Nav.NavigateTo($"/download/{Uri.EscapeDataString(filename)}", forceLoad: false);
+            }
+            else
+            {
+                statusMessage = $"❌ Error: {error}";
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"❌ Exception: {ex.Message}";
+        }
+
+        LoadDownloadList();
+    }
+
+    private void LoadDownloadList()
+    {
+        try
+        {
+            string path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "wwwroot", "download");
+            downloadedFiles = Directory.Exists(path)
+                ? Directory.GetFiles(path)
+                    .Select(Path.GetFileName)
+                    .OrderByDescending(f => File.GetLastWriteTime(Path.Combine(path, f)))
+                    .ToList()
+                : new List<string>();
+        }
+        catch
+        {
+            downloadedFiles = new();
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        LoadDownloadList();
+    }
+}

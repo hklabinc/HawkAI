@@ -47,6 +47,7 @@
   <ItemGroup>
     <Folder Include="Migrations\" />
     <Folder Include="wwwroot\datasets\" />
+    <Folder Include="wwwroot\download\" />
     <Folder Include="wwwroot\runs\YS_bridge_small_123456_000000\" />
     <Folder Include="wwwroot\runs\YS_top_small_123456_000000\" />
   </ItemGroup>

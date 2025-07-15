@@ -54,21 +54,30 @@
 
         <AuthorizeView Roles="Admin">
             <div class="nav-item px-3">
+                <NavLink class="nav-link" href="/youtube-downloader">
+                    <span class="oi oi-plus" aria-hidden="true"></span> YouTube Download
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="/example/webgl">
+                    <span class="oi oi-plus" aria-hidden="true"></span> WebGL
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
                 <NavLink class="nav-link" href="https://ictrobot.hknu.ac.kr:8089">
                     <span class="oi oi-play-circle" aria-hidden="true"></span> WebRTC
                 </NavLink>
             </div>
-        </AuthorizeView>
-
-        <AuthorizeView Roles="Admin">
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="webrtc">
                     <span class="oi oi-account-login" aria-hidden="true"></span> WebRTC JS
                 </NavLink>
             </div>
-        </AuthorizeView>
-        
-        <AuthorizeView Roles="Admin">
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="/test/webcam">
+                    <span class="oi oi-play-circle" aria-hidden="true"></span> WebCam
+                </NavLink>
+            </div>
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="/test/opencv">
                     <span class="oi oi-bug" aria-hidden="true"></span> OpenCV
@@ -86,7 +95,7 @@
             </div>
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="/test/mqtt">
-                    <span class="oi oi-link-intact" aria-hidden="true"></span> MQTT Test
+                    <span class="oi oi-chat" aria-hidden="true"></span> MQTT Test
                 </NavLink>
             </div>
             <div class="nav-item px-3">
@@ -95,19 +104,13 @@
                 </NavLink>
             </div>
             <div class="nav-item px-3">
+                <NavLink class="nav-link" href="/test/push-test">
+                    <span class="oi oi-bell" aria-hidden="true"></span> Pushbullet Test
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
                 <NavLink class="nav-link" href="/test/email-test">
-                    <span class="oi oi-command" aria-hidden="true"></span> Email Test
-                </NavLink>
-            </div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="/test/webcam">
-                    <span class="oi oi-play-circle" aria-hidden="true"></span> WebCam
-                </NavLink>
-            </div>
-
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="/example/webgl">
-                    <span class="oi oi-plus" aria-hidden="true"></span> WebGL
+                    <span class="oi oi-bell" aria-hidden="true"></span> Email Test
                 </NavLink>
             </div>
         </AuthorizeView>

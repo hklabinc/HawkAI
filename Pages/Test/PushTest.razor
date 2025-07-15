@@ -1,0 +1,29 @@
+﻿@page "/test/push-test"
+@inherits PushTestBase
+
+<h3>🔔 Pushbullet Test</h3>
+
+<div class="mb-3">
+    <label class="form-label">Push Title</label>
+    <input class="form-control" @bind="pushTitle" placeholder="Enter title..." />
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Push Body</label>
+    <textarea class="form-control" @bind="pushBody" rows="4" placeholder="Enter message..."></textarea>
+</div>
+
+<div class="mb-3">
+    <label class="form-label">Pushbullet Token(s)</label>
+    <input class="form-control" @bind="customTokens" placeholder="Optional. Separate multiple tokens with , or ;" />
+    <small class="form-text text-muted">Leave empty to use the default token.</small>
+</div>
+
+<button class="btn btn-success" @onclick="SendPush" disabled="@isSending">Send Push</button>
+
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="alert @(statusMessage.Contains("✅") ? "alert-success" : "alert-danger") mt-3">
+        @statusMessage
+    </div>
+}
