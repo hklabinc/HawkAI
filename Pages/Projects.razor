@@ -1596,13 +1596,12 @@ else
 
     private async Task StartInferLoop(string modelName)
     {
-        Console.WriteLine($"🚀 StartInferLoop called with model: {modelName}");
         isInferLoopRunning = true;
 
         while (isInferLoopRunning)
         {
             await InferFromWebcam(modelName);
-            await Task.Delay(100); // 1초 간격 (조절 가능)
+            await Task.Delay(200); // 1초 간격 (조절 가능)
         }
     }
 
