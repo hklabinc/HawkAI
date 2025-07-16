@@ -466,6 +466,7 @@ else
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" @onclick="() => showCameraModal = false">Close</button>
+                    <button class="btn btn-danger" @onclick="DeleteCameraJson">Delete</button>
                 </div>
             </div>
         </div>
@@ -1565,5 +1566,34 @@ else
             JS.InvokeVoidAsync("alert", $"❌ results.png not found in folder: {folderName}");
         }
     }
+
+
+    private async Task DeleteCameraJson()
+    {
+        var jsonPath = Path.Combine(Env.WebRootPath, "datasets", cameraProjectName, "camera.json");
+
+        if (File.Exists(jsonPath))
+        {
+            var confirm = await JS.InvokeAsync<bool>("confirm", $"Are you sure you want to delete the camera.json for project '{cameraProjectName}'?");
+            if (confirm)
+            {
+                try
+                {
+                    File.Delete(jsonPath);
+                    showCameraModal = false;
+                    await JS.InvokeVoidAsync("alert", "✅ camera.json has been deleted.");
+                }
+                catch (Exception ex)
+                {
+                    await JS.InvokeVoidAsync("alert", $"❌ Failed to delete camera.json: {ex.Message}");
+                }
+            }
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("alert", "❌ camera.json file not found.");
+        }
+    }
+
 
 }
