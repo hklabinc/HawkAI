@@ -492,7 +492,7 @@ else
                         <ul>
                             @foreach (var folder in modelFolderNames)
                             {
-                                <li style="cursor: pointer; color: blue;" @onclick="() => ShowResultsImage(folder)">
+                                <li style="cursor: pointer; color: blue;" @onclick="() => OpenInferenceModal(folder)">
                                     @folder
                                 </li>
                             }
@@ -507,26 +507,32 @@ else
     </div>
 }
 
-@if (showResultsImageModal)
+@if (showInferenceModal)
 {
-    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.6);">
+    <div class="modal show d-block" style="background: rgba(0,0,0,0.6);">
         <div class="modal-dialog modal-xl">
             <div class="modal-content">
-                <div class="modal-header bg-dark text-white">
-                    <h5 class="modal-title">Results Image</h5>
-                    <button type="button" class="btn-close btn-close-white" @onclick="() => showResultsImageModal = false"></button>
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Inference Result - @selectedModelName</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showInferenceModal = false"></button>
                 </div>
                 <div class="modal-body text-center">
-                    <img src="@resultsImagePath" style="max-width: 100%; height: auto;" alt="Results" />
+                    @if (!string.IsNullOrEmpty(inferImageUrl))
+                    {
+                        <img src="@inferImageUrl" style="max-width: 100%; height: auto;" />
+                    }
+                    else
+                    {
+                        <p class="text-danger">❌ No result image received.</p>
+                    }
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="() => showResultsImageModal = false">Close</button>
+                    <button class="btn btn-secondary" @onclick="() => showInferenceModal = false">Close</button>
                 </div>
             </div>
         </div>
     </div>
 }
-
 
 
 
@@ -1551,21 +1557,39 @@ else
         showModelModal = true;
     }
 
-    private void ShowResultsImage(string folderName)
-    {
-        var imagePath = Path.Combine("runs", folderName, "results.png");
-        var fullPath = Path.Combine(Env.WebRootPath, imagePath);
+    private string selectedModelName = "";
+    private string inferImageUrl = "";
+    private bool showInferenceModal = false;
 
-        if (File.Exists(fullPath))
+    private async void OpenInferenceModal(string modelName)
+    {
+        selectedModelName = modelName;
+        showInferenceModal = true;
+
+        // Webcam 캡처 요청
+        var base64Image = await JS.InvokeAsync<string>("captureWebcamImage");
+
+        if (!string.IsNullOrWhiteSpace(base64Image))
         {
-            resultsImagePath = "/" + imagePath.Replace("\\", "/"); // 웹 경로로
-            showResultsImageModal = true;
-        }
-        else
-        {
-            JS.InvokeVoidAsync("alert", $"❌ results.png not found in folder: {folderName}");
+            var imageBytes = Convert.FromBase64String(base64Image.Split(',')[1]);
+            var content = new MultipartFormDataContent();
+            content.Add(new StringContent(modelName), "model_name");
+            content.Add(new ByteArrayContent(imageBytes), "image", "webcam.jpg");
+
+            var response = await Http.PostAsync("http://localhost:9003/infer", content);
+            if (response.IsSuccessStatusCode)
+            {
+                var imgData = await response.Content.ReadAsByteArrayAsync();
+                inferImageUrl = "data:image/jpeg;base64," + Convert.ToBase64String(imgData);
+            }
+            else
+            {
+                inferImageUrl = "";
+                await JS.InvokeVoidAsync("alert", $"❌ 서버 응답 오류: {response.StatusCode}");
+            }
         }
     }
+
 
 
     private async Task DeleteCameraJson()
