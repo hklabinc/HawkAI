@@ -146,11 +146,11 @@
             var process = new Process { StartInfo = startInfo };
             process.Start();
 
-            string finalFilename = null;
+            string finalFilename = string.Empty;
 
             while (!process.StandardOutput.EndOfStream)
             {
-                string line = await process.StandardOutput.ReadLineAsync();
+                string? line = await process.StandardOutput.ReadLineAsync();
                 if (!string.IsNullOrWhiteSpace(line))
                 {
                     // ✅ 진행 메시지 갱신

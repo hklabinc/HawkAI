@@ -146,8 +146,8 @@
                                     }
                                     else
                                     {
-                                        string rxLabel = objMsg.label;
-                                        if (objMsg.type == "pong" || (rxLabel.StartsWith('{') && rxLabel.EndsWith('}')))
+                                        string? rxLabel = objMsg.label;
+                                        if (!string.IsNullOrEmpty(rxLabel) && (objMsg.type == "pong" || (rxLabel.StartsWith('{') && rxLabel.EndsWith('}'))))
                                         {                                                
                                             ControlMsg? ctrlmsg = JsonSerializer.Deserialize<ControlMsg>(rxLabel);
                                             if (ctrlmsg is not null)

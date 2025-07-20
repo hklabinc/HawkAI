@@ -445,7 +445,7 @@ else
 
                 <div class="modal-footer">
                     <button class="btn btn-secondary" @onclick="() => showTrainModal = false">Close</button>
-                    <button class="btn btn-primary" @onclick="() => TriggerTrain(latestExportFolderName)" disabled="@isTraining">Start Training</button>
+                    <button class="btn btn-primary" @onclick="() => TriggerTrain(latestExportFolderName ?? string.Empty)" disabled="@isTraining">Start Training</button>
                 </div>
             </div>
         </div>
@@ -554,10 +554,6 @@ else
     private string userId = string.Empty;
 
     private List<IBrowserFile> createUploadedFiles = new();
-
-    private bool showDeleteConfirm = false;
-    private int projectToDeleteId = -1;
-    private string projectToDeleteName = string.Empty;
 
     private bool showExportModal = false;
     private int exportProjectId;
@@ -868,6 +864,16 @@ else
 
         var project = await Db.Projects.Include(p => p.Images).FirstOrDefaultAsync(p => p.Id == projectId);
         if (project == null || project.Images.Count == 0) return;
+
+        int labeled = project.Images.Count(img => img.LabelStatus == "Labeled");
+        int total = project.Images.Count;
+        int percent = (int)Math.Round((double)labeled / total * 100);
+
+        if (percent < 100)
+        {
+            await JS.InvokeVoidAsync("alert", $"⚠️ Only {percent}% of images are labeled. Please label all images before exporting.");
+            return;
+        }
 
         var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
         var exportFolderName = $"{project.Name}_{timestamp}";

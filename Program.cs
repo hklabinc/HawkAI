@@ -55,8 +55,8 @@ builder.Services.AddScoped<IProjectService, ProjectService>();
 builder.Services.AddAuthentication()
     .AddGoogle(googleOptions =>
     {
-        googleOptions.ClientId = builder.Configuration["Authentication:Google:ClientId"];
-        googleOptions.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"];
+        googleOptions.ClientId = builder.Configuration["Authentication:Google:ClientId"]!;
+        googleOptions.ClientSecret = builder.Configuration["Authentication:Google:ClientSecret"]!;
     });
 
 
@@ -119,8 +119,8 @@ builder.Services.AddScoped(sp => new HttpClient
 
 
 /************ 이메일 발송 관련 ************/
-var email = builder.Configuration["Email:Sender"];
-var pw = builder.Configuration["Email:AppPassword"];
+var email = builder.Configuration["Email:Sender"]!;
+var pw = builder.Configuration["Email:AppPassword"]!;
 builder.Services.AddSingleton(new EmailService(email, pw));
 
 

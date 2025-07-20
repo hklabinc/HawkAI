@@ -40,32 +40,30 @@
 
         // Dispose
         #region
-        ~HostedMqttHub()
-        {
-            this.Dispose(false);
-        }
-
         private bool disposed;
 
-        public void Dispose()
+        ~HostedMqttHub()
         {
-            this.Dispose(true);
+            Dispose(false);
+        }
+
+        public new void Dispose()  // 부모의 Dispose()를 숨김
+        {
+            Dispose(true);
             GC.SuppressFinalize(this);
         }
 
-        protected virtual void Dispose(bool disposing)
+        protected void Dispose(bool disposing)
         {
-            if (this.disposed)
-            {
+            if (disposed)
                 return;
-            }
 
             if (disposing)
             {
                 clientSubscribe?.Dispose();
             }
 
-            this.disposed = true;
+            disposed = true;
         }
         #endregion
     }

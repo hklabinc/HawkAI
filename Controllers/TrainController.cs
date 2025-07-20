@@ -24,8 +24,8 @@ namespace HawkAI.Controllers
 
         public class SignalRMessage
         {
-            public string session_id { get; set; }
-            public string message { get; set; }
+            public required string session_id { get; set; }
+            public required string message { get; set; }
         }
     }
 

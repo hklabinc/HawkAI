@@ -136,7 +136,7 @@ else
 
 
 @code {
-    List<Dictionary<string, string>> modelRows;
+    List<Dictionary<string, string>> modelRows = new();
     string sortColumn = "모델명";
     bool sortAscending = true;
     string exportSortColumn = "ModelName";
@@ -167,11 +167,11 @@ else
 
     class ExportRow
     {
-        public string ModelName { get; set; }
+        public string ModelName { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public int TrainCount { get; set; }
         public int ValidCount { get; set; }
-        public string FolderName { get; set; }
+        public string FolderName { get; set; } = string.Empty;
     }
 
     List<ExportRow> exportInfos = new();

@@ -8,7 +8,7 @@ namespace HawkAI.Hubs
         public override async Task OnConnectedAsync()
         {
             var httpContext = Context.GetHttpContext();
-            var sessionId = httpContext?.Request.Query["sessionId"];
+            var sessionId = httpContext?.Request.Query["sessionId"].ToString();
             //Console.WriteLine($"[Hub] ▶️ Client connected. SessionId: {sessionId}");
 
             if (!string.IsNullOrWhiteSpace(sessionId))
