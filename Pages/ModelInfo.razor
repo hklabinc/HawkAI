@@ -104,6 +104,7 @@ else
                 <td>@row.TrainCount</td>
                 <td>@row.ValidCount</td>
                 <td>
+                    <a class="btn btn-sm btn-info me-1" href="@($"/exports/{row.FolderName}.zip")" download>다운로드</a>
                     <button class="btn btn-sm btn-danger" @onclick="() => ConfirmDeleteExport(row.FolderName)">삭제</button>
                 </td>
             </tr>
@@ -137,10 +138,10 @@ else
 
 @code {
     List<Dictionary<string, string>> modelRows = new();
-    string sortColumn = "모델명";
-    bool sortAscending = true;
-    string exportSortColumn = "ModelName";
-    bool exportSortAscending = true;
+    string sortColumn = "만든날짜";
+    bool sortAscending = false;  // 최신순 정렬
+    string exportSortColumn = "CreatedAt";
+    bool exportSortAscending = false;  // 최신순 정렬
 
     List<string> userProjectNames = new();
     bool isAdmin = false;
