@@ -39,8 +39,11 @@ else
             </span>
         </p>
 
-        <!-- 다음 줄 왼쪽에 Delete 버튼 -->
+        <!-- 다음 줄 왼쪽에 Download 및 Delete 버튼 -->
         <div class="mt-1">
+            <button class="btn btn-primary me-2" @onclick="DownloadAllImages">
+                <span class="oi oi-cloud-download"></span> Download All Images
+            </button>
             <button class="btn btn-danger" @onclick="ConfirmBulkDeleteImages">
                 <span class="oi oi-trash"></span> Delete Selected
             </button>
@@ -389,4 +392,41 @@ else
         project.ImageCount = await Db.Images.CountAsync(i => i.ProjectId == projectId);
         await Db.SaveChangesAsync();
     }
+
+
+    private async Task DownloadAllImages()
+    {
+        try
+        {
+            var imagesFolder = System.IO.Path.Combine(Env.WebRootPath, "datasets", project.Name, "images");
+            if (!Directory.Exists(imagesFolder))
+            {
+                await JS.InvokeVoidAsync("alert", "Images folder not found.");
+                return;
+            }
+
+            var zipFileName = $"{project.Name}.zip";
+            var zipPath = System.IO.Path.Combine(Env.WebRootPath, "temp", zipFileName);
+
+            // 임시 폴더 생성
+            Directory.CreateDirectory(System.IO.Path.GetDirectoryName(zipPath)!);
+
+            // 기존 zip 파일 삭제
+            if (File.Exists(zipPath))
+                File.Delete(zipPath);
+
+            // zip 파일 생성
+            System.IO.Compression.ZipFile.CreateFromDirectory(imagesFolder, zipPath);
+
+            // 다운로드 트리거
+            var downloadUrl = $"/temp/{zipFileName}";
+            await JS.InvokeVoidAsync("open", downloadUrl, "_blank");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[❌] Error zipping images: {ex.Message}");
+            await JS.InvokeVoidAsync("alert", "❌ Failed to create ZIP file.");
+        }
+    }
+
 }
