@@ -438,14 +438,16 @@ else
     {
         try
         {
-            // ✅ PythonScripts는 wwwroot와 같은 레벨이므로 ContentRoot 사용
-            var projectFolder = System.IO.Path.Combine(Env.ContentRootPath, "wwwroot", "datasets", project.Name, "images");
+            var imageDir = System.IO.Path.Combine(Env.WebRootPath, "datasets", project.Name, "images");
+            var annotatedDir = System.IO.Path.Combine(Env.WebRootPath, "datasets", project.Name, "images_annotated");
             var scriptPath = System.IO.Path.Combine(Env.ContentRootPath, "PythonScripts", "auto_labeling.py");
+
+            Directory.CreateDirectory(annotatedDir); // ✅ Ensure annotated folder exists
 
             var startInfo = new ProcessStartInfo
             {
                 FileName = "python",
-                Arguments = $"\"{scriptPath}\" \"{projectFolder}\" \"{project.Name}\"",
+                Arguments = $"\"{scriptPath}\" \"{imageDir}\" \"{project.Name}\"",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -467,20 +469,60 @@ else
             }
 
             var jsonResult = JsonDocument.Parse(output).RootElement;
+            var labelList = project.Labels.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()).ToList();
+            var colors = new[] { Color.Red, Color.Green, Color.Blue, Color.Orange, Color.Purple };
+            var font = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+                ? SystemFonts.CreateFont("Arial", 16)
+                : SystemFonts.CreateFont("DejaVu Sans", 16);
+
             foreach (var kvp in jsonResult.EnumerateObject())
             {
                 var fileName = kvp.Name;
                 var image = images.FirstOrDefault(i => i.FileName == fileName);
                 if (image == null) continue;
 
-                image.LabelData = kvp.Value.GetRawText();
+                var labelDataJson = kvp.Value.GetRawText();
+                image.LabelData = labelDataJson;
                 image.LabelStatus = "Labeled";
+
+                // ✅ Annotated image 생성
+                var imagePath = System.IO.Path.Combine(imageDir, image.FileName);
+                var annotatedPath = System.IO.Path.Combine(annotatedDir, image.FileName);
+
+                try
+                {
+                    using var srcImage = await Image.LoadAsync<Rgba32>(imagePath);
+                    var labelBoxes = JsonDocument.Parse(labelDataJson).RootElement;
+
+                    foreach (var box in labelBoxes.EnumerateArray())
+                    {
+                        float x = (float)box.GetProperty("x").GetDouble();
+                        float y = (float)box.GetProperty("y").GetDouble();
+                        float w = (float)box.GetProperty("w").GetDouble();
+                        float h = (float)box.GetProperty("h").GetDouble();
+                        string label = box.GetProperty("label").GetString() ?? "";
+                        int idx = labelList.IndexOf(label);
+                        var color = colors[idx % colors.Length];
+
+                        srcImage.Mutate(ctx =>
+                        {
+                            ctx.Draw(color, 1, new RectangleF(x, y, w, h));
+                            ctx.DrawText(label, font, color, new PointF(x + 4, y - 16));
+                        });
+                    }
+
+                    await srcImage.SaveAsJpegAsync(annotatedPath);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[❌] Annotated image error for {fileName}: {ex.Message}");
+                }
             }
 
             await Db.SaveChangesAsync();
             await LoadImages();
 
-            await JS.InvokeVoidAsync("alert", "✅ Auto labeling completed!");
+            await JS.InvokeVoidAsync("alert", "✅ Auto labeling completed and annotated images saved!");
         }
         catch (Exception ex)
         {
@@ -488,6 +530,7 @@ else
             await JS.InvokeVoidAsync("alert", "❌ Failed to run auto labeling.\n" + ex.Message);
         }
     }
+
 
 
 }
