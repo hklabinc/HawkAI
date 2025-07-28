@@ -1,5 +1,4 @@
 ﻿#!/usr/bin/env python
-# PythonScripts/auto_labeling.py
 import cv2
 import numpy as np
 import json
@@ -25,7 +24,7 @@ def detect_contours(img):
         if MIN_CONTOUR_AREA <= cv2.contourArea(cnt) <= MAX_CONTOUR_AREA
     ]
 
-def extract_box_info(img_path):
+def extract_box_info(img_path, label):
     img = cv2.imread(str(img_path))
     if img is None:
         return []
@@ -48,17 +47,19 @@ def extract_box_info(img_path):
             "y": round(float(y), 2),
             "w": round(float(w), 2),
             "h": round(float(h), 2),
-            "label": "film"
+            "label": label  # ✅ 프로젝트 이름 사용
         })
 
     return box_info_list
 
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: auto_labeling.py <image_folder>", file=sys.stderr)
+    if len(sys.argv) != 3:
+        print("Usage: auto_labeling.py <image_folder> <label_name>", file=sys.stderr)
         sys.exit(1)
 
     image_folder = Path(sys.argv[1])
+    label_name = sys.argv[2]
+
     if not image_folder.exists() or not image_folder.is_dir():
         print("Invalid folder path.", file=sys.stderr)
         sys.exit(1)
@@ -67,11 +68,11 @@ def main():
     for img_path in sorted(image_folder.glob("*")):
         if img_path.suffix.lower() not in [".jpg", ".jpeg", ".png", ".bmp"]:
             continue
-        boxes = extract_box_info(img_path)
+        boxes = extract_box_info(img_path, label_name)
         if boxes:
             result[img_path.name] = boxes
 
-    print(json.dumps(result))  # ✅ stdout으로 출력
+    print(json.dumps(result))  # ✅ stdout 출력
 
 if __name__ == "__main__":
     main()
