@@ -56,63 +56,6 @@ else
     </table>
 }
 
-<br />
-<h3>Exported Datasets</h3>
-<table class="table table-bordered table-hover">
-    <thead>
-        <tr>
-            <th>No</th>
-            <th @onclick="() => SortExportBy(nameof(ExportRow.ModelName))">
-                모델명
-                @if (exportSortColumn == nameof(ExportRow.ModelName))
-                {
-                    <span>@(exportSortAscending ? "▲" : "▼")</span>
-                }
-            </th>
-            <th @onclick="() => SortExportBy(nameof(ExportRow.CreatedAt))">
-                만든날짜
-                @if (exportSortColumn == nameof(ExportRow.CreatedAt))
-                {
-                    <span>@(exportSortAscending ? "▲" : "▼")</span>
-                }
-            </th>
-            <th @onclick="() => SortExportBy(nameof(ExportRow.TrainCount))">
-                Train Count
-                @if (exportSortColumn == nameof(ExportRow.TrainCount))
-                {
-                    <span>@(exportSortAscending ? "▲" : "▼")</span>
-                }
-            </th>
-            <th @onclick="() => SortExportBy(nameof(ExportRow.ValidCount))">
-                Valid Count
-                @if (exportSortColumn == nameof(ExportRow.ValidCount))
-                {
-                    <span>@(exportSortAscending ? "▲" : "▼")</span>
-                }
-            </th>
-            <th>Action</th>
-        </tr>
-    </thead>
-    <tbody>
-        @for (int i = 0; i < SortedExportInfos.Count(); i++)
-        {
-            var row = SortedExportInfos.ElementAt(i);
-            <tr>
-                <td>@(i + 1)</td>
-                <td>@row.ModelName</td>
-                <td>@row.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</td>
-                <td>@row.TrainCount</td>
-                <td>@row.ValidCount</td>
-                <td>
-                    <a class="btn btn-sm btn-info me-1" href="@($"/exports/{row.FolderName}.zip")" download>다운로드</a>
-                    <button class="btn btn-sm btn-danger" @onclick="() => ConfirmDeleteExport(row.FolderName)">삭제</button>
-                </td>
-            </tr>
-        }
-    </tbody>
-</table>
-
-
 
 @if (showResultsImageModal)
 {
@@ -140,8 +83,6 @@ else
     List<Dictionary<string, string>> modelRows = new();
     string sortColumn = "만든날짜";
     bool sortAscending = false;  // 최신순 정렬
-    string exportSortColumn = "CreatedAt";
-    bool exportSortAscending = false;  // 최신순 정렬
 
     List<string> userProjectNames = new();
     bool isAdmin = false;
@@ -160,23 +101,6 @@ else
             ? modelRows.OrderBy(row => row[sortColumn], StringComparer.CurrentCulture)
             : modelRows.OrderByDescending(row => row[sortColumn], StringComparer.CurrentCulture);
 
-    IEnumerable<ExportRow> SortedExportInfos =>
-    exportSortAscending
-        ? exportInfos.OrderBy(e => e.GetType().GetProperty(exportSortColumn)?.GetValue(e, null))
-        : exportInfos.OrderByDescending(e => e.GetType().GetProperty(exportSortColumn)?.GetValue(e, null));
-
-
-    class ExportRow
-    {
-        public string ModelName { get; set; } = string.Empty;
-        public DateTime CreatedAt { get; set; }
-        public int TrainCount { get; set; }
-        public int ValidCount { get; set; }
-        public string FolderName { get; set; } = string.Empty;
-    }
-
-    List<ExportRow> exportInfos = new();
-
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
@@ -191,7 +115,6 @@ else
         }
 
         LoadModelInfo();
-        LoadExportInfo();
     }
 
     void SortBy(string column)
@@ -265,62 +188,6 @@ else
         }
     }
 
-    void SortExportBy(string column)
-    {
-        if (exportSortColumn == column)
-            exportSortAscending = !exportSortAscending;
-        else
-        {
-            exportSortColumn = column;
-            exportSortAscending = true;
-        }
-    }
-
-    void LoadExportInfo()
-    {
-        var expDir = Path.Combine(Env.WebRootPath, "exports");
-        if (!Directory.Exists(expDir)) return;
-
-        var folders = Directory.GetDirectories(expDir);
-        exportInfos.Clear();
-
-        foreach (var folder in folders)
-        {
-            var folderName = Path.GetFileName(folder);
-            var parts = folderName.Split('_');
-            if (parts.Length < 3) continue;
-
-            var modelName = string.Join('_', parts[..^2]);
-
-            // ✅ Admin이 아니면 사용자 프로젝트 prefix와 일치하는지 검사
-            if (!isAdmin && !userProjectNames.Any(p => modelName.Equals(p, StringComparison.OrdinalIgnoreCase)))
-                continue;
-
-            var yaml = Path.Combine(folder, "data.yaml");
-            if (!File.Exists(yaml)) continue;
-
-            int train = 0, valid = 0;
-            var lines = File.ReadAllLines(yaml);
-            foreach (var line in lines)
-            {
-                if (line.Contains("trainCount"))
-                    train = int.Parse(line.Split(':')[1].Trim());
-                if (line.Contains("validCount"))
-                    valid = int.Parse(line.Split(':')[1].Trim());
-            }
-
-            exportInfos.Add(new ExportRow
-            {
-                ModelName = modelName,
-                CreatedAt = Directory.GetCreationTime(folder),
-                TrainCount = train,
-                ValidCount = valid,
-                FolderName = folderName
-            });
-        }
-    }
-
-
     async Task ConfirmDelete(Dictionary<string, string> row)
     {
         var folder = Path.Combine(Env.WebRootPath, "runs", row["폴더명"]);
@@ -332,32 +199,6 @@ else
                 {
                     Directory.Delete(folder, true);
                     modelRows.Remove(row);
-                }
-                catch (Exception ex)
-                {
-                    await JS.InvokeVoidAsync("alert", $"삭제 실패: {ex.Message}");
-                }
-            }
-        }
-    }
-
-    async Task ConfirmDeleteExport(string folderName)
-    {
-        var folder = Path.Combine(Env.WebRootPath, "exports", folderName);
-        var zipFile = Path.Combine(Env.WebRootPath, "exports", folderName + ".zip");
-
-        if (Directory.Exists(folder))
-        {
-            if (await JS.InvokeAsync<bool>("confirm", $"Export 폴더를 삭제할까요?\n{folderName}"))
-            {
-                try
-                {
-                    Directory.Delete(folder, true);
-                    if (File.Exists(zipFile))
-                    {
-                        File.Delete(zipFile);
-                    }
-                    exportInfos.RemoveAll(x => x.FolderName == folderName);
                 }
                 catch (Exception ex)
                 {
