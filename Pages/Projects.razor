@@ -1264,7 +1264,37 @@ else
                 var src = Path.Combine(Env.WebRootPath, entry.RelativePath);
                 var dest = Path.Combine(imgDir, entry.FileName);
                 if (File.Exists(src))
+                {
+                    if (File.Exists(dest))
+                    {
+                        if (allowDuplicateMerge)
+                        {
+                            int suffix = 1;
+                            var name = Path.GetFileNameWithoutExtension(uniqueFileName);
+                            var ext = Path.GetExtension(uniqueFileName);
+
+                            string newDest;
+                            do
+                            {
+                                uniqueFileName = $"{name}_{suffix}{ext}";
+                                newDest = Path.Combine(imgDir, uniqueFileName);
+                                suffix++;
+                            }
+                            while (File.Exists(newDest) || addedFileNames.Contains(uniqueFileName));
+
+                            dest = newDest;
+                            addedFileNames.Add(uniqueFileName);
+                        }
+                        else
+                        {
+                            skippedFiles.Add(uniqueFileName);
+                            continue;
+                        }
+                    }
+
                     File.Copy(src, dest, overwrite: false);
+                }
+
 
                 // DB에 이미지 추가
                 var newEntry = new ImageEntry
