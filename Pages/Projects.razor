@@ -223,6 +223,12 @@ else
                         <label class="form-label">Labels (merged)</label>
                         <textarea class="form-control" rows="3" readonly>@mergeLabels</textarea>
                     </div>
+                    <div class="form-check mt-2">
+                        <input class="form-check-input" type="checkbox" id="allowDuplicates" @bind="allowDuplicateMerge" />
+                        <label class="form-check-label" for="allowDuplicates">
+                            Allow merging duplicate filenames (auto rename with _1, _2...)
+                        </label>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" @onclick="() => showMergeModal = false">Cancel</button>
@@ -567,6 +573,7 @@ else
     private bool showMergeModal = false;
     private string mergeProjectName = string.Empty;
     private string mergeLabels = string.Empty;
+    private bool allowDuplicateMerge = false;
 
     private int validRatioInt = 30;  // 기본값 30%
     private float validRatio => validRatioInt / 100f;
@@ -1229,10 +1236,28 @@ else
             var imageEntries = await Db.Images.Where(img => img.ProjectId == proj.Id).ToListAsync();
             foreach (var entry in imageEntries)
             {
-                if (!addedFileNames.Add(entry.FileName))
+                string originalFileName = entry.FileName;
+                string uniqueFileName = originalFileName;
+
+                if (!addedFileNames.Add(uniqueFileName))
                 {
-                    skippedFiles.Add(entry.FileName);
-                    continue;
+                    if (allowDuplicateMerge)
+                    {
+                        int suffix = 1;
+                        var name = Path.GetFileNameWithoutExtension(originalFileName);
+                        var ext = Path.GetExtension(originalFileName);
+
+                        while (!addedFileNames.Add(uniqueFileName))
+                        {
+                            uniqueFileName = $"{name}_{suffix}{ext}";
+                            suffix++;
+                        }
+                    }
+                    else
+                    {
+                        skippedFiles.Add(originalFileName);
+                        continue;
+                    }
                 }
 
                 // 이미지 복사
@@ -1298,17 +1323,28 @@ else
         // ✅ 9. 중복된 파일 경고
         if (skippedFiles.Any() || cameraJsonCandidates.Count > 1)
         {
-            var message = $"⚠️ {skippedFiles.Count} duplicated file(s) were skipped:\n" +
-                          string.Join("\n", skippedFiles);
+            var message = "";
+
+            if (skippedFiles.Any())
+            {
+                message += $"⚠️ {skippedFiles.Count} duplicated file(s) were skipped:\n" +
+                           string.Join("\n", skippedFiles);
+            }
+
+            if (allowDuplicateMerge)
+            {
+                message = $"✅ Duplicate filenames were auto-renamed and merged.\n";
+            }
 
             if (cameraJsonCandidates.Count > 1)
             {
                 var selectedFrom = Path.GetFileName(Path.GetDirectoryName(cameraJsonCandidates.First().FullName));
-                message += $"\n\n📷 Multiple camera.json files found.\nThe one from '{selectedFrom}' was used.";
+                message += $"\n📷 Multiple camera.json files found.\nThe one from '{selectedFrom}' was used.";
             }
 
             await JS.InvokeVoidAsync("alert", message);
         }
+
     }
 
 
