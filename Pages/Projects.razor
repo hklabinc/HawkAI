@@ -1319,9 +1319,38 @@ else
 
                 // annotated 이미지 복사
                 var annSrc = Path.Combine(Env.WebRootPath, "datasets", proj.Name, "images_annotated", entry.FileName);
-                var annDest = Path.Combine(annDir, entry.FileName);
+                var annDest = Path.Combine(annDir, entry.FileName);  // 초기 경로
+
                 if (File.Exists(annSrc))
+                {
+                    string annFinalName = uniqueFileName; // images 복사에 사용된 이름 기준으로 시작
+                    annDest = Path.Combine(annDir, annFinalName);    // ← 기존 annDest 변수에 덮어쓰기
+
+                    if (File.Exists(annDest))
+                    {
+                        if (allowDuplicateMerge)
+                        {
+                            int suffix = 1;
+                            var name = Path.GetFileNameWithoutExtension(annFinalName);
+                            var ext = Path.GetExtension(annFinalName);
+
+                            do
+                            {
+                                annFinalName = $"{name}_{suffix}{ext}";
+                                annDest = Path.Combine(annDir, annFinalName);
+                                suffix++;
+                            }
+                            while (File.Exists(annDest));
+                        }
+                        else
+                        {
+                            continue; // 병합 허용 안 하면 건너뜀
+                        }
+                    }
+
                     File.Copy(annSrc, annDest, overwrite: false);
+                }
+
             }
         }
 
