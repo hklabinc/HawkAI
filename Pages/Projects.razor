@@ -467,11 +467,26 @@ else
                     <h5 class="modal-title">Camera Info - @cameraProjectName</h5>
                     <button type="button" class="btn-close" @onclick="() => showCameraModal = false"></button>
                 </div>
-                <div class="modal-body">
+                @if (isCameraJsonEditable)
+                {
+                    <textarea class="form-control" style="height: 300px; white-space: pre-wrap;" @bind="editableCameraJsonContent"></textarea>
+                }
+                else
+                {
                     <pre style="white-space: pre-wrap;">@cameraJsonContent</pre>
-                </div>
+                }
                 <div class="modal-footer">
                     <button class="btn btn-secondary" @onclick="() => showCameraModal = false">Close</button>
+
+                    @if (!isCameraJsonEditable)
+                    {
+                        <button class="btn btn-outline-primary" @onclick="EnableCameraJsonEdit">Edit</button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-success" @onclick="SaveCameraJsonEdits">Save</button>
+                    }
+
                     <button class="btn btn-danger" @onclick="DeleteCameraJson">Delete</button>
                 </div>
             </div>
@@ -601,6 +616,8 @@ else
     private string cameraJsonContent = string.Empty;
     private string cameraProjectName = string.Empty;
     private string selectedTrainServer = "http://localhost:9002";
+    private bool isCameraJsonEditable = false;
+    private string editableCameraJsonContent = string.Empty;
 
     private bool showModelModal = false;
     private string modelProjectName = string.Empty;
@@ -1767,5 +1784,33 @@ else
         }
     }
 
+    private void EnableCameraJsonEdit()
+    {
+        editableCameraJsonContent = cameraJsonContent;
+        isCameraJsonEditable = true;
+    }
+
+    private async Task SaveCameraJsonEdits()
+    {
+        var jsonPath = Path.Combine(Env.WebRootPath, "datasets", cameraProjectName, "camera.json");
+
+        try
+        {
+            // 유효한 JSON인지 검증
+            JsonDocument.Parse(editableCameraJsonContent);
+
+            await File.WriteAllTextAsync(jsonPath, editableCameraJsonContent);
+
+            // UI 업데이트
+            cameraJsonContent = editableCameraJsonContent;
+            isCameraJsonEditable = false;
+
+            await JS.InvokeVoidAsync("alert", "✅ camera.json has been updated.");
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"❌ Invalid JSON format: {ex.Message}");
+        }
+    }
 
 }
