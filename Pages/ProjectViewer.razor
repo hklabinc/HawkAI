@@ -263,7 +263,7 @@ else
                 var font = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                     ? SystemFonts.CreateFont("Arial", 16)
                     : SystemFonts.CreateFont("DejaVu Sans", 16);
-                var colorMap = new[] { Color.Red, Color.Green, Color.Blue, Color.Orange, Color.Purple };
+                var colorMap = new[] { Color.Blue, Color.Green, Color.Red, Color.Orange, Color.Purple };
                 var labelList = project.Labels.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()).ToList();
                 var labelBoxes = JsonDocument.Parse(labelJson).RootElement;
 
