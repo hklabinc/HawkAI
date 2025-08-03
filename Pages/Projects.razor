@@ -140,7 +140,7 @@ else
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Labels (comma-separated)</label>
-                        <input class="form-control" @bind="labelInput" placeholder="e.g., person, car, dog" />
+                        <input class="form-control" @bind="labelInput" placeholder="e.g., film, good, bad" />
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Upload Images</label>
@@ -568,7 +568,7 @@ else
     private Dictionary<string, bool> projectHasModelMap = new();
 
     private string newProjectName = string.Empty;
-    private string labelInput = string.Empty;
+    private string labelInput = "film, good, bad";
     private bool showCreateModal = false;
     private string errorMessage = string.Empty;
     private string errorMessage2 = string.Empty;
