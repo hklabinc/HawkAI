@@ -473,7 +473,7 @@ else
 
             var jsonResult = JsonDocument.Parse(output).RootElement;
             var labelList = project.Labels.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()).ToList();
-            var colors = new[] { Color.Red, Color.Green, Color.Blue, Color.Orange, Color.Purple };
+            var colors = new[] { Color.Blue, Color.Green, Color.Red, Color.Orange, Color.Purple };
             var font = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                 ? SystemFonts.CreateFont("Arial", 16)
                 : SystemFonts.CreateFont("DejaVu Sans", 16);
