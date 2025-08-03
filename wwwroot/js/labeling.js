@@ -4,6 +4,7 @@
     let boxes = []; 
     let history = [];           // ✅ 박스 상태 히스토리 저장
     let redoStack = [];         // ✅ 복원할 미래 상태를 저장
+    let multiSelectedIndexes = [];  // ✅ Shift+드래그로 선택된 박스 인덱스들
     let selectedBoxIndex = -1;  // ✅ 선택된 박스 인덱스
     let draggingHandle = null;
     let startX, startY, isDrawing = false;
@@ -51,6 +52,17 @@
         const invY = img.naturalHeight / canvas.clientHeight;
         const px = clickX * invX;
         const py = clickY * invY;
+
+        if (e.shiftKey) {
+            // ✅ Shift + 드래그 시작 (다중 선택용)
+            startX = clickX;
+            startY = clickY;
+            isDrawing = true;
+            selectedBoxIndex = -1;
+            multiSelectedIndexes = [];
+            redraw();
+            return;
+        }
 
         selectedBoxIndex = -1;
         draggingHandle = null;
@@ -172,6 +184,38 @@
             boxes.push(correctedBox);
             selectedBoxIndex = boxes.length - 1;
             redraw();
+        }
+
+        if (e.shiftKey && isDrawing) {
+            isDrawing = false;
+
+            const endX = e.offsetX;
+            const endY = e.offsetY;
+
+            const { scaleX, scaleY } = getScaleFactors();
+
+            let x1 = Math.min(startX, endX) * scaleX;
+            let y1 = Math.min(startY, endY) * scaleY;
+            let x2 = Math.max(startX, endX) * scaleX;
+            let y2 = Math.max(startY, endY) * scaleY;
+
+            multiSelectedIndexes = [];
+
+            boxes.forEach((box, i) => {
+                const bx1 = box.x;
+                const by1 = box.y;
+                const bx2 = box.x + box.w;
+                const by2 = box.y + box.h;
+
+                const isInside = bx1 >= x1 && bx2 <= x2 && by1 >= y1 && by2 <= y2;
+
+                if (isInside) {
+                    multiSelectedIndexes.push(i);
+                }
+            });
+
+            redraw();
+            return;
         }
     });
 
@@ -423,40 +467,54 @@
             return;
         }
 
-        // ✅ 방향키로 박스 이동 (선택된 박스가 있을 경우)
-        if (selectedBoxIndex !== -1 && !e.ctrlKey && !e.metaKey) {
+        // ✅ 방향키로 박스 이동
+        if (!e.ctrlKey && !e.metaKey) {
             const moveAmount = 1;
-            const box = boxes[selectedBoxIndex];
 
-            // 👉 이동 전에 저장
-            redoStack = [];
-            history.push(JSON.parse(JSON.stringify(boxes)));
+            // ✅ 다중 선택이 있는 경우
+            if (multiSelectedIndexes.length > 0) {
+                history.push(JSON.parse(JSON.stringify(boxes)));
+                redoStack = [];
 
-            switch (e.key) {
-                case 'ArrowLeft':
-                    box.x -= moveAmount;
-                    e.preventDefault();
-                    break;
-                case 'ArrowRight':
-                    box.x += moveAmount;
-                    e.preventDefault();
-                    break;
-                case 'ArrowUp':
-                    box.y -= moveAmount;
-                    e.preventDefault();
-                    break;
-                case 'ArrowDown':
-                    box.y += moveAmount;
-                    e.preventDefault();
-                    break;
+                multiSelectedIndexes.forEach(i => {
+                    const box = boxes[i];
+                    switch (e.key) {
+                        case 'ArrowLeft': box.x -= moveAmount; break;
+                        case 'ArrowRight': box.x += moveAmount; break;
+                        case 'ArrowUp': box.y -= moveAmount; break;
+                        case 'ArrowDown': box.y += moveAmount; break;
+                    }
+
+                    // 경계 조건 처리
+                    if (box.x < 0) box.x = 0;
+                    if (box.y < 0) box.y = 0;
+                });
+
+                redraw();
+                e.preventDefault();
+                return;
             }
 
-            if (box.x < 0) box.x = 0;
-            if (box.y < 0) box.y = 0;
+            // ✅ 단일 선택일 경우
+            if (selectedBoxIndex !== -1) {
+                const box = boxes[selectedBoxIndex];
+                history.push(JSON.parse(JSON.stringify(boxes)));
+                redoStack = [];
 
-            redraw();
+                switch (e.key) {
+                    case 'ArrowLeft': box.x -= moveAmount; break;
+                    case 'ArrowRight': box.x += moveAmount; break;
+                    case 'ArrowUp': box.y -= moveAmount; break;
+                    case 'ArrowDown': box.y += moveAmount; break;
+                }
+
+                if (box.x < 0) box.x = 0;
+                if (box.y < 0) box.y = 0;
+
+                redraw();
+                e.preventDefault();
+            }
         }
-
     });
 
     function getHandles(box) {
@@ -501,6 +559,15 @@
                     const hx = x * inverseScaleX;
                     const hy = y * inverseScaleY;
                     ctx.fillStyle = 'cyan';
+                    ctx.fillRect(hx - HANDLE_SIZE / 2, hy - HANDLE_SIZE / 2, HANDLE_SIZE, HANDLE_SIZE);
+                }
+            }
+            else if (multiSelectedIndexes.includes(i)) {
+                const handles = getHandles(box);
+                for (const { x, y } of Object.values(handles)) {
+                    const hx = x * inverseScaleX;
+                    const hy = y * inverseScaleY;
+                    ctx.fillStyle = 'lightgreen';  // ✅ 다중 선택 박스는 연녹색 핸들
                     ctx.fillRect(hx - HANDLE_SIZE / 2, hy - HANDLE_SIZE / 2, HANDLE_SIZE, HANDLE_SIZE);
                 }
             }
