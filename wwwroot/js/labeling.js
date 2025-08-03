@@ -387,6 +387,20 @@
             e.preventDefault();
         }
 
+        // ✅ C 키만 눌렀을 때 라벨 순환
+        if (!e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 'c') {
+            if (selectedBoxIndex !== -1) {
+                const box = boxes[selectedBoxIndex];
+                const labelSelector = document.getElementById('labelSelector');
+                const options = Array.from(labelSelector.options);
+                const currentIndex = options.findIndex(opt => opt.value === box.label);
+                const nextIndex = (currentIndex + 1) % options.length;
+                box.label = options[nextIndex].value;
+                redraw();
+            }
+            e.preventDefault();  // 기본 동작 방지
+        }
+
         // ✅ Shift + 방향키로 크기 조절
         if (selectedBoxIndex !== -1 && e.shiftKey && !e.ctrlKey && !e.metaKey) {
             const box = boxes[selectedBoxIndex];
