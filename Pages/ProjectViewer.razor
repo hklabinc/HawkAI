@@ -447,7 +447,8 @@ else
             var startInfo = new ProcessStartInfo
             {
                 FileName = "python",
-                Arguments = $"\"{scriptPath}\" \"{imageDir}\" \"{project.Name}\"",
+                // Arguments = $"\"{scriptPath}\" \"{imageDir}\" \"{project.Name}\"",
+                Arguments = $"\"{scriptPath}\" \"{imageDir}\" \"film\"",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,

@@ -513,7 +513,7 @@
     };
 
     function getColorForLabel(label) {
-        const colors = ['red', 'green', 'blue', 'orange', 'purple'];
+        const colors = ['blue', 'green', 'red', 'orange', 'purple'];
         const index = Array.from(document.getElementById('labelSelector').options)
             .findIndex(opt => opt.value === label);
         return colors[index % colors.length];
