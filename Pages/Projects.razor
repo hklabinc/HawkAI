@@ -326,7 +326,7 @@ else
 
                         <div class="mb-3">
                             <label class="form-label">Seed Value (optional)</label>
-                            <input type="number" class="form-control" @bind="augmentSeed" placeholder="e.g. 42" disabled="@isExporting" />
+                            <input type="number" class="form-control" @bind="augmentSeed" placeholder="e.g. 7" disabled="@isExporting" />
                         </div>
 
                         <div class="form-check mt-2">
@@ -420,7 +420,7 @@ else
                             </div>
                             <div class="col">
                                 <label class="form-label">Seed (Optional)</label>
-                                <input type="number" class="form-control" @bind="trainSeed" placeholder="e.g. 42" disabled="@isTraining" />
+                                <input type="number" class="form-control" @bind="trainSeed" placeholder="e.g. 7" disabled="@isTraining" />
                             </div>
                         </div>
 
@@ -597,7 +597,7 @@ else
     private int augMultiplier = 3;
     const int MaxAugMultiplier = 40;
     private string augmentStatusMessage = string.Empty;
-    private int? augmentSeed = null;
+    private int? augmentSeed = 7;
     private int recommendedAugMultiplier => selectedProject?.ImageCount > 0
         ? (int)Math.Ceiling(10000.0 / (56 * selectedProject.ImageCount) - 1)
         : 1;
@@ -606,9 +606,9 @@ else
     private string trainModelSize = "small";
     private string trainStatusMessage = string.Empty;
     private DotNetObjectReference<Projects>? sseRef;
-    private int trainEpochs = 300;
+    private int trainEpochs = 500;
     private int trainBatch = 32;
-    private int? trainSeed = null;
+    private int? trainSeed = 7;
 
     private bool showBulkDeleteConfirm = false;
 
