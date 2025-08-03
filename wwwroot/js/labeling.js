@@ -526,6 +526,23 @@
         window.dotNetHelper.invokeMethodAsync('SaveLabelWrapper', json);
     };
 
+    window.applyLabelToSelectedBox = () => {
+        if (selectedBoxIndex === -1) {
+            console.log("No box selected. Skipping label apply.");
+            return;
+        }
+
+        const labelSelector = document.getElementById('labelSelector');
+        const selectedLabel = labelSelector.value;
+
+        history.push(JSON.parse(JSON.stringify(boxes)));
+        redoStack = [];
+
+        boxes[selectedBoxIndex].label = selectedLabel;
+        redraw();
+    };
+
+
     function getColorForLabel(label) {
         const colors = ['blue', 'green', 'red', 'orange', 'purple'];
         const index = Array.from(document.getElementById('labelSelector').options)

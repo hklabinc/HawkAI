@@ -118,6 +118,7 @@ else
                 <div class="modal-footer d-flex justify-content-between align-items-center flex-wrap">
                     <div class="d-flex align-items-center gap-2">
                         <button class="btn btn-danger" onclick="clearBoxes()"><span class="oi oi-trash"></span> Clear Boxes</button>
+                        <button class="btn btn-info" @onclick="LoadPreviousLabel"><span class="oi oi-reload"></span> Load Previous Label</button>
                     </div>
                     <div class="d-flex align-items-center gap-2 flex-grow-1 justify-content-center">
                         <label for="labelSelector" class="form-label mb-0">Select label:</label>
@@ -127,6 +128,7 @@ else
                                 <option value="@label.Trim()">@label.Trim()</option>
                             }
                         </select>
+                        <button class="btn btn-outline-primary" onclick="applyLabelToSelectedBox()">Apply</button>
                     </div>
                     <div class="d-flex gap-2">
                         <button class="btn btn-secondary" @onclick="() => showLabelingModal = false">Close</button>
@@ -532,6 +534,29 @@ else
         }
     }
 
+    private async Task LoadPreviousLabel()
+    {
+        int currentId = selectedImageId;
+        var previous = await Db.Images
+            .Where(i => i.ProjectId == projectId && i.Id < currentId && i.LabelStatus == "Labeled")
+            .OrderByDescending(i => i.Id)
+            .FirstOrDefaultAsync();
+
+        if (previous == null)
+        {
+            await JS.InvokeVoidAsync("alert", "❗ No previous labeled image found.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(previous.LabelData) || previous.LabelData == "[]")
+        {
+            await JS.InvokeVoidAsync("alert", "⚠️ Previous image has no label data.");
+            return;
+        }
+
+        // JS에서 initLabelingCanvas 다시 실행
+        await JS.InvokeVoidAsync("initLabelingCanvas", dotNetRef, previous.LabelData);
+    }
 
 
 }
