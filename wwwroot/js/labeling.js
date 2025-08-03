@@ -8,6 +8,7 @@
     let selectedBoxIndex = -1;  // ✅ 선택된 박스 인덱스
     let draggingHandle = null;
     let startX, startY, isDrawing = false;
+    let isShiftSelecting = false; 
     let lastMouseX = null;
     let lastMouseY = null;
     let isMovingBox = false;
@@ -53,12 +54,14 @@
         const px = clickX * invX;
         const py = clickY * invY;
 
+        selectedBoxIndex = -1;
+        draggingHandle = null;
+
         if (e.shiftKey) {
-            // ✅ Shift + 드래그 시작 (다중 선택용)
             startX = clickX;
             startY = clickY;
             isDrawing = true;
-            selectedBoxIndex = -1;
+            isShiftSelecting = true;
             multiSelectedIndexes = [];
             redraw();
             return;
@@ -141,6 +144,36 @@
     });
 
     canvas.addEventListener('mouseup', (e) => {
+        if (isShiftSelecting && isDrawing) {
+            isDrawing = false;
+            isShiftSelecting = false;
+
+            const endX = e.offsetX;
+            const endY = e.offsetY;
+
+            const { scaleX, scaleY } = getScaleFactors();
+
+            const x1 = Math.min(startX, endX) * scaleX;
+            const y1 = Math.min(startY, endY) * scaleY;
+            const x2 = Math.max(startX, endX) * scaleX;
+            const y2 = Math.max(startY, endY) * scaleY;
+
+            multiSelectedIndexes = [];
+
+            boxes.forEach((box, i) => {
+                const bx1 = box.x;
+                const by1 = box.y;
+                const bx2 = box.x + box.w;
+                const by2 = box.y + box.h;
+
+                const isInside = bx1 >= x1 && bx2 <= x2 && by1 >= y1 && by2 <= y2;
+                if (isInside) multiSelectedIndexes.push(i);
+            });
+
+            redraw();
+            return;  // ✅ 박스 추가 로직 실행 안 함
+        }
+
         if (isMovingBox) {
             isMovingBox = false;
             return;
@@ -152,6 +185,7 @@
         }
 
         if (!isDrawing) return;
+
         const endX = e.offsetX;
         const endY = e.offsetY;
         isDrawing = false;
@@ -331,7 +365,7 @@
             redraw();
             const tempW = moveX - startX;
             const tempH = moveY - startY;
-            ctx.strokeStyle = '#505050';  // 진한 회색
+            ctx.strokeStyle = isShiftSelecting ? 'lightgreen' : '#505050';  // ✅ 선택 시 연녹색
             ctx.setLineDash([5, 3]);
             ctx.lineWidth = 1;
             ctx.strokeRect(startX, startY, tempW, tempH);
@@ -577,6 +611,7 @@
     window.clearBoxes = () => {
         boxes = [];
         selectedBoxIndex = -1;
+        multiSelectedIndexes = [];
         redraw();
     };
 
@@ -594,18 +629,24 @@
     };
 
     window.applyLabelToSelectedBox = () => {
-        if (selectedBoxIndex === -1) {
+        const labelSelector = document.getElementById('labelSelector');
+        const selectedLabel = labelSelector.value;
+
+        if (selectedBoxIndex === -1 && multiSelectedIndexes.length === 0) {
             console.log("No box selected. Skipping label apply.");
             return;
         }
 
-        const labelSelector = document.getElementById('labelSelector');
-        const selectedLabel = labelSelector.value;
-
         history.push(JSON.parse(JSON.stringify(boxes)));
         redoStack = [];
 
-        boxes[selectedBoxIndex].label = selectedLabel;
+        if (selectedBoxIndex !== -1) {
+            boxes[selectedBoxIndex].label = selectedLabel;
+        }
+        if (multiSelectedIndexes.length > 0) {
+            multiSelectedIndexes.forEach(i => boxes[i].label = selectedLabel);
+        }
+
         redraw();
     };
 
