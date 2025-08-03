@@ -390,16 +390,37 @@
 
     // ✅ Delete 키 이벤트 등록
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Delete' && selectedBoxIndex !== -1) {
-            redoStack = [];
-            history.push(JSON.parse(JSON.stringify(boxes)));
-            boxes.splice(selectedBoxIndex, 1);
-            selectedBoxIndex = -1;
-            draggingHandle = null;
-            isMovingBox = false;
-            isDrawing = false;
-            redraw();
-            e.preventDefault();
+        // ✅ Delete 키: 단일 또는 다중 선택 삭제
+        if (e.key === 'Delete') {
+            const hasSingle = selectedBoxIndex !== -1;
+            const hasMulti = multiSelectedIndexes.length > 0;
+
+            if (hasSingle || hasMulti) {
+                history.push(JSON.parse(JSON.stringify(boxes)));
+                redoStack = [];
+
+                // ✅ 다중 선택 박스들 먼저 제거 (인덱스 내림차순 정렬)
+                if (hasMulti) {
+                    // 인덱스 역순으로 지워야 인덱스 깨지지 않음
+                    multiSelectedIndexes.sort((a, b) => b - a).forEach(i => {
+                        boxes.splice(i, 1);
+                    });
+                    multiSelectedIndexes = [];
+                }
+
+                // ✅ 단일 선택 박스 제거
+                if (hasSingle) {
+                    boxes.splice(selectedBoxIndex, 1);
+                    selectedBoxIndex = -1;
+                }
+
+                draggingHandle = null;
+                isMovingBox = false;
+                isDrawing = false;
+                redraw();
+                e.preventDefault();
+                return;
+            }
         }
 
         if (e.key.toLowerCase() === 'z' && (e.ctrlKey || e.metaKey)) {
