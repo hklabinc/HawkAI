@@ -48,6 +48,9 @@ else
             <button class="btn btn-success me-2" @onclick="RunAutoLabeling">
                 <span class="oi oi-flash"></span> Auto Labeling
             </button>
+            <button class="btn btn-success me-2" @onclick="RunAddLabels">
+                <span class="oi oi-plus"></span> Add Labels
+            </button>
             <button class="btn btn-danger" @onclick="ConfirmBulkDeleteImages">
                 <span class="oi oi-trash"></span> Delete Selected
             </button>
@@ -558,5 +561,78 @@ else
         await JS.InvokeVoidAsync("initLabelingCanvas", dotNetRef, previous.LabelData);
     }
 
+    private async Task RunAddLabels()
+    {
+        try
+        {
+            foreach (var image in images)
+            {
+                if (string.IsNullOrWhiteSpace(image.LabelData) || image.LabelData == "[]")
+                    continue;
+
+                var labelArray = JsonDocument.Parse(image.LabelData).RootElement;
+                var updatedBoxes = new List<Dictionary<string, object>>();
+
+                foreach (var box in labelArray.EnumerateArray())
+                {
+                    var label = box.GetProperty("label").GetString();
+                    var x = box.GetProperty("x").GetDouble();
+                    var y = box.GetProperty("y").GetDouble();
+                    var w = box.GetProperty("w").GetDouble();
+                    var h = box.GetProperty("h").GetDouble();
+
+                    // 기존 박스 유지
+                    var originalBox = new Dictionary<string, object>
+                    {
+                        ["x"] = x,
+                        ["y"] = y,
+                        ["w"] = w,
+                        ["h"] = h,
+                        ["label"] = label
+                    };
+                    updatedBoxes.Add(originalBox);
+
+                    // film 라벨일 경우 good/bad 박스 추가
+                    if (label == "film")
+                    {
+                        int w1 = (int)Math.Round(w * 73 / 144.0);
+                        int w2 = (int)Math.Round(w * 71 / 144.0);
+
+                        updatedBoxes.Add(new Dictionary<string, object>
+                        {
+                            ["x"] = x,
+                            ["y"] = y,
+                            ["w"] = w1,
+                            ["h"] = h,
+                            ["label"] = "good"
+                        });
+
+                        updatedBoxes.Add(new Dictionary<string, object>
+                        {
+                            ["x"] = x + w1,
+                            ["y"] = y,
+                            ["w"] = w2,
+                            ["h"] = h,
+                            ["label"] = "bad"
+                        });
+                    }
+                }
+
+                // JSON 문자열로 변환
+                image.LabelData = JsonSerializer.Serialize(updatedBoxes);
+                image.LabelStatus = "Labeled";
+            }
+
+            await Db.SaveChangesAsync();
+            await LoadImages();
+
+            await JS.InvokeVoidAsync("alert", "✅ Labels successfully added!");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[❌] Exception in RunAddLabels: {ex.Message}");
+            await JS.InvokeVoidAsync("alert", "❌ Failed to add labels.\n" + ex.Message);
+        }
+    }
 
 }
