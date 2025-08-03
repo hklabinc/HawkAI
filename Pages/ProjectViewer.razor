@@ -51,6 +51,9 @@ else
             <button class="btn btn-success me-2" @onclick="RunAddLabels">
                 <span class="oi oi-plus"></span> Add Labels
             </button>
+            <button class="btn btn-success me-2" @onclick="RunAddLabels2">
+                <span class="oi oi-plus"></span> Add Labels2
+            </button>
             <button class="btn btn-danger" @onclick="ConfirmBulkDeleteImages">
                 <span class="oi oi-trash"></span> Delete Selected
             </button>
@@ -632,6 +635,88 @@ else
         {
             Console.WriteLine($"[❌] Exception in RunAddLabels: {ex.Message}");
             await JS.InvokeVoidAsync("alert", "❌ Failed to add labels.\n" + ex.Message);
+        }
+    }
+
+
+    private async Task RunAddLabels2()
+    {
+        try
+        {
+            foreach (var image in images)
+            {
+                if (string.IsNullOrWhiteSpace(image.LabelData) || image.LabelData == "[]")
+                    continue;
+
+                var labelArray = JsonDocument.Parse(image.LabelData).RootElement;
+                var updatedBoxes = new List<Dictionary<string, object>>();
+
+                foreach (var box in labelArray.EnumerateArray())
+                {
+                    var label = box.GetProperty("label").GetString();
+                    var x = box.GetProperty("x").GetDouble();
+                    var y = box.GetProperty("y").GetDouble();
+                    var w = box.GetProperty("w").GetDouble();
+                    var h = box.GetProperty("h").GetDouble();
+
+                    // 원본 박스 유지
+                    updatedBoxes.Add(new Dictionary<string, object>
+                    {
+                        ["x"] = x,
+                        ["y"] = y,
+                        ["w"] = w,
+                        ["h"] = h,
+                        ["label"] = label
+                    });
+
+                    // film 박스에 대해서만 추가 작업
+                    if (label == "film")
+                    {
+                        // 비율 적용
+                        int w1 = (int)Math.Round(w * 107 / 142.0); // 왼쪽 (bad)
+                        int w2 = (int)Math.Round(w * 75 / 142.0);  // 오른쪽 (good)
+
+                        // x1 (왼쪽 상단) 기준
+                        int x1 = (int)Math.Round(x);
+                        int y1 = (int)Math.Round(y);
+                        int x2 = x1 + (int)Math.Round(w); // 원본 박스의 오른쪽 끝점
+
+                        // 왼쪽 박스
+                        updatedBoxes.Add(new Dictionary<string, object>
+                        {
+                            ["x"] = x1,
+                            ["y"] = y1,
+                            ["w"] = w1,
+                            ["h"] = h,
+                            ["label"] = "bad"
+                        });
+
+                        // 오른쪽 박스는 x2-w2 기준
+                        updatedBoxes.Add(new Dictionary<string, object>
+                        {
+                            ["x"] = x2 - w2,
+                            ["y"] = y1,
+                            ["w"] = w2,
+                            ["h"] = h,
+                            ["label"] = "good"
+                        });
+                    }
+                }
+
+                // JSON 문자열로 변환 (한 줄)
+                image.LabelData = JsonSerializer.Serialize(updatedBoxes);
+                image.LabelStatus = "Labeled";
+            }
+
+            await Db.SaveChangesAsync();
+            await LoadImages();
+
+            await JS.InvokeVoidAsync("alert", "✅ Labels (v2) successfully added!");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[❌] Exception in RunAddLabels2: {ex.Message}");
+            await JS.InvokeVoidAsync("alert", "❌ Failed to add labels (v2).\n" + ex.Message);
         }
     }
 
