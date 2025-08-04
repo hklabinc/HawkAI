@@ -51,9 +51,6 @@ else
             <button class="btn btn-success me-2" @onclick="RunAddLabels">
                 <span class="oi oi-plus"></span> Add Labels
             </button>
-            <button class="btn btn-success me-2" @onclick="RunAddLabels2">
-                <span class="oi oi-plus"></span> Add Labels2
-            </button>
             <button class="btn btn-danger" @onclick="ConfirmBulkDeleteImages">
                 <span class="oi oi-trash"></span> Delete Selected
             </button>
@@ -585,43 +582,36 @@ else
                     var h = box.GetProperty("h").GetDouble();
 
                     // 기존 박스 유지
-                    var originalBox = new Dictionary<string, object>
+                    updatedBoxes.Add(new Dictionary<string, object>
                     {
                         ["x"] = x,
                         ["y"] = y,
                         ["w"] = w,
                         ["h"] = h,
                         ["label"] = label
-                    };
-                    updatedBoxes.Add(originalBox);
+                    });
 
-                    // film 라벨일 경우 good/bad 박스 추가
-                    if (label == "film")
+                    // film 라벨 박스 추가
+                    if (label == "film" && project.Name == "L2017-07")
                     {
-                        int w1 = (int)Math.Round(w * 73 / 144.0);
-                        int w2 = (int)Math.Round(w * 71 / 144.0);
+                        double subW = w / 3.0;
+                        double subH = h * 0.48;
+                        double baseY = y + h - subH;
 
-                        updatedBoxes.Add(new Dictionary<string, object>
+                        for (int i = 0; i < 3; i++)
                         {
-                            ["x"] = x,
-                            ["y"] = y,
-                            ["w"] = w1,
-                            ["h"] = h,
-                            ["label"] = "good"
-                        });
-
-                        updatedBoxes.Add(new Dictionary<string, object>
-                        {
-                            ["x"] = x + w1,
-                            ["y"] = y,
-                            ["w"] = w2,
-                            ["h"] = h,
-                            ["label"] = "bad"
-                        });
+                            updatedBoxes.Add(new Dictionary<string, object>
+                            {
+                                ["x"] = x + i * subW,
+                                ["y"] = baseY,
+                                ["w"] = subW,
+                                ["h"] = subH,
+                                ["label"] = "good"
+                            });
+                        }
                     }
                 }
 
-                // JSON 문자열로 변환
                 image.LabelData = JsonSerializer.Serialize(updatedBoxes);
                 image.LabelStatus = "Labeled";
             }
@@ -639,85 +629,86 @@ else
     }
 
 
-    private async Task RunAddLabels2()
-    {
-        try
-        {
-            foreach (var image in images)
-            {
-                if (string.IsNullOrWhiteSpace(image.LabelData) || image.LabelData == "[]")
-                    continue;
 
-                var labelArray = JsonDocument.Parse(image.LabelData).RootElement;
-                var updatedBoxes = new List<Dictionary<string, object>>();
+    // private async Task RunAddLabels2()
+    // {
+    //     try
+    //     {
+    //         foreach (var image in images)
+    //         {
+    //             if (string.IsNullOrWhiteSpace(image.LabelData) || image.LabelData == "[]")
+    //                 continue;
 
-                foreach (var box in labelArray.EnumerateArray())
-                {
-                    var label = box.GetProperty("label").GetString();
-                    var x = box.GetProperty("x").GetDouble();
-                    var y = box.GetProperty("y").GetDouble();
-                    var w = box.GetProperty("w").GetDouble();
-                    var h = box.GetProperty("h").GetDouble();
+    //             var labelArray = JsonDocument.Parse(image.LabelData).RootElement;
+    //             var updatedBoxes = new List<Dictionary<string, object>>();
 
-                    // 원본 박스 유지
-                    updatedBoxes.Add(new Dictionary<string, object>
-                    {
-                        ["x"] = x,
-                        ["y"] = y,
-                        ["w"] = w,
-                        ["h"] = h,
-                        ["label"] = label
-                    });
+    //             foreach (var box in labelArray.EnumerateArray())
+    //             {
+    //                 var label = box.GetProperty("label").GetString();
+    //                 var x = box.GetProperty("x").GetDouble();
+    //                 var y = box.GetProperty("y").GetDouble();
+    //                 var w = box.GetProperty("w").GetDouble();
+    //                 var h = box.GetProperty("h").GetDouble();
 
-                    // film 박스에 대해서만 추가 작업
-                    if (label == "film")
-                    {
-                        // 비율 적용
-                        int w1 = (int)Math.Round(w * 49 / 142.0); // 왼쪽 (bad)
-                        int w2 = (int)Math.Round(w * 75 / 142.0);  // 오른쪽 (good)
+    //                 // 원본 박스 유지
+    //                 updatedBoxes.Add(new Dictionary<string, object>
+    //                 {
+    //                     ["x"] = x,
+    //                     ["y"] = y,
+    //                     ["w"] = w,
+    //                     ["h"] = h,
+    //                     ["label"] = label
+    //                 });
 
-                        // x1 (왼쪽 상단) 기준
-                        int x1 = (int)Math.Round(x);
-                        int y1 = (int)Math.Round(y);
-                        int x2 = x1 + (int)Math.Round(w); // 원본 박스의 오른쪽 끝점
+    //                 // film 박스에 대해서만 추가 작업
+    //                 if (label == "film")
+    //                 {
+    //                     // 비율 적용
+    //                     int w1 = (int)Math.Round(w * 49 / 142.0); // 왼쪽 (bad)
+    //                     int w2 = (int)Math.Round(w * 75 / 142.0);  // 오른쪽 (good)
 
-                        // 왼쪽 박스
-                        updatedBoxes.Add(new Dictionary<string, object>
-                        {
-                            ["x"] = x1,
-                            ["y"] = y1,
-                            ["w"] = w1,
-                            ["h"] = h,
-                            ["label"] = "bad"
-                        });
+    //                     // x1 (왼쪽 상단) 기준
+    //                     int x1 = (int)Math.Round(x);
+    //                     int y1 = (int)Math.Round(y);
+    //                     int x2 = x1 + (int)Math.Round(w); // 원본 박스의 오른쪽 끝점
 
-                        // 오른쪽 박스는 x2-w2 기준
-                        updatedBoxes.Add(new Dictionary<string, object>
-                        {
-                            ["x"] = x2 - w2,
-                            ["y"] = y1,
-                            ["w"] = w2,
-                            ["h"] = h,
-                            ["label"] = "good"
-                        });
-                    }
-                }
+    //                     // 왼쪽 박스
+    //                     updatedBoxes.Add(new Dictionary<string, object>
+    //                     {
+    //                         ["x"] = x1,
+    //                         ["y"] = y1,
+    //                         ["w"] = w1,
+    //                         ["h"] = h,
+    //                         ["label"] = "bad"
+    //                     });
 
-                // JSON 문자열로 변환 (한 줄)
-                image.LabelData = JsonSerializer.Serialize(updatedBoxes);
-                image.LabelStatus = "Labeled";
-            }
+    //                     // 오른쪽 박스는 x2-w2 기준
+    //                     updatedBoxes.Add(new Dictionary<string, object>
+    //                     {
+    //                         ["x"] = x2 - w2,
+    //                         ["y"] = y1,
+    //                         ["w"] = w2,
+    //                         ["h"] = h,
+    //                         ["label"] = "good"
+    //                     });
+    //                 }
+    //             }
 
-            await Db.SaveChangesAsync();
-            await LoadImages();
+    //             // JSON 문자열로 변환 (한 줄)
+    //             image.LabelData = JsonSerializer.Serialize(updatedBoxes);
+    //             image.LabelStatus = "Labeled";
+    //         }
 
-            await JS.InvokeVoidAsync("alert", "✅ Labels (v2) successfully added!");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[❌] Exception in RunAddLabels2: {ex.Message}");
-            await JS.InvokeVoidAsync("alert", "❌ Failed to add labels (v2).\n" + ex.Message);
-        }
-    }
+    //         await Db.SaveChangesAsync();
+    //         await LoadImages();
+
+    //         await JS.InvokeVoidAsync("alert", "✅ Labels (v2) successfully added!");
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         Console.WriteLine($"[❌] Exception in RunAddLabels2: {ex.Message}");
+    //         await JS.InvokeVoidAsync("alert", "❌ Failed to add labels (v2).\n" + ex.Message);
+    //     }
+    // }
 
 }
