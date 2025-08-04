@@ -636,7 +636,7 @@ else
                         double w = Convert.ToDouble(leftBox["w"]);
                         double h = Convert.ToDouble(leftBox["h"]);
 
-                        double newH = h * 0.523;
+                        double newH = h * 0.53;
                         double newY = y + h - newH;
 
                         updatedBoxes.Add(new Dictionary<string, object>
@@ -656,7 +656,7 @@ else
                         double h = Convert.ToDouble(rightBox["h"]);
 
                         double newH = h * 0.449;
-                        double newY = y + h - newH - 5;  // 추가로 5픽셀 위로 이동
+                        double newY = y + h - newH - 7;  // 추가로 7픽셀 위로 이동
 
                         updatedBoxes.Add(new Dictionary<string, object>
                         {
