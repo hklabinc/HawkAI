@@ -561,6 +561,49 @@ else
         await JS.InvokeVoidAsync("initLabelingCanvas", dotNetRef, previous.LabelData);
     }
 
+    [JSInvokable]
+    public async Task SaveAndLoadNext(string labelJson)
+    {
+        await SaveLabelWrapper(labelJson);
+
+        var next = await Db.Images
+            .Where(i => i.ProjectId == projectId && i.Id > selectedImageId)
+            .OrderBy(i => i.Id)
+            .FirstOrDefaultAsync();
+
+        if (next != null)
+        {
+            OpenLabelingModal(next.RelativePath, next.Id);
+            StateHasChanged();
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("alert", "🔚 No next image.");
+        }
+    }
+
+    [JSInvokable]
+    public async Task SaveAndLoadPrevious(string labelJson)
+    {
+        await SaveLabelWrapper(labelJson);
+
+        var previous = await Db.Images
+            .Where(i => i.ProjectId == projectId && i.Id < selectedImageId)
+            .OrderByDescending(i => i.Id)
+            .FirstOrDefaultAsync();
+
+        if (previous != null)
+        {
+            OpenLabelingModal(previous.RelativePath, previous.Id);
+            StateHasChanged();
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("alert", "🔚 No previous image.");
+        }
+    }
+
+
     private async Task RunAddLabels()
     {
         try

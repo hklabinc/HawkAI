@@ -390,6 +390,29 @@
 
     // ✅ Delete 키 이벤트 등록
     document.addEventListener('keydown', (e) => {
+        // ✅ s 키 → 저장
+        if (e.key.toLowerCase() === 's') {
+            e.preventDefault();
+            window.saveLabelData();
+            return;
+        }
+
+        // ✅ → 키 → 저장 후 다음 이미지 로드
+        if (e.key === 'ArrowRight' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            const json = JSON.stringify(boxes);
+            window.dotNetHelper.invokeMethodAsync('SaveAndLoadNext', json);
+            return;
+        }
+
+        // ✅ ← 키 → 저장 후 이전 이미지 로드
+        if (e.key === 'ArrowLeft' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            const json = JSON.stringify(boxes);
+            window.dotNetHelper.invokeMethodAsync('SaveAndLoadPrevious', json);
+            return;
+        }
+
         // ✅ Delete 키: 단일 또는 다중 선택 삭제
         if (e.key === 'Delete') {
             const hasSingle = selectedBoxIndex !== -1;
