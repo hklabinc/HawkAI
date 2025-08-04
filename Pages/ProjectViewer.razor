@@ -49,7 +49,7 @@ else
                 <span class="oi oi-flash"></span> Auto Labeling
             </button>
             <button class="btn btn-warning me-2" @onclick="AdjustLabels">
-                <span class="oi oi-plus"></span> Adjust Labels
+                <span class="oi oi-wrench"></span> Adjust Labels
             </button>
             <button class="btn btn-danger" @onclick="ConfirmBulkDeleteImages">
                 <span class="oi oi-trash"></span> Delete Selected
@@ -705,6 +705,35 @@ else
                         });
                     }
                 }
+                else if (project.Name == "L1570-07" && nonFilmBoxes.Count == 3)
+                {
+                    // y 기준 정렬 (위 → 중간 → 아래)
+                    var sortedByY = nonFilmBoxes.OrderBy(b => Convert.ToDouble(b["y"])).ToList();
+
+                    for (int i = 0; i < 3; i++)
+                    {
+                        var box = sortedByY[i];
+
+                        double x = Convert.ToDouble(box["x"]);
+                        double y = Convert.ToDouble(box["y"]);
+                        double w = Convert.ToDouble(box["w"]);
+                        double h = Convert.ToDouble(box["h"]);
+                        string label = box["label"].ToString() ?? "";
+
+                        // 맨 아래 박스만 width 줄임
+                        if (i == 2)
+                            w *= 0.5;
+
+                        updatedBoxes.Add(new Dictionary<string, object>
+                        {
+                            ["x"] = x,
+                            ["y"] = y,
+                            ["w"] = w,
+                            ["h"] = h,
+                            ["label"] = label
+                        });
+                    }
+                }
                 else
                 {
                     // film 외 박스 그대로 유지
@@ -717,7 +746,7 @@ else
 
             await Db.SaveChangesAsync();
             await LoadImages();
-            await JS.InvokeVoidAsync("alert", "✅ Labels successfully added!");
+            await JS.InvokeVoidAsync("alert", "✅ Labels successfully adjusted!");
         }
         catch (Exception ex)
         {
