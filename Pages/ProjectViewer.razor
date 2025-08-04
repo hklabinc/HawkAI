@@ -594,21 +594,41 @@ else
                     // film 라벨 박스 추가
                     if (label == "film" && project.Name == "L2017-07")
                     {
-                        double subW = w / 3.0;
+                        double leftW = w * 0.33;
+                        double midW = w * 0.31;
+                        double rightW = w * 0.36;
                         double subH = h * 0.48;
                         double baseY = y + h - subH;
 
-                        for (int i = 0; i < 3; i++)
+                        // 왼쪽 박스
+                        updatedBoxes.Add(new Dictionary<string, object>
                         {
-                            updatedBoxes.Add(new Dictionary<string, object>
-                            {
-                                ["x"] = x + i * subW,
-                                ["y"] = baseY,
-                                ["w"] = subW,
-                                ["h"] = subH,
-                                ["label"] = "good"
-                            });
-                        }
+                            ["x"] = x,
+                            ["y"] = baseY,
+                            ["w"] = leftW,
+                            ["h"] = subH,
+                            ["label"] = "good"
+                        });
+
+                        // 가운데 박스
+                        updatedBoxes.Add(new Dictionary<string, object>
+                        {
+                            ["x"] = x + leftW,
+                            ["y"] = baseY,
+                            ["w"] = midW,
+                            ["h"] = subH,
+                            ["label"] = "good"
+                        });
+
+                        // 오른쪽 박스
+                        updatedBoxes.Add(new Dictionary<string, object>
+                        {
+                            ["x"] = x + leftW + midW,
+                            ["y"] = baseY,
+                            ["w"] = rightW,
+                            ["h"] = subH,
+                            ["label"] = "good"
+                        });
                     }
                 }
 
@@ -627,6 +647,7 @@ else
             await JS.InvokeVoidAsync("alert", "❌ Failed to add labels.\n" + ex.Message);
         }
     }
+
 
 
 
