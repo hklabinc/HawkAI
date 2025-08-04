@@ -101,8 +101,8 @@ else
 
 @if (showLabelingModal)
 {
-    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.6);">
-        <div class="modal-dialog modal-xl" style="max-height: 95vh;">
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.6);">        
+        <div class="modal-dialog modal-xl" style="max-height: 95vh;" tabindex="0" @onkeydown="HandleKeyDown">
             <div class="modal-content" style="max-height: 95vh; display: flex; flex-direction: column;">
                 <div class="modal-header">
                     <h5 class="modal-title">Label Image</h5>
@@ -561,48 +561,13 @@ else
         await JS.InvokeVoidAsync("initLabelingCanvas", dotNetRef, previous.LabelData);
     }
 
-    [JSInvokable]
-    public async Task SaveAndLoadNext(string labelJson)
+    private async Task HandleKeyDown(KeyboardEventArgs e)
     {
-        await SaveLabelWrapper(labelJson);
-
-        var next = await Db.Images
-            .Where(i => i.ProjectId == projectId && i.Id > selectedImageId)
-            .OrderBy(i => i.Id)
-            .FirstOrDefaultAsync();
-
-        if (next != null)
+        if (e.Key == "s" || e.Key == "S")
         {
-            OpenLabelingModal(next.RelativePath, next.Id);
-            StateHasChanged();
-        }
-        else
-        {
-            await JS.InvokeVoidAsync("alert", "🔚 No next image.");
+            await JS.InvokeVoidAsync("saveLabelData");
         }
     }
-
-    [JSInvokable]
-    public async Task SaveAndLoadPrevious(string labelJson)
-    {
-        await SaveLabelWrapper(labelJson);
-
-        var previous = await Db.Images
-            .Where(i => i.ProjectId == projectId && i.Id < selectedImageId)
-            .OrderByDescending(i => i.Id)
-            .FirstOrDefaultAsync();
-
-        if (previous != null)
-        {
-            OpenLabelingModal(previous.RelativePath, previous.Id);
-            StateHasChanged();
-        }
-        else
-        {
-            await JS.InvokeVoidAsync("alert", "🔚 No previous image.");
-        }
-    }
-
 
     private async Task RunAddLabels()
     {
