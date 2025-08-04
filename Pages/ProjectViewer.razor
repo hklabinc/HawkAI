@@ -101,8 +101,8 @@ else
 
 @if (showLabelingModal)
 {
-    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.6);">        
-        <div class="modal-dialog modal-xl" style="max-height: 95vh;" tabindex="0" @onkeydown="HandleKeyDown">
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.6);">
+        <div class="modal-dialog modal-xl" style="max-height: 95vh;">
             <div class="modal-content" style="max-height: 95vh; display: flex; flex-direction: column;">
                 <div class="modal-header">
                     <h5 class="modal-title">Label Image</h5>
@@ -561,14 +561,6 @@ else
         await JS.InvokeVoidAsync("initLabelingCanvas", dotNetRef, previous.LabelData);
     }
 
-    private async Task HandleKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "s" || e.Key == "S")
-        {
-            await JS.InvokeVoidAsync("saveLabelData");
-        }
-    }
-
     private async Task RunAddLabels()
     {
         try
@@ -581,6 +573,9 @@ else
                 var labelArray = JsonDocument.Parse(image.LabelData).RootElement;
                 var updatedBoxes = new List<Dictionary<string, object>>();
 
+                var filmBoxes = new List<Dictionary<string, object>>();
+                var nonFilmBoxes = new List<Dictionary<string, object>>();
+
                 foreach (var box in labelArray.EnumerateArray())
                 {
                     var label = box.GetProperty("label").GetString();
@@ -589,55 +584,94 @@ else
                     var w = box.GetProperty("w").GetDouble();
                     var h = box.GetProperty("h").GetDouble();
 
-                    // 기존 박스 유지
-                    updatedBoxes.Add(new Dictionary<string, object>
+                    // 분리 저장
+                    var boxDict = new Dictionary<string, object>
                     {
                         ["x"] = x,
                         ["y"] = y,
                         ["w"] = w,
                         ["h"] = h,
                         ["label"] = label
-                    });
+                    };
 
-                    // film 라벨 박스 추가
-                    if (label == "film" && project.Name == "L2017-07")
+                    if (label == "film")
+                        filmBoxes.Add(boxDict);
+                    else
+                        nonFilmBoxes.Add(boxDict);
+                }
+
+                // 기본은 모두 유지
+                updatedBoxes.AddRange(filmBoxes);
+
+                if (project.Name == "L2017-07")
+                {
+                    foreach (var box in filmBoxes)
                     {
+                        double x = Convert.ToDouble(box["x"]);
+                        double y = Convert.ToDouble(box["y"]);
+                        double w = Convert.ToDouble(box["w"]);
+                        double h = Convert.ToDouble(box["h"]);
+
                         double leftW = w * 0.33;
                         double midW = w * 0.31;
                         double rightW = w * 0.36;
                         double subH = h * 0.48;
                         double baseY = y + h - subH;
 
-                        // 왼쪽 박스
+                        updatedBoxes.Add(new Dictionary<string, object> { ["x"] = x, ["y"] = baseY, ["w"] = leftW, ["h"] = subH, ["label"] = "good" });
+                        updatedBoxes.Add(new Dictionary<string, object> { ["x"] = x + leftW, ["y"] = baseY, ["w"] = midW, ["h"] = subH, ["label"] = "good" });
+                        updatedBoxes.Add(new Dictionary<string, object> { ["x"] = x + leftW + midW, ["y"] = baseY, ["w"] = rightW, ["h"] = subH, ["label"] = "good" });
+                    }
+                }
+                else if (project.Name == "L2018-07" && nonFilmBoxes.Count == 2)
+                {
+                    // 왼쪽 박스: x 작은 값 기준
+                    var sorted = nonFilmBoxes.OrderBy(b => Convert.ToDouble(b["x"])).ToList();
+                    var leftBox = sorted[0];
+                    var rightBox = sorted[1];
+
+                    {
+                        double x = Convert.ToDouble(leftBox["x"]);
+                        double y = Convert.ToDouble(leftBox["y"]);
+                        double w = Convert.ToDouble(leftBox["w"]);
+                        double h = Convert.ToDouble(leftBox["h"]);
+
+                        double newH = h * 0.523;
+                        double newY = y + h - newH;
+
                         updatedBoxes.Add(new Dictionary<string, object>
                         {
                             ["x"] = x,
-                            ["y"] = baseY,
-                            ["w"] = leftW,
-                            ["h"] = subH,
-                            ["label"] = "good"
-                        });
-
-                        // 가운데 박스
-                        updatedBoxes.Add(new Dictionary<string, object>
-                        {
-                            ["x"] = x + leftW,
-                            ["y"] = baseY,
-                            ["w"] = midW,
-                            ["h"] = subH,
-                            ["label"] = "good"
-                        });
-
-                        // 오른쪽 박스
-                        updatedBoxes.Add(new Dictionary<string, object>
-                        {
-                            ["x"] = x + leftW + midW,
-                            ["y"] = baseY,
-                            ["w"] = rightW,
-                            ["h"] = subH,
-                            ["label"] = "good"
+                            ["y"] = newY,
+                            ["w"] = w,
+                            ["h"] = newH,
+                            ["label"] = leftBox["label"]
                         });
                     }
+
+                    {
+                        double x = Convert.ToDouble(rightBox["x"]);
+                        double y = Convert.ToDouble(rightBox["y"]);
+                        double w = Convert.ToDouble(rightBox["w"]);
+                        double h = Convert.ToDouble(rightBox["h"]);
+
+                        double newH = h * 0.449;
+                        double newY = y + h - newH - 5;  // 추가로 5픽셀 위로 이동
+
+                        updatedBoxes.Add(new Dictionary<string, object>
+                        {
+                            ["x"] = x,
+                            ["y"] = newY,
+                            ["w"] = w,
+                            ["h"] = newH,
+                            ["label"] = rightBox["label"]
+                        });
+                    }
+                }
+                else
+                {
+                    // film 외 박스 그대로 유지
+                    updatedBoxes.AddRange(nonFilmBoxes);
                 }
 
                 image.LabelData = JsonSerializer.Serialize(updatedBoxes);
@@ -646,7 +680,6 @@ else
 
             await Db.SaveChangesAsync();
             await LoadImages();
-
             await JS.InvokeVoidAsync("alert", "✅ Labels successfully added!");
         }
         catch (Exception ex)
@@ -655,7 +688,6 @@ else
             await JS.InvokeVoidAsync("alert", "❌ Failed to add labels.\n" + ex.Message);
         }
     }
-
 
 
 
