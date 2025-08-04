@@ -668,6 +668,35 @@ else
                         });
                     }
                 }
+                else if (project.Name == "L0625-12" && nonFilmBoxes.Count == 3)
+                {
+                    // y값 기준으로 위-중간-아래 순으로 정렬
+                    var sortedByY = nonFilmBoxes.OrderBy(b => Convert.ToDouble(b["y"])).ToList();
+
+                    double[] widthFactors = { 0.5, 0.48, 0.47 };
+
+                    for (int i = 0; i < 3; i++)
+                    {
+                        var box = sortedByY[i];
+
+                        double x = Convert.ToDouble(box["x"]);
+                        double y = Convert.ToDouble(box["y"]);
+                        double w = Convert.ToDouble(box["w"]);
+                        double h = Convert.ToDouble(box["h"]);
+                        string label = box["label"].ToString() ?? "";
+
+                        double newW = w * widthFactors[i];
+
+                        updatedBoxes.Add(new Dictionary<string, object>
+                        {
+                            ["x"] = x,
+                            ["y"] = y,
+                            ["w"] = newW,
+                            ["h"] = h,
+                            ["label"] = label
+                        });
+                    }
+                }
                 else
                 {
                     // film 외 박스 그대로 유지
