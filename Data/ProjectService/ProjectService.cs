@@ -57,5 +57,12 @@ namespace HawkAI.Data.ProjectService
             Projects = await _context.Projects.Where(p => p.CreatorUserId == userId).Include(p => p.Images).ToListAsync();
             return Projects;
         }
+        public async Task<Project?> GetProjectById(int id)
+        {
+            return await _context.Projects
+                .Include(p => p.Images)
+                .FirstOrDefaultAsync(p => p.Id == id);
+        }
+
     }
 }

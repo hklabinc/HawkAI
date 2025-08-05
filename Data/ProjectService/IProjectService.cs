@@ -9,5 +9,6 @@
         Task DeleteProject(int id);
         Task<IEnumerable<Project>> GetAllProjects();
         Task<IEnumerable<Project>> GetUserProjects(string userId);
+        Task<Project?> GetProjectById(int id);
     }
 }

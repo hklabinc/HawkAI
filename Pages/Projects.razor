@@ -19,7 +19,7 @@
 
 <div class="d-flex gap-2 mb-3">
     <button @onclick="() => showCreateModal = true" class="btn btn-primary"><span class="oi oi-plus"></span> Create New Project</button>
-    <button class="btn btn-success" @onclick="PrepareMerge"><span class="oi oi-transfer"></span> Project Merge</button>
+    <button class="btn btn-success" @onclick="PrepareCopyOrMerge"><span class="oi oi-transfer"></span> Copy / Merge</button>
     <button class="btn btn-danger" @onclick="ConfirmBulkDelete" title="Delete selected projects"><span class="oi oi-trash"></span> Delete Selected</button>
 </div>
 
@@ -34,8 +34,19 @@ else if (projects.Count == 0)
 else
 {
     <div class="d-flex flex-wrap gap-3">
+        @{
+            string? lastUserId = null;
+        }
+
         @foreach (var p in projects)
         {
+            // ✅ 사용자 ID가 바뀌면 <hr /> 삽입 (단, 처음은 제외)
+            if (lastUserId != null && lastUserId != p.CreatorUserId)
+            {
+                <hr class="w-100 my-3 border-top border-3 border-dark" />
+            }
+            lastUserId = p.CreatorUserId;
+
             <div class="card" style="width: 320px;">
                 @if (p.Images.Count > 0)
                 {
@@ -175,7 +186,7 @@ else
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title">Edit Project - @selectedProject?.Name</h5>
+                    <h5 class="modal-title">Edit Project - @editingProject?.Name</h5>
                     <button type="button" class="btn-close" @onclick="() => showEditModal = false"></button>
                 </div>
                 <div class="modal-body">
@@ -191,6 +202,13 @@ else
                         <label class="form-label">Labels (comma-separated)</label>
                         <input class="form-control" @bind="editingProject.Labels" />
                     </div>
+                    @if (isAdmin)
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">Creator User ID</label>
+                            <input class="form-control" @bind="editingProject.CreatorUserId" />
+                        </div>
+                    }
                     <div class="mb-3">
                         <label class="form-label">Add Images</label>
                         <InputFile OnChange="HandleFileUpload" multiple MaxFiles="500" />
@@ -211,7 +229,7 @@ else
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title">Merge Selected Projects</h5>
+                    <h5 class="modal-title">@((isCopyMode ? "Copy Project" : "Merge Selected Projects"))</h5>
                     <button type="button" class="btn-close" @onclick="() => showMergeModal = false"></button>
                 </div>
                 <div class="modal-body">
@@ -223,16 +241,19 @@ else
                         <label class="form-label">Labels (merged)</label>
                         <textarea class="form-control" rows="3" readonly>@mergeLabels</textarea>
                     </div>
-                    <div class="form-check mt-2">
-                        <input class="form-check-input" type="checkbox" id="allowDuplicates" @bind="allowDuplicateMerge" />
-                        <label class="form-check-label" for="allowDuplicates">
-                            Allow merging duplicate filenames (auto rename with _1, _2...)
-                        </label>
-                    </div>
+                    @if (!isCopyMode)
+                    {
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="allowDuplicates" @bind="allowDuplicateMerge" />
+                            <label class="form-check-label" for="allowDuplicates">
+                                Allow merging duplicate filenames (auto rename with _1, _2...)
+                            </label>
+                        </div>
+                    }
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" @onclick="() => showMergeModal = false">Cancel</button>
-                    <button class="btn btn-primary" @onclick="ExecuteMerge">Merge</button>
+                    <button class="btn btn-primary" @onclick="ExecuteMerge">@((isCopyMode ? "Copy" : "Merge"))</button>
                 </div>
             </div>
         </div>
@@ -634,6 +655,9 @@ else
     private bool isExporting = false;
     private bool isTraining = false;
     private string recipientEmails = string.Empty;  // 사용자 입력 이메일 저장용
+
+    private bool isCopyMode = false; // Copy 모드 여부
+    private ProjectViewModel? copySourceProject = null; // 복사할 프로젝트 저장
 
 
     public void Dispose()
@@ -1099,6 +1123,10 @@ else
             var oldProjectName = project.Name;
             project.Name = editingProject.Name;
             project.Labels = editingProject.Labels;
+            if (isAdmin)
+            {
+                project.CreatorUserId = editingProject.CreatorUserId;
+            }
 
             // If project name changed, rename folder and update paths
             if (!string.Equals(oldProjectName, project.Name, StringComparison.OrdinalIgnoreCase))
@@ -1185,6 +1213,137 @@ else
     }
 
 
+    private void PrepareCopyOrMerge()
+    {
+        var selected = projects.Where(p => p.IsSelectedForMerge).ToList();
+
+        if (selected.Count == 0)
+        {
+            JS.InvokeVoidAsync("alert", "⚠️ Please select at least one project to copy or merge.");
+            return;
+        }
+
+        if (selected.Count == 1)
+        {
+            PrepareCopy(selected.First());
+        }
+        else
+        {
+            PrepareMerge();
+        }
+    }
+
+    private void PrepareCopy(ProjectViewModel selected)
+    {
+        isCopyMode = true;
+        copySourceProject = selected;
+        mergeProjectName = $"{selected.Name}_Copy_{DateTime.Now:yyyyMMdd_HHmmss}";
+        mergeLabels = selected.Labels;
+        showMergeModal = true;
+    }
+
+    private async Task ExecuteCopyFromModal()
+    {
+        if (copySourceProject == null)
+        {
+            await JS.InvokeVoidAsync("alert", "❌ No source project selected for copy.");
+            return;
+        }
+
+        var source = await Db.Projects.Include(p => p.Images).FirstOrDefaultAsync(p => p.Id == copySourceProject.Id);
+        if (source == null)
+        {
+            await JS.InvokeVoidAsync("alert", $"❌ Source project '{copySourceProject.Name}' not found.");
+            return;
+        }
+
+        if (Db.Projects.Any(p => p.Name == mergeProjectName))
+        {
+            await JS.InvokeVoidAsync("alert", $"❌ A project named '{mergeProjectName}' already exists.");
+            return;
+        }
+
+        var newProj = new Project
+        {
+            Name = mergeProjectName,
+            Labels = source.Labels,
+            CreatorUserId = userId,
+            ImageCount = source.Images.Count
+        };
+        await ProjectService.CreateProject(newProj);
+
+        var newDir = Path.Combine(Env.WebRootPath, "datasets", newProj.Name);
+        var imgDir = Path.Combine(newDir, "images");
+        var lblDir = Path.Combine(newDir, "labels");
+        var annDir = Path.Combine(newDir, "images_annotated");
+        Directory.CreateDirectory(imgDir);
+        Directory.CreateDirectory(lblDir);
+        Directory.CreateDirectory(annDir);
+
+        foreach (var entry in source.Images)
+        {
+            var newFile = entry.FileName;
+            var srcPath = Path.Combine(Env.WebRootPath, entry.RelativePath);
+            var newPath = Path.Combine(imgDir, newFile);
+            if (File.Exists(srcPath))
+            {
+                File.Copy(srcPath, newPath, overwrite: false);
+            }
+
+            Db.Images.Add(new ImageEntry
+            {
+                ProjectId = newProj.Id,
+                FileName = newFile,
+                RelativePath = $"datasets/{newProj.Name}/images/{newFile}",
+                UploadedAt = DateTime.Now,
+                UploadedByUserId = userId,
+                Width = entry.Width,
+                Height = entry.Height,
+                LabelStatus = entry.LabelStatus,
+                LabelData = entry.LabelData
+            });
+
+            // label 파일 복사
+            var labelSrc = Path.Combine(Env.WebRootPath, "datasets", source.Name, "labels", Path.ChangeExtension(entry.FileName, ".txt"));
+            var labelDest = Path.Combine(lblDir, Path.GetFileName(labelSrc));
+            if (File.Exists(labelSrc)) File.Copy(labelSrc, labelDest, false);
+
+            // annotated 이미지 복사
+            var annSrc = Path.Combine(Env.WebRootPath, "datasets", source.Name, "images_annotated", entry.FileName);
+            var annDest = Path.Combine(annDir, entry.FileName);
+            if (File.Exists(annSrc)) File.Copy(annSrc, annDest, false);
+        }
+
+        // 카메라 설정 복사
+        var camSrc = Path.Combine(Env.WebRootPath, "datasets", source.Name, "camera.json");
+        var camDest = Path.Combine(newDir, "camera.json");
+        if (File.Exists(camSrc)) File.Copy(camSrc, camDest, false);
+
+        await Db.SaveChangesAsync();
+        await ReloadProjects();
+
+        showMergeModal = false;
+        isCopyMode = false;
+        copySourceProject = null;
+
+        await JS.InvokeVoidAsync("alert", $"✅ Project '{mergeProjectName}' copied successfully.");
+    }
+
+
+    private void CopyDirectory(string sourceDir, string destinationDir)
+    {
+        Directory.CreateDirectory(destinationDir);
+        foreach (var file in Directory.GetFiles(sourceDir))
+        {
+            var destFile = Path.Combine(destinationDir, Path.GetFileName(file));
+            File.Copy(file, destFile, overwrite: false);
+        }
+        foreach (var dir in Directory.GetDirectories(sourceDir))
+        {
+            CopyDirectory(dir, Path.Combine(destinationDir, Path.GetFileName(dir)));
+        }
+    }
+
     private void PrepareMerge()
     {
         var selected = projects.Where(p => p.IsSelectedForMerge).ToList();        
@@ -1209,6 +1368,12 @@ else
 
     private async Task ExecuteMerge()
     {
+        if (isCopyMode)
+        {
+            await ExecuteCopyFromModal();
+            return;
+        }
+
         // ✅ 1. ViewModel에서 선택된 프로젝트 확인
         var selectedProjectVMs = projects.Where(p => p.IsSelectedForMerge).ToList();        
 
@@ -1243,7 +1408,9 @@ else
         var skippedFiles = new List<string>();
 
         // ✅ 6. 실제 Project 목록 조회
-        var allProjects = await ProjectService.GetUserProjects(userId);
+        var allProjects = isAdmin
+            ? await ProjectService.GetAllProjects()
+            : await ProjectService.GetUserProjects(userId);
         var selectedProjects = allProjects
             .Where(p => selectedProjectVMs.Any(vm => vm.Id == p.Id))
             .ToList();
