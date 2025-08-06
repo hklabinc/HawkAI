@@ -456,11 +456,15 @@ else
 
             Directory.CreateDirectory(annotatedDir); // ✅ Ensure annotated folder exists
 
+            // ✅ Labels에서 첫 번째 라벨만 사용
+            var firstLabel = project.Labels.Split(',', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? "film";
+
             var startInfo = new ProcessStartInfo
             {
                 FileName = "python",
                 // Arguments = $"\"{scriptPath}\" \"{imageDir}\" \"{project.Name}\"",
-                Arguments = $"\"{scriptPath}\" \"{imageDir}\" \"film\"",
+                // Arguments = $"\"{scriptPath}\" \"{imageDir}\" \"film\"",
+                Arguments = $"\"{scriptPath}\" \"{imageDir}\" \"{firstLabel}\"",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
