@@ -994,7 +994,9 @@ else
             $"  project: {project.Name.ToLower().Replace(" ", "-")}\n" +
             $"  version: 1\n" +
             $"  url: https://hawkai.hknu.ac.kr/projects/{projectId}\n" +
-            $"  ratioOfValid: {validRatio}\n";
+            $"  ratioOfValid: {validRatio}\n" +
+            $"  augMultiplier: {augMultiplier}\n" +
+            $"  augmentSeed: {(augmentSeed.HasValue ? augmentSeed.Value.ToString() : "null")}\n";
 
         await File.WriteAllTextAsync(yamlPath, yaml);
 

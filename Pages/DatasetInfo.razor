@@ -24,6 +24,20 @@
                     <span>@(exportSortAscending ? "▲" : "▼")</span>
                 }
             </th>
+            <th @onclick="() => SortExportBy(nameof(ExportRow.AugMultiplier))">
+                Aug Multiplier
+                @if (exportSortColumn == nameof(ExportRow.AugMultiplier))
+                {
+                    <span>@(exportSortAscending ? "▲" : "▼")</span>
+                }
+            </th>
+            <th @onclick="() => SortExportBy(nameof(ExportRow.AugmentSeed))">
+                Aug Seed
+                @if (exportSortColumn == nameof(ExportRow.AugmentSeed))
+                {
+                    <span>@(exportSortAscending ? "▲" : "▼")</span>
+                }
+            </th>
             <th @onclick="() => SortExportBy(nameof(ExportRow.TrainCount))">
                 Train Count
                 @if (exportSortColumn == nameof(ExportRow.TrainCount))
@@ -49,6 +63,8 @@
                 <td>@(i + 1)</td>
                 <td>@row.ModelName</td>
                 <td>@row.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                <td>@(row.AugMultiplier?.ToString() ?? "")</td>
+                <td>@(row.AugmentSeed?.ToString() ?? "")</td>
                 <td>@row.TrainCount</td>
                 <td>@row.ValidCount</td>
                 <td>
@@ -81,9 +97,11 @@
     {
         public string ModelName { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
+        public int? AugMultiplier { get; set; }
+        public int? AugmentSeed { get; set; }
         public int TrainCount { get; set; }
         public int ValidCount { get; set; }
-        public string FolderName { get; set; } = string.Empty;
+        public string FolderName { get; set; } = string.Empty;        
     }
 
     List<ExportRow> exportInfos = new();
@@ -140,6 +158,8 @@
             if (!File.Exists(yaml)) continue;
 
             int train = 0, valid = 0;
+            int? augMultiplier = null, augmentSeed = null;
+
             var lines = File.ReadAllLines(yaml);
             foreach (var line in lines)
             {
@@ -147,12 +167,18 @@
                     train = int.Parse(line.Split(':')[1].Trim());
                 if (line.Contains("validCount"))
                     valid = int.Parse(line.Split(':')[1].Trim());
+                if (line.Contains("augMultiplier"))
+                    augMultiplier = int.Parse(line.Split(':')[1].Trim());
+                if (line.Contains("augmentSeed"))
+                    augmentSeed = int.Parse(line.Split(':')[1].Trim());
             }
 
             exportInfos.Add(new ExportRow
             {
                 ModelName = modelName,
                 CreatedAt = Directory.GetCreationTime(folder),
+                AugMultiplier = augMultiplier,
+                AugmentSeed = augmentSeed,
                 TrainCount = train,
                 ValidCount = valid,
                 FolderName = folderName
