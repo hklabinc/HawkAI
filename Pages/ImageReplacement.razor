@@ -1,0 +1,142 @@
+﻿@page "/image-replacement"
+@inject IJSRuntime JS
+
+<PageTitle>Image Replacement Tool</PageTitle>
+
+<div class="container my-3">
+    <h2 class="h4 mb-3">Image Replacement Tool (Blazor)</h2>
+
+    <!-- 캔버스: 좌(이미지1)/우(이미지2) -->
+    <div class="border rounded mb-3 p-1">
+        <canvas id="ir-canvas"
+                width="1600"
+                height="700"
+                tabindex="0"
+                class="w-100"
+                style="outline:none;"></canvas>
+    </div>
+
+    <!-- 상단 컨트롤 -->
+    <div class="row g-2 align-items-center mb-3">
+        <div class="col-12 col-md-3">
+            <input id="file-image1" type="file" accept="image/*" class="form-control" />
+        </div>
+        <div class="col-12 col-md-3">
+            <input id="file-image2" type="file" accept="image/*" class="form-control" />
+        </div>
+        <div class="col-12 col-md-6 d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-outline-secondary"
+                    @onclick="@(() => Invoke("loadBoth"))">
+                Load Both
+            </button>
+
+            <button type="button" class="btn btn-primary"
+                    @onclick="@(() => Invoke("applyReplace"))">
+                Apply
+            </button>
+            <button type="button" class="btn btn-outline-secondary"
+                    @onclick="@(() => Invoke("undoApply"))">
+                Undo Apply
+            </button>
+            <button type="button" class="btn btn-outline-secondary"
+                    @onclick="@(() => Invoke("saveImage"))">
+                Save
+            </button>
+        </div>
+    </div>
+
+    <!-- 패널: 좌/우 컨트롤 -->
+    <div class="row g-3">
+        <!-- Image 1 -->
+        <div class="col-12 col-lg-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="fw-bold">Image 1 View</div>
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="btn btn-outline-secondary btn-sm mb-0">
+                                Reload
+                                <input id="reload-image1" type="file" accept="image/*" class="d-none" />
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="@(() => Invoke("zoom", 1, 1.25))">Zoom In</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="@(() => Invoke("zoom", 1, 0.8))">Zoom Out</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="@(() => Invoke("pan", 1, 0, -50))">↑</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="@(() => Invoke("pan", 1, 0, 50))">↓</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="@(() => Invoke("pan", 1, -50, 0))">←</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="@(() => Invoke("pan", 1, 50, 0))">→</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="@(() => Invoke("resetView", 1))">Reset</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Image 2 -->
+        <div class="col-12 col-lg-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="fw-bold">Image 2 View</div>
+                        <div class="d-flex align-items-center gap-2">
+                            <label class="btn btn-outline-secondary btn-sm mb-0">
+                                Reload
+                                <input id="reload-image2" type="file" accept="image/*" class="d-none" />
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="@(() => Invoke("zoom", 2, 1.25))">Zoom In</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="@(() => Invoke("zoom", 2, 0.8))">Zoom Out</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="@(() => Invoke("pan", 2, 0, -50))">↑</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="@(() => Invoke("pan", 2, 0, 50))">↓</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="@(() => Invoke("pan", 2, -50, 0))">←</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="@(() => Invoke("pan", 2, 50, 0))">→</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="@(() => Invoke("resetView", 2))">Reset</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <p class="text-muted mt-3 mb-0 small">
+        Shortcuts: <strong>Ctrl+Z</strong> Undo, <strong>Ctrl+Y</strong> Apply, <strong>Ctrl+S</strong> Save.
+        Arrows = move Image 2 crop. <strong>Shift+Arrows</strong> = resize Image 2 crop.
+    </p>
+</div>
+
+@code {
+    private bool _initialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_initialized)
+        {
+            _initialized = true;
+
+            // 스크립트가 로드되어 있는지 빠르게 점검 (콘솔에서 확인용)
+            try
+            {
+                await JS.InvokeVoidAsync("console.log", "[ImageReplacement] Razor page rendered. Initializing JS...");
+                await JS.InvokeVoidAsync("ImageTool.init",
+                    "#ir-canvas",
+                    "#file-image1",
+                    "#file-image2",
+                    "#reload-image1",
+                    "#reload-image2");
+                await JS.InvokeVoidAsync("console.log", "[ImageReplacement] JS init complete.");
+            }
+            catch (JSException)
+            {
+                // 스크립트 경로 문제 시 여기서 예외가 납니다.
+                await JS.InvokeVoidAsync("console.error", "[ImageReplacement] Failed to init ImageTool. Check script path and loading order.");
+            }
+        }
+    }
+
+    private ValueTask Invoke(string fn, params object[] args)
+        => JS.InvokeVoidAsync($"ImageTool.{fn}", args);
+}
