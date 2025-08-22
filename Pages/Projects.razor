@@ -322,6 +322,7 @@ else
                         <div class="mb-3">
                             <label class="form-label">Image Size</label>
                             <select class="form-select" @bind="selectedImageSize" disabled="@isExporting">
+                                <option value="0">Original Size</option>
                                 <option value="640">640 x 640</option>
                                 <option value="512">512 x 512</option>
                                 <option value="416">416 x 416</option>
@@ -599,7 +600,7 @@ else
 
     private bool showExportModal = false;
     private int exportProjectId;
-    private int selectedImageSize = 640;
+    private int selectedImageSize = 0;
 
     private bool showEditModal = false;
     private Project editingProject = new();
@@ -955,7 +956,10 @@ else
             if (File.Exists(srcImg))
             {
                 using var img = SixLabors.ImageSharp.Image.Load<Rgba32>(srcImg);
-                img.Mutate(x => x.Resize(selectedImageSize, selectedImageSize));
+                if (selectedImageSize > 0)
+                {
+                    img.Mutate(x => x.Resize(selectedImageSize, selectedImageSize));
+                }
                 await img.SaveAsJpegAsync(imgDest);
             }
 
