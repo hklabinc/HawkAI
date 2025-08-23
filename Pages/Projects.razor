@@ -351,6 +351,13 @@ else
                             <input type="number" class="form-control" @bind="augmentSeed" placeholder="e.g. 7" disabled="@isExporting" />
                         </div>
 
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="exportSeg" @bind="exportAsSegmentation" />
+                            <label class="form-check-label" for="exportSeg">
+                                Save labels in YOLO segmentation format
+                            </label>
+                        </div>
+
                         <div class="form-check mt-2">
                             <input class="form-check-input" type="checkbox" id="autoDownload" @bind="enableAutoDownload" disabled="@isExporting" />
                             <label class="form-check-label" for="autoDownload">
@@ -612,9 +619,10 @@ else
     private string mergeLabels = string.Empty;
     private bool allowDuplicateMerge = false;
 
+    private bool exportAsSegmentation = false;  // Export 시 detection / segmentation 선택용
     private int validRatioInt = 30;  // 기본값 30%
     private float validRatio => validRatioInt / 100f;
-
+    
     private Project? selectedProject = null;
     private int augMultiplier = 3;
     const int MaxAugMultiplier = 40;
@@ -977,12 +985,30 @@ else
                     var width = box.GetProperty("w").GetDouble();
                     var height = box.GetProperty("h").GetDouble();
 
-                    var x_center = (xMin + width / 2.0) / image.Width;
-                    var y_center = (yMin + height / 2.0) / image.Height;
-                    var w_norm = width / image.Width;
-                    var h_norm = height / image.Height;
+                    if (!exportAsSegmentation)
+                    {
+                        // ✅ 기존 YOLO detection 포맷
+                        var x_center = (xMin + width / 2.0) / image.Width;
+                        var y_center = (yMin + height / 2.0) / image.Height;
+                        var w_norm = width / image.Width;
+                        var h_norm = height / image.Height;
 
-                    labelLines.Add($"{cls} {x_center:F6} {y_center:F6} {w_norm:F6} {h_norm:F6}");
+                        labelLines.Add($"{cls} {x_center:F6} {y_center:F6} {w_norm:F6} {h_norm:F6}");
+                    }
+                    else
+                    {
+                        // ✅ YOLO segmentation 포맷 (직사각형 4점 좌표)
+                        var x1 = xMin / image.Width;
+                        var y1 = yMin / image.Height;
+                        var x2 = (xMin + width) / image.Width;
+                        var y2 = yMin / image.Height;
+                        var x3 = (xMin + width) / image.Width;
+                        var y3 = (yMin + height) / image.Height;
+                        var x4 = xMin / image.Width;
+                        var y4 = (yMin + height) / image.Height;
+
+                        labelLines.Add($"{cls} {x1:F6} {y1:F6} {x2:F6} {y2:F6} {x3:F6} {y3:F6} {x4:F6} {y4:F6}");
+                    }
                 }
                 await File.WriteAllLinesAsync(labelPath, labelLines);
             }
@@ -1000,7 +1026,8 @@ else
             $"  url: https://hawkai.hknu.ac.kr/projects/{projectId}\n" +
             $"  ratioOfValid: {validRatio}\n" +
             $"  augMultiplier: {augMultiplier}\n" +
-            $"  augmentSeed: {(augmentSeed.HasValue ? augmentSeed.Value.ToString() : "null")}\n";
+            $"  augmentSeed: {(augmentSeed.HasValue ? augmentSeed.Value.ToString() : "null")}\n" + 
+            $"  task: {(exportAsSegmentation ? "segment" : "detect")}\n";   
 
         await File.WriteAllTextAsync(yamlPath, yaml);
 
