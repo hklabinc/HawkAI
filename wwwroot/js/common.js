@@ -63,6 +63,20 @@ window.ShowSweetAlert = (type, message) => {
 
 }
 
+window.bootstrapModalShow = (selector) => {
+    const el = document.querySelector(selector);
+    if (!el) return;
+    const modal = bootstrap.Modal.getOrCreateInstance(el);
+    modal.show();
+};
+
+window.bootstrapModalHide = (selector) => {
+    const el = document.querySelector(selector);
+    if (!el) return;
+    const modal = bootstrap.Modal.getOrCreateInstance(el);
+    modal.hide();
+};
+
 function ShowDeleteConfirmationModal() {
     $('#deleteConfirmationModal').modal('show');
 }
