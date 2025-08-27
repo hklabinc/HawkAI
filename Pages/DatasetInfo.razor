@@ -133,7 +133,6 @@
                     </li>
                 </ul>
 
-
                 @if (activeTab == "yaml")
                 {
                     <pre class="p-3 bg-light border rounded" style="max-height:70vh; overflow:auto">@yamlText</pre>
@@ -222,10 +221,13 @@
     </div>
 </div>
 
-<!-- Lightbox -->
-<div class="lightbox-backdrop" style="@(_lightboxVisible ? "display:flex" : "display:none")" @onclick="CloseLightbox">
-    <img src="@_lightboxSrc" class="lightbox-image" />
-</div>
+@* 기존 style 토글 방식 말고, DOM 자체를 조건부로 *@
+@if (_lightboxVisible)
+{
+    <div class="lightbox-backdrop" @onclick="CloseLightbox">
+        <img src="@_lightboxSrc" class="lightbox-image" />
+    </div>
+}
 
 <style>
     .thumb-grid {
@@ -250,13 +252,17 @@
         overflow: auto;
     }
 
+    /* Bootstrap z-index 기준:
+         .modal-backdrop: 1050, .modal: 1055 (기본)
+         오버레이는 모달보다 "낮게" 둬야 가리지 않음 */
     .lightbox-backdrop {
         position: fixed;
         inset: 0;
-        background: rgba(0,0,0,.85);
+        display: flex;
         align-items: center;
         justify-content: center;
-        z-index: 1080;
+        background: rgba(0,0,0,.85);
+        z-index: 1050; /* 모달(1055)보다 낮게 */
         cursor: zoom-out;
     }
 
@@ -443,6 +449,30 @@
         return files.Select(f => $"{webBase}/{Path.GetFileName(f)}").ToList();
     }
 
+
+    static readonly string[] ImgExts = new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp" };
+
+    static List<string> ToFileUrls(string folderAbsPath, string webBase, string[]? allowExts = null)
+    {
+        var list = new List<string>();
+        if (!Directory.Exists(folderAbsPath)) return list;
+
+        var files = Directory.GetFiles(folderAbsPath);
+        Array.Sort(files, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var f in files)
+        {
+            var ext = Path.GetExtension(f);
+            if (allowExts != null && !allowExts.Any(e => string.Equals(e, ext, StringComparison.OrdinalIgnoreCase)))
+                continue;
+
+            var name = Path.GetFileName(f);
+            var encoded = System.Net.WebUtility.UrlEncode(name); // 🔒 한글/공백 대비
+            list.Add($"{webBase}/{encoded}");
+        }
+        return list;
+    }
+
     // 보기 열기
     async Task OpenViewExport(string folderName)
     {
@@ -461,10 +491,10 @@
         var validImgDir = Path.Combine(baseFolder, "valid", "images");
         var validLblDir = Path.Combine(baseFolder, "valid", "labels");
 
-        trainImages = ToUrls(trainImgDir, $"{webBase}/train/images");
-        validImages = ToUrls(validImgDir, $"{webBase}/valid/images");
-        trainLabels = ToUrls(trainLblDir, $"{webBase}/train/labels");
-        validLabels = ToUrls(validLblDir, $"{webBase}/valid/labels");
+        trainImages = ToFileUrls(trainImgDir, $"{webBase}/train/images", ImgExts);
+        validImages = ToFileUrls(validImgDir, $"{webBase}/valid/images", ImgExts);
+        trainLabels = ToFileUrls(trainLblDir, $"{webBase}/train/labels", new[] { ".txt" });
+        validLabels = ToFileUrls(validLblDir, $"{webBase}/valid/labels", new[] { ".txt" });
 
         // 기본 탭은 YAML로
         activeTab = "yaml";
