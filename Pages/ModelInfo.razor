@@ -19,7 +19,7 @@ else
                 <th>No</th>
                 @foreach (var col in Columns)
                 {
-                    <th @onclick="() => SortBy(col)">
+                    <th @onclick="() => SortBy(col)" style="cursor:pointer;">
                         @col
                         @if (sortColumn == col)
                         {
@@ -47,7 +47,7 @@ else
                     <td>@row["ValBoxLoss"]</td>
                     <td>@row["ValClsLoss"]</td>
                     <td>
-                        <button class="btn btn-sm btn-info me-1" @onclick="() => ShowResultsImage(row)">보기</button>
+                        <button class="btn btn-sm btn-info me-1" @onclick="() => ShowFolder(row)">보기</button>
                         <button class="btn btn-sm btn-danger" @onclick="() => ConfirmDelete(row)">삭제</button>
                     </td>
                 </tr>
@@ -56,39 +56,95 @@ else
     </table>
 }
 
-
-@if (showResultsImageModal)
+@if (showFolderModal)
 {
     <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.6);">
-        <div class="modal-dialog modal-xl">
+        <div class="modal-dialog modal-xxl" style="max-width: 1200px;">
             <div class="modal-content">
                 <div class="modal-header bg-dark text-white">
-                    <h5 class="modal-title">Results Image</h5>
-                    <button type="button" class="btn-close btn-close-white" @onclick="() => showResultsImageModal = false"></button>
+                    <h5 class="modal-title">Folder: @currentFolderName</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseFolderModal"></button>
                 </div>
-                <div class="modal-body text-center">
-                    <img src="@resultsImagePath" style="max-width: 100%; height: auto;" alt="Results" />
+                <div class="modal-body">
+                    <div class="row">
+                        <!-- Left: file list -->
+                        <div class="col-4" style="max-height:70vh; overflow:auto;">
+                            <input class="form-control mb-2" placeholder="Filter files..."
+                                   @bind="fileFilter" @bind:event="oninput" />
+                            <ul class="list-group">
+                                @foreach (var f in FilteredFiles)
+                                {
+                                    <li class="list-group-item d-flex justify-content-between align-items-center"
+                                        style="cursor:pointer;@(selectedFile?.RelativePath == f.RelativePath ? "background:#eef;" : "")"
+                                        @onclick="() => PreviewFile(f)">
+                                        <div>
+                                            <div><strong>@f.Name</strong></div>
+                                            <small class="text-muted">@f.Ext · @FormatSize(f.Size) · @f.Modified.ToString("yyyy-MM-dd HH:mm:ss")</small>
+                                        </div>
+                                        <a class="btn btn-sm btn-outline-secondary"
+                                           href="@("/" + f.RelativePath.Replace("\\", "/"))"
+                                           download>다운로드</a>
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+
+                        <!-- Right: preview -->
+                        <div class="col-8">
+                            @if (selectedFile is null)
+                            {
+                                <div class="text-muted">좌측에서 파일을 선택하세요.</div>
+                            }
+                            else
+                            {
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div>
+                                        <h6 class="mb-0">@selectedFile.Name</h6>
+                                        <small class="text-muted">@selectedFile.Ext · @FormatSize(selectedFile.Size) · @selectedFile.Modified.ToString("yyyy-MM-dd HH:mm:ss")</small>
+                                    </div>
+                                    <a class="btn btn-sm btn-primary"
+                                       href="@("/" + selectedFile.RelativePath.Replace("\\", "/"))"
+                                       download>다운로드</a>
+                                </div>
+
+                                @if (IsImage(selectedFile.Ext))
+                                {
+                                    <div class="text-center">
+                                        <img src="@("/" + selectedFile.RelativePath.Replace("\\", "/"))"
+                                             style="max-width:100%; max-height:70vh; object-fit:contain;"
+                                             alt="@selectedFile.Name" />
+                                    </div>
+                                }
+                                else if (IsText(selectedFile.Ext))
+                                {
+                                    <pre style="max-height:70vh; overflow:auto; background:#111; color:#ddd; padding:12px; border-radius:8px;">@previewContent</pre>
+                                }
+                                else
+                                {
+                                    <div class="alert alert-info">
+                                        이 파일 형식은 미리보기를 지원하지 않습니다. 다운로드해서 확인하세요.
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="() => showResultsImageModal = false">Close</button>
+                    <button class="btn btn-secondary" @onclick="CloseFolderModal">Close</button>
                 </div>
             </div>
         </div>
     </div>
 }
 
-
-
 @code {
+    // ===== 기존 필드 =====
     List<Dictionary<string, string>> modelRows = new();
     string sortColumn = "만든날짜";
     bool sortAscending = false;  // 최신순 정렬
 
     List<string> userProjectNames = new();
     bool isAdmin = false;
-
-    string resultsImagePath = "";
-    bool showResultsImageModal = false;
 
     string[] Columns = new[] {
         "모델명", "사이즈", "만든날짜", "Epoch",
@@ -100,6 +156,28 @@ else
         sortAscending
             ? modelRows.OrderBy(row => row[sortColumn], StringComparer.CurrentCulture)
             : modelRows.OrderByDescending(row => row[sortColumn], StringComparer.CurrentCulture);
+
+    // ===== 새로 추가된: 폴더 브라우저 상태 =====
+    class FileItem
+    {
+        public string Name { get; set; } = "";
+        public string RelativePath { get; set; } = ""; // e.g., "runs/folder/file.ext"
+        public long Size { get; set; }
+        public DateTime Modified { get; set; }
+        public string Ext { get; set; } = "";
+    }
+
+    bool showFolderModal = false;
+    string currentFolderName = "";
+    List<FileItem> currentFiles = new();
+    FileItem? selectedFile = null;
+    string previewContent = "";
+    string fileFilter = "";
+
+    IEnumerable<FileItem> FilteredFiles =>
+        string.IsNullOrWhiteSpace(fileFilter)
+        ? currentFiles
+        : currentFiles.Where(f => f.Name.Contains(fileFilter, StringComparison.CurrentCultureIgnoreCase));
 
     protected override async Task OnInitializedAsync()
     {
@@ -172,13 +250,13 @@ else
                     if (lines.Length >= 2)
                     {
                         var last = lines.Last().Split(',');
-                        row["Epoch"] = last[0];
-                        row["Precision"] = last[5];
-                        row["Recall"] = last[6];
-                        row["mAP50"] = last[7];
-                        row["mAP50-95"] = last[8];
-                        row["ValBoxLoss"] = last[9];
-                        row["ValClsLoss"] = last[10];
+                        row["Epoch"] = last.ElementAtOrDefault(0) ?? "-";
+                        row["Precision"] = last.ElementAtOrDefault(5) ?? "-";
+                        row["Recall"] = last.ElementAtOrDefault(6) ?? "-";
+                        row["mAP50"] = last.ElementAtOrDefault(7) ?? "-";
+                        row["mAP50-95"] = last.ElementAtOrDefault(8) ?? "-";
+                        row["ValBoxLoss"] = last.ElementAtOrDefault(9) ?? "-";
+                        row["ValClsLoss"] = last.ElementAtOrDefault(10) ?? "-";
                     }
                 }
                 catch { }
@@ -208,7 +286,6 @@ else
         }
     }
 
-
     string ParseDate(string input)
     {
         if (DateTime.TryParseExact(input, "yyyyMMdd_HHmmss", null, DateTimeStyles.None, out var dt))
@@ -218,21 +295,104 @@ else
         return input;
     }
 
-
-    void ShowResultsImage(Dictionary<string, string> row)
+    // ===== 새로 추가된: 폴더 보기/미리보기 로직 =====
+    void ShowFolder(Dictionary<string, string> row)
     {
-        var folderName = row["폴더명"];
-        var imagePath = Path.Combine("runs", folderName, "results.png");
-        var fullPath = Path.Combine(Env.WebRootPath, imagePath);
+        currentFolderName = row["폴더명"];
+        var folderAbs = Path.Combine(Env.WebRootPath, "runs", currentFolderName);
+        currentFiles = new();
 
-        if (File.Exists(fullPath))
+        if (Directory.Exists(folderAbs))
         {
-            resultsImagePath = "/" + imagePath.Replace("\\", "/");
-            showResultsImageModal = true;
+            foreach (var path in Directory.GetFiles(folderAbs))
+            {
+                var fi = new FileInfo(path);
+                currentFiles.Add(new FileItem
+                {
+                    Name = fi.Name,
+                    RelativePath = Path.Combine("runs", currentFolderName, fi.Name),
+                    Size = fi.Length,
+                    Modified = fi.LastWriteTime,
+                    Ext = fi.Extension.ToLowerInvariant()
+                });
+            }
+
+            // 기본 선택: results.png가 있으면 우선, 없으면 첫 파일
+            var defaultSel = currentFiles.FirstOrDefault(f => f.Name.Equals("results.png", StringComparison.OrdinalIgnoreCase))
+                             ?? currentFiles.FirstOrDefault();
+            selectedFile = null;
+            previewContent = "";
+            fileFilter = "";
+            showFolderModal = true;
+
+            if (defaultSel != null)
+                PreviewFile(defaultSel);
         }
         else
         {
-            JS.InvokeVoidAsync("alert", $"❌ results.png not found in folder: {folderName}");
+            JS.InvokeVoidAsync("alert", $"폴더를 찾을 수 없습니다: {currentFolderName}");
         }
+    }
+
+    void PreviewFile(FileItem f)
+    {
+        selectedFile = f;
+        previewContent = "";
+
+        var abs = Path.Combine(Env.WebRootPath, f.RelativePath);
+        if (IsText(f.Ext))
+        {
+            try
+            {
+                // 너무 큰 파일 방지: 앞부분만 미리보기 (최대 ~200KB)
+                const int maxBytes = 200_000;
+                using var fs = new FileStream(abs, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var sr = new StreamReader(fs);
+                char[] buffer = new char[Math.Min(maxBytes, (int)fs.Length)];
+                int read = sr.Read(buffer, 0, buffer.Length);
+                previewContent = new string(buffer, 0, read);
+
+                // CSV 가독성: 너무 긴 줄이면 잘라서 표시
+                if (f.Ext is ".csv")
+                {
+                    var lines = previewContent.Split('\n').Take(200); // 최대 200줄 미리보기
+                    previewContent = string.Join('\n', lines);
+                }
+            }
+            catch (Exception ex)
+            {
+                previewContent = $"[미리보기 실패] {ex.Message}";
+            }
+        }
+        StateHasChanged();
+    }
+
+    void CloseFolderModal()
+    {
+        showFolderModal = false;
+        selectedFile = null;
+        currentFiles.Clear();
+        previewContent = "";
+        fileFilter = "";
+        currentFolderName = "";
+    }
+
+    static bool IsImage(string ext)
+        => ext is ".png" or ".jpg" or ".jpeg" or ".gif" or ".webp";
+
+    static bool IsText(string ext)
+        => ext is ".txt" or ".csv" or ".json" or ".yaml" or ".yml" or ".log" or ".md";
+
+    static string FormatSize(long bytes)
+    {
+        string[] units = { "B", "KB", "MB", "GB" };
+        double size = bytes;
+        int unit = 0;
+        while (size >= 1024 && unit < units.Length - 1)
+        {
+            size /= 1024;
+            unit++;
+        }
+        return $"{size:0.##} {units[unit]}";
     }
 }
