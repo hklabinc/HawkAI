@@ -237,7 +237,7 @@
     <div class="lightbox-backdrop" @onclick="CloseLightbox">
         <img src="@_lightboxSrc"
              class="lightbox-image"
-             @onclick:stopPropagation @* 이미지 클릭은 닫히지 않게 *@ />
+             @onclick:stopPropagation="true" />
     </div>
 }
 
