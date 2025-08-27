@@ -4,6 +4,9 @@
 @inject IJSRuntime JS
 @inject HawkAI.Data.ProjectService.IProjectService ProjectService
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@using System.Globalization
+@using System.IO.Compression
+@using System.Linq
 
 <h3>Model Info</h3>
 
@@ -47,7 +50,12 @@ else
                     <td>@row["ValBoxLoss"]</td>
                     <td>@row["ValClsLoss"]</td>
                     <td>
-                        <button class="btn btn-sm btn-info me-1" @onclick="() => ShowFolder(row)">보기</button>
+                        <button class="btn btn-sm btn-secondary me-1" @onclick="() => ShowFolder(row)">보기</button>
+                        <button class="btn btn-sm btn-info me-1"
+                                disabled="@(isZipping && zippingTarget == row["폴더명"])"
+                                @onclick="() => DownloadFolderAsZip(row)">
+                            @(isZipping && zippingTarget == row["폴더명"] ? "압축중..." : "다운로드")
+                        </button>
                         <button class="btn btn-sm btn-danger" @onclick="() => ConfirmDelete(row)">삭제</button>
                     </td>
                 </tr>
@@ -145,6 +153,10 @@ else
 
     List<string> userProjectNames = new();
     bool isAdmin = false;
+    
+    // ZIP 진행 상태
+    bool isZipping = false;
+    string? zippingTarget = null;
 
     string[] Columns = new[] {
         "모델명", "사이즈", "만든날짜", "Epoch",
@@ -395,4 +407,67 @@ else
         }
         return $"{size:0.##} {units[unit]}";
     }
+
+    async Task DownloadFolderAsZip(Dictionary<string, string> row)
+    {
+        var folderName = row["폴더명"];
+        var srcDir = Path.Combine(Env.WebRootPath, "runs", folderName);
+
+        if (!Directory.Exists(srcDir))
+        {
+            await JS.InvokeVoidAsync("alert", $"폴더가 없습니다: {folderName}");
+            return;
+        }
+
+        try
+        {
+            isZipping = true;
+            zippingTarget = folderName;
+            StateHasChanged();
+
+            // ZIP 출력 폴더 준비 (wwwroot/_zips)
+            var zipsDir = Path.Combine(Env.WebRootPath, "_zips");
+            Directory.CreateDirectory(zipsDir);
+
+            // 오래된 ZIP 자동 정리(선택): 1일 지난 파일 삭제
+            try
+            {
+                foreach (var p in Directory.GetFiles(zipsDir, "*.zip"))
+                {
+                    if (File.GetCreationTime(p) < DateTime.Now.AddDays(-1))
+                        File.Delete(p);
+                }
+            }
+            catch { /* best-effort cleanup */ }
+
+            // 캐싱 회피를 위해 파일명에 타임스탬프 포함
+            var zipFileName = $"{folderName}_{DateTime.Now:yyyyMMdd_HHmmss}.zip";
+            var zipPath = Path.Combine(zipsDir, zipFileName);
+
+            if (System.IO.File.Exists(zipPath)) System.IO.File.Delete(zipPath);
+
+            // 폴더 전체를 ZIP으로 (상위 폴더는 포함하지 않음)
+            ZipFile.CreateFromDirectory(
+                sourceDirectoryName: srcDir,
+                destinationArchiveFileName: zipPath,
+                compressionLevel: CompressionLevel.Fastest,
+                includeBaseDirectory: false
+            );
+
+            // 정적 파일로 제공 → 새 탭에서 바로 다운로드 시작
+            var url = "/" + Path.Combine("_zips", zipFileName).Replace("\\", "/");
+            await JS.InvokeVoidAsync("open", url, "_blank");
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"ZIP 생성 실패: {ex.Message}");
+        }
+        finally
+        {
+            isZipping = false;
+            zippingTarget = null;
+            StateHasChanged();
+        }
+    }
+
 }
