@@ -174,14 +174,18 @@
                 }
                 else if (activeTab == "train-labels")
                 {
-                    @if (trainLabels?.Any() == true)
+                    if (trainLabels?.Any() == true)
                     {
                         <ul class="list-group list-group-flush file-list">
                             @foreach (var url in trainLabels)
                             {
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <span class="text-truncate" style="max-width: 80%;">@System.IO.Path.GetFileName(url)</span>
-                                    <a class="btn btn-sm btn-outline-primary" href="@url" target="_blank">열기</a>
+                                <li class="list-group-item d-flex justify-content-between align-items-center"
+                                    style="cursor:pointer"
+                                    title="클릭하여 미리보기"
+                                    @onclick="@(() => OpenTxtPreview(url))">
+                                    <span class="text-truncate" style="max-width: 100%;">
+                                        @System.IO.Path.GetFileName(System.Net.WebUtility.UrlDecode(url))
+                                    </span>
                                 </li>
                             }
                         </ul>
@@ -192,16 +196,22 @@
                         <div class="text-muted">No labels.</div>
                     }
                 }
+
+                @* valid-labels 탭도 동일하게 *@
                 else if (activeTab == "valid-labels")
                 {
-                    @if (validLabels?.Any() == true)
+                    if (validLabels?.Any() == true)
                     {
                         <ul class="list-group list-group-flush file-list">
                             @foreach (var url in validLabels)
                             {
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <span class="text-truncate" style="max-width: 80%;">@System.IO.Path.GetFileName(url)</span>
-                                    <a class="btn btn-sm btn-outline-primary" href="@url" target="_blank">열기</a>
+                                <li class="list-group-item d-flex justify-content-between align-items-center"
+                                    style="cursor:pointer"
+                                    title="클릭하여 미리보기"
+                                    @onclick="@(() => OpenTxtPreview(url))">
+                                    <span class="text-truncate" style="max-width: 100%;">
+                                        @System.IO.Path.GetFileName(System.Net.WebUtility.UrlDecode(url))
+                                    </span>
                                 </li>
                             }
                         </ul>
@@ -225,7 +235,9 @@
 @if (_lightboxVisible)
 {
     <div class="lightbox-backdrop" @onclick="CloseLightbox">
-        <img src="@_lightboxSrc" class="lightbox-image" />
+        <img src="@_lightboxSrc"
+             class="lightbox-image"
+             @onclick:stopPropagation @* 이미지 클릭은 닫히지 않게 *@ />
     </div>
 }
 
@@ -252,9 +264,7 @@
         overflow: auto;
     }
 
-    /* Bootstrap z-index 기준:
-         .modal-backdrop: 1050, .modal: 1055 (기본)
-         오버레이는 모달보다 "낮게" 둬야 가리지 않음 */
+    /* Bootstrap: .modal-backdrop 1050, .modal 1055 */
     .lightbox-backdrop {
         position: fixed;
         inset: 0;
@@ -262,7 +272,7 @@
         align-items: center;
         justify-content: center;
         background: rgba(0,0,0,.85);
-        z-index: 1050; /* 모달(1055)보다 낮게 */
+        z-index: 2000; /* 🚀 모달보다 위로 */
         cursor: zoom-out;
     }
 
@@ -271,9 +281,77 @@
         max-height: 95vh;
         object-fit: contain;
         border-radius: 6px;
+        cursor: default;
     }
 </style>
 
+
+@if (_txtPreviewVisible)
+{
+    <div class="topmodal-backdrop" @onclick="CloseTxtPreview">
+        <div class="topmodal-dialog" @onclick:stopPropagation>
+            <div class="topmodal-header">
+                <div class="fw-bold">@_txtPreviewTitle</div>
+                <button type="button" class="btn-close" aria-label="Close" @onclick="CloseTxtPreview"></button>
+            </div>
+            <div class="topmodal-body">
+                <pre class="topmodal-pre">@_txtPreviewContent</pre>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    /* 기존 모달(1055), 라이트박스(2000)보다 더 높게 */
+    .topmodal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2200; /* 제일 위 */
+    }
+
+    .topmodal-dialog {
+        width: min(900px, 95vw);
+        background: #fff;
+        border-radius: 10px;
+        box-shadow: 0 10px 30px rgba(0,0,0,.35);
+        display: flex;
+        flex-direction: column;
+        max-height: 85vh;
+    }
+
+    .topmodal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 14px;
+        border-bottom: 1px solid #eee;
+        position: sticky;
+        top: 0;
+        background: #fff;
+        z-index: 1;
+    }
+
+    .topmodal-body {
+        padding: 0;
+    }
+
+    .topmodal-pre {
+        margin: 0;
+        padding: 14px;
+        max-height: 80vh;
+        overflow: auto;
+        background: #f8f9fa;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+        font-size: .9rem;
+        line-height: 1.45;
+        white-space: pre-wrap; /* 길면 줄바꿈 */
+        word-break: break-all; /* 긴 토큰 강제 줄바꿈 */
+    }
+</style>
 
 
 
@@ -512,4 +590,60 @@
         // trainImages = validImages = trainLabels = validLabels = null;
     }
 
+
+    bool _txtPreviewVisible = false;
+    string? _txtPreviewTitle = null;
+    string? _txtPreviewContent = null;
+
+    async Task OpenTxtPreview(string webUrl)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(selectedExportFolder))
+                return;
+
+            var decodedUrl = System.Net.WebUtility.UrlDecode(webUrl);
+            var fileName = Path.GetFileName(decodedUrl);
+
+            var isTrain = decodedUrl.Contains("/train/labels/", StringComparison.OrdinalIgnoreCase);
+            var isValid = decodedUrl.Contains("/valid/labels/", StringComparison.OrdinalIgnoreCase);
+            if (!isTrain && !isValid) return;
+
+            var labelsDir = Path.Combine(
+                Env.WebRootPath, "exports", selectedExportFolder!,
+                isTrain ? "train" : "valid", "labels"
+            );
+            var absPath = Path.Combine(labelsDir, fileName);
+
+            if (!System.IO.File.Exists(absPath))
+            {
+                _txtPreviewTitle = fileName;
+                _txtPreviewContent = "(파일을 찾을 수 없습니다)";
+            }
+            else
+            {
+                using var fs = new FileStream(absPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var sr = new StreamReader(fs, detectEncodingFromByteOrderMarks: true);
+                _txtPreviewTitle = fileName;
+                _txtPreviewContent = await sr.ReadToEndAsync();
+            }
+
+            _txtPreviewVisible = true;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _txtPreviewTitle = "미리보기 오류";
+            _txtPreviewContent = ex.Message;
+            _txtPreviewVisible = true;
+            StateHasChanged();
+        }
+    }
+
+    void CloseTxtPreview()
+    {
+        _txtPreviewVisible = false;
+        _txtPreviewTitle = null;
+        _txtPreviewContent = null;
+    }
 }

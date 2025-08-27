@@ -421,41 +421,38 @@ else
 
         try
         {
+            // 상태 변경 & 즉시 렌더
             isZipping = true;
             zippingTarget = folderName;
-            StateHasChanged();
+            await InvokeAsync(StateHasChanged);
+            await Task.Yield();
 
-            // ZIP 출력 폴더 준비 (wwwroot/_zips)
             var zipsDir = Path.Combine(Env.WebRootPath, "_zips");
             Directory.CreateDirectory(zipsDir);
 
-            // 오래된 ZIP 자동 정리(선택): 1일 지난 파일 삭제
-            try
-            {
-                foreach (var p in Directory.GetFiles(zipsDir, "*.zip"))
-                {
-                    if (File.GetCreationTime(p) < DateTime.Now.AddDays(-1))
-                        File.Delete(p);
-                }
-            }
-            catch { /* best-effort cleanup */ }
-
-            // 캐싱 회피를 위해 파일명에 타임스탬프 포함
-            var zipFileName = $"{folderName}_{DateTime.Now:yyyyMMdd_HHmmss}.zip";
+            // ⬇️ 파일명 = 폴더명.zip (타임스탬프 제거)
+            var zipFileName = $"{folderName}.zip";
             var zipPath = Path.Combine(zipsDir, zipFileName);
 
-            if (System.IO.File.Exists(zipPath)) System.IO.File.Delete(zipPath);
+            // 기존 동일 이름 ZIP 있으면 삭제
+            if (System.IO.File.Exists(zipPath))
+                System.IO.File.Delete(zipPath);
 
-            // 폴더 전체를 ZIP으로 (상위 폴더는 포함하지 않음)
-            ZipFile.CreateFromDirectory(
-                sourceDirectoryName: srcDir,
-                destinationArchiveFileName: zipPath,
-                compressionLevel: CompressionLevel.Fastest,
-                includeBaseDirectory: false
-            );
+            // ZIP 생성 (백그라운드 스레드)
+            await Task.Run(() =>
+            {
+                ZipFile.CreateFromDirectory(
+                    sourceDirectoryName: srcDir,
+                    destinationArchiveFileName: zipPath,
+                    compressionLevel: CompressionLevel.Fastest,
+                    includeBaseDirectory: false
+                );
+            });
 
-            // 정적 파일로 제공 → 새 탭에서 바로 다운로드 시작
-            var url = "/" + Path.Combine("_zips", zipFileName).Replace("\\", "/");
+            // 캐시 무효화를 위해 쿼리스트링만 추가(파일명은 그대로)
+            var cacheBuster = DateTimeOffset.Now.ToUnixTimeSeconds();
+            var url = "/" + Path.Combine("_zips", zipFileName).Replace("\\", "/") + $"?t={cacheBuster}";
+
             await JS.InvokeVoidAsync("open", url, "_blank");
         }
         catch (Exception ex)
@@ -466,7 +463,7 @@ else
         {
             isZipping = false;
             zippingTarget = null;
-            StateHasChanged();
+            await InvokeAsync(StateHasChanged);
         }
     }
 
