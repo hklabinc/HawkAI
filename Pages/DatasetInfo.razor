@@ -97,41 +97,42 @@
             <div class="modal-body">
                 <ul class="nav nav-tabs mb-3">
                     <li class="nav-item">
-                        <a class="nav-link @(activeTab == "yaml" ? "active" : null)"
-                           href="#"
-                           @onclick="@(() => SwitchTab("yaml"))">
+                        <button type="button"
+                                class="nav-link @(activeTab == "yaml" ? "active" : null)"
+                                @onclick="@(() => SwitchTab("yaml"))">
                             data.yaml
-                        </a>
+                        </button>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @(activeTab == "train-images" ? "active" : null)"
-                           href="#"
-                           @onclick="@(() => SwitchTab("train-images"))">
+                        <button type="button"
+                                class="nav-link @(activeTab == "train-images" ? "active" : null)"
+                                @onclick="@(() => SwitchTab("train-images"))">
                             train/images (@(trainImages?.Count ?? 0))
-                        </a>
+                        </button>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @(activeTab == "train-labels" ? "active" : null)"
-                           href="#"
-                           @onclick="@(() => SwitchTab("train-labels"))">
+                        <button type="button"
+                                class="nav-link @(activeTab == "train-labels" ? "active" : null)"
+                                @onclick="@(() => SwitchTab("train-labels"))">
                             train/labels (@(trainLabels?.Count ?? 0))
-                        </a>
+                        </button>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @(activeTab == "valid-images" ? "active" : null)"
-                           href="#"
-                           @onclick="@(() => SwitchTab("valid-images"))">
+                        <button type="button"
+                                class="nav-link @(activeTab == "valid-images" ? "active" : null)"
+                                @onclick="@(() => SwitchTab("valid-images"))">
                             valid/images (@(validImages?.Count ?? 0))
-                        </a>
+                        </button>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link @(activeTab == "valid-labels" ? "active" : null)"
-                           href="#"
-                           @onclick="@(() => SwitchTab("valid-labels"))">
+                        <button type="button"
+                                class="nav-link @(activeTab == "valid-labels" ? "active" : null)"
+                                @onclick="@(() => SwitchTab("valid-labels"))">
                             valid/labels (@(validLabels?.Count ?? 0))
-                        </a>
+                        </button>
                     </li>
                 </ul>
+
 
                 @if (activeTab == "yaml")
                 {
