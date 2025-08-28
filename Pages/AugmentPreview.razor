@@ -12,139 +12,6 @@
 
 <h3>Augmentation Preview</h3>
 
-<div class="card mb-3">
-    <div class="card-body">
-        <!-- ✅ Fixed variants (여러 개 체크 시 첫 번째만 적용) -->
-        <div class="d-flex align-items-end gap-2 flex-wrap">
-            <div class="form-text mb-1 fw-semibold">Fixed variants</div>
-            <div class="form-check ms-2">
-                <input class="form-check-input" type="checkbox" @bind="AugCfg.Fixed.Original" id="fxOriginal" />
-                <label class="form-check-label" for="fxOriginal">Original</label>
-            </div>
-            <div class="form-check">
-                <input class="form-check-input" type="checkbox" @bind="AugCfg.Fixed.Rotate90" id="fxRot90" />
-                <label class="form-check-label" for="fxRot90">Rotate90</label>
-            </div>
-            <div class="form-check">
-                <input class="form-check-input" type="checkbox" @bind="AugCfg.Fixed.Rotate180" id="fxRot180" />
-                <label class="form-check-label" for="fxRot180">Rotate180</label>
-            </div>
-            <div class="form-check">
-                <input class="form-check-input" type="checkbox" @bind="AugCfg.Fixed.Rotate270" id="fxRot270" />
-                <label class="form-check-label" for="fxRot270">Rotate270</label>
-            </div>
-            <div class="form-check">
-                <input class="form-check-input" type="checkbox" @bind="AugCfg.Fixed.HFlip" id="fxHFlip" />
-                <label class="form-check-label" for="fxHFlip">HFlip</label>
-            </div>
-            <div class="form-check">
-                <input class="form-check-input" type="checkbox" @bind="AugCfg.Fixed.HFlipRotate90" id="fxHFlipRot90" />
-                <label class="form-check-label" for="fxHFlipRot90">HFlip+Rot90</label>
-            </div>
-            <div class="form-check">
-                <input class="form-check-input" type="checkbox" @bind="AugCfg.Fixed.HFlipRotate180" id="fxHFlipRot180" />
-                <label class="form-check-label" for="fxHFlipRot180">HFlip+Rot180</label>
-            </div>
-            <div class="form-check">
-                <input class="form-check-input" type="checkbox" @bind="AugCfg.Fixed.HFlipRotate270" id="fxHFlipRot270" />
-                <label class="form-check-label" for="fxHFlipRot270">HFlip+Rot270</label>
-            </div>
-        </div>
-
-        <div class="d-flex align-items-end gap-3 flex-wrap small">
-            <!-- ✅ 모든 옵션을 한 번에 표시 (초기값은 모두 미선택) -->
-            <div class="form-check me-2">
-                <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Rotate.Enabled" id="rndRotate" />
-                <label class="form-check-label fw-semibold" for="rndRotate">Rotate</label>
-            </div>
-            <div><div class="form-text mb-1">limit</div><input type="number" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Rotate.Limit" /></div>
-            <div><div class="form-text mb-1">p</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Rotate.P" /></div>
-
-            <div class="vr"></div>
-            <div class="form-check me-2">
-                <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Affine_Shear.Enabled" id="rndAffine" />
-                <label class="form-check-label fw-semibold" for="rndAffine">Affine Shear</label>
-            </div>
-            <div><div class="form-text mb-1">x min</div><input type="number" step="0.1" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Affine_Shear.XMin" /></div>
-            <div><div class="form-text mb-1">x max</div><input type="number" step="0.1" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Affine_Shear.XMax" /></div>
-            <div><div class="form-text mb-1">y min</div><input type="number" step="0.1" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Affine_Shear.YMin" /></div>
-            <div><div class="form-text mb-1">y max</div><input type="number" step="0.1" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Affine_Shear.YMax" /></div>
-            <div><div class="form-text mb-1">p</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Affine_Shear.P" /></div>
-
-            <div class="vr"></div>
-            <div class="form-check me-2">
-                <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Brightness_Contrast.Enabled" id="rndBC" />
-                <label class="form-check-label fw-semibold" for="rndBC">Bright/Contrast</label>
-            </div>
-            <div><div class="form-text mb-1">b min</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Brightness_Contrast.BrightnessMin" /></div>
-            <div><div class="form-text mb-1">b max</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Brightness_Contrast.BrightnessMax" /></div>
-            <div><div class="form-text mb-1">c min</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Brightness_Contrast.ContrastMin" /></div>
-            <div><div class="form-text mb-1">c max</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Brightness_Contrast.ContrastMax" /></div>
-            <div><div class="form-text mb-1">p</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Brightness_Contrast.P" /></div>
-
-            <div class="vr"></div>
-            <div class="form-check me-2">
-                <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Gamma.Enabled" id="rndGamma" />
-                <label class="form-check-label fw-semibold" for="rndGamma">Gamma</label>
-            </div>
-            <div><div class="form-text mb-1">min</div><input type="number" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Gamma.Min" /></div>
-            <div><div class="form-text mb-1">max</div><input type="number" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Gamma.Max" /></div>
-            <div><div class="form-text mb-1">p</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Gamma.P" /></div>
-
-            <div class="vr"></div>
-            <div class="form-check me-2">
-                <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Rgb_Shift.Enabled" id="rndRGB" />
-                <label class="form-check-label fw-semibold" for="rndRGB">RGBShift</label>
-            </div>
-            <div><div class="form-text mb-1">Rmin</div><input type="number" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Rgb_Shift.RMin" /></div>
-            <div><div class="form-text mb-1">Rmax</div><input type="number" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Rgb_Shift.RMax" /></div>
-            <div><div class="form-text mb-1">Gmin</div><input type="number" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Rgb_Shift.GMin" /></div>
-            <div><div class="form-text mb-1">Gmax</div><input type="number" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Rgb_Shift.GMax" /></div>
-            <div><div class="form-text mb-1">Bmin</div><input type="number" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Rgb_Shift.BMin" /></div>
-            <div><div class="form-text mb-1">Bmax</div><input type="number" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Rgb_Shift.BMax" /></div>
-            <div><div class="form-text mb-1">p</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Rgb_Shift.P" /></div>
-
-            <div class="vr"></div>
-            <div class="form-check me-2">
-                <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Gaussian_Blur.Enabled" id="rndBlur" />
-                <label class="form-check-label fw-semibold" for="rndBlur">GaussianBlur</label>
-            </div>
-            <div><div class="form-text mb-1">min</div><input type="number" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Gaussian_Blur.Min" /></div>
-            <div><div class="form-text mb-1">max</div><input type="number" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Gaussian_Blur.Max" /></div>
-            <div><div class="form-text mb-1">p</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Gaussian_Blur.P" /></div>
-
-            <div class="vr"></div>
-            <div class="form-check me-2">
-                <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Shift_Scale_Rotate.Enabled" id="rndSSR" />
-                <label class="form-check-label fw-semibold" for="rndSSR">ShiftScaleRotate</label>
-            </div>
-            <div><div class="form-text mb-1">shift</div><input type="number" step="0.01" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Shift_Scale_Rotate.ShiftLimit" /></div>
-            <div><div class="form-text mb-1">scale</div><input type="number" step="0.01" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Shift_Scale_Rotate.ScaleLimit" /></div>
-            <div><div class="form-text mb-1">rotate</div><input type="number" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Shift_Scale_Rotate.RotateLimit" /></div>
-            <div><div class="form-text mb-1">p</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Shift_Scale_Rotate.P" /></div>
-
-            <div class="vr"></div>
-            <div class="form-check me-2">
-                <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Hue_Saturation_Value.Enabled" id="rndHSV" />
-                <label class="form-check-label fw-semibold" for="rndHSV">HSV</label>
-            </div>
-            <div><div class="form-text mb-1">Hue</div><input type="number" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Hue_Saturation_Value.Hue" /></div>
-            <div><div class="form-text mb-1">Sat</div><input type="number" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Hue_Saturation_Value.Sat" /></div>
-            <div><div class="form-text mb-1">Val</div><input type="number" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Hue_Saturation_Value.Val" /></div>
-            <div><div class="form-text mb-1">p</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Hue_Saturation_Value.P" /></div>
-
-            <div class="vr"></div>
-            <div class="form-check me-2">
-                <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Gauss_Noise.Enabled" id="rndNoise" />
-                <label class="form-check-label fw-semibold" for="rndNoise">GaussNoise</label>
-            </div>
-            <div><div class="form-text mb-1">p</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:70px" @bind="AugCfg.Random.Gauss_Noise.P" /></div>
-
-            <button class="btn btn-primary ms-2" @onclick="RunPreview" :disabled="@IsBusy">Preview</button>
-        </div>
-    </div>
-</div>
-
 <style>
     .dropzone {
         height: 420px;
@@ -209,6 +76,200 @@
     </div>
 </div>
 
+<div class="card my-3">
+    <div class="card-body">
+
+        <!-- Fixed variants -->
+        <div class="d-flex align-items-end gap-2 flex-wrap">
+            <div class="form-text mb-1 fw-semibold">Fixed variants</div>
+            <div class="form-check ms-2">
+                <input class="form-check-input" type="checkbox" @bind="AugCfg.Fixed.Original" id="fxOriginal" />
+                <label class="form-check-label" for="fxOriginal">Original</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" @bind="AugCfg.Fixed.Rotate90" id="fxRot90" />
+                <label class="form-check-label" for="fxRot90">Rotate90</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" @bind="AugCfg.Fixed.Rotate180" id="fxRot180" />
+                <label class="form-check-label" for="fxRot180">Rotate180</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" @bind="AugCfg.Fixed.Rotate270" id="fxRot270" />
+                <label class="form-check-label" for="fxRot270">Rotate270</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" @bind="AugCfg.Fixed.HFlip" id="fxHFlip" />
+                <label class="form-check-label" for="fxHFlip">HFlip</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" @bind="AugCfg.Fixed.HFlipRotate90" id="fxHFlipRot90" />
+                <label class="form-check-label" for="fxHFlipRot90">HFlip+Rot90</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" @bind="AugCfg.Fixed.HFlipRotate180" id="fxHFlipRot180" />
+                <label class="form-check-label" for="fxHFlipRot180">HFlip+Rot180</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" @bind="AugCfg.Fixed.HFlipRotate270" id="fxHFlipRot270" />
+                <label class="form-check-label" for="fxHFlipRot270">HFlip+Rot270</label>
+            </div>
+        </div>
+
+        <!-- 구분선 -->
+        <hr class="my-3">
+
+        <!-- Random variants -->
+        <div class="form-text mb-2 fw-semibold">Random variants</div>
+
+        <div class="row g-3 small">
+
+            <!-- Rotate -->
+            <div class="col-12 col-lg-6">
+                <div class="border rounded p-2 h-100">
+                    <div class="d-flex align-items-end gap-2 flex-wrap">
+                        <div class="form-check m-0 me-2">
+                            <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Rotate.Enabled" id="rndRotate" />
+                            <label class="form-check-label ms-1" for="rndRotate">Rotate</label>
+                        </div>
+                        <div>
+                            <div class="form-text mb-1">limit</div>
+                            <input type="number" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Rotate.Limit" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Affine Shear -->
+            <div class="col-12 col-lg-6">
+                <div class="border rounded p-2 h-100">
+                    <div class="d-flex align-items-end gap-2 flex-wrap">
+                        <div class="form-check m-0 me-2">
+                            <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Affine_Shear.Enabled" id="rndAffine" />
+                            <label class="form-check-label ms-1" for="rndAffine">Affine Shear</label>
+                        </div>
+                        <div><div class="form-text mb-1">x min</div><input type="number" step="0.1" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Affine_Shear.XMin" /></div>
+                        <div><div class="form-text mb-1">x max</div><input type="number" step="0.1" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Affine_Shear.XMax" /></div>
+                        <div><div class="form-text mb-1">y min</div><input type="number" step="0.1" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Affine_Shear.YMin" /></div>
+                        <div><div class="form-text mb-1">y max</div><input type="number" step="0.1" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Affine_Shear.YMax" /></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Brightness / Contrast -->
+            <div class="col-12 col-lg-6">
+                <div class="border rounded p-2 h-100">
+                    <div class="d-flex align-items-end gap-2 flex-wrap">
+                        <div class="form-check m-0 me-2">
+                            <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Brightness_Contrast.Enabled" id="rndBC" />
+                            <label class="form-check-label ms-1" for="rndBC">Brightness / Contrast</label>
+                        </div>
+                        <div><div class="form-text mb-1">b min</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Brightness_Contrast.BrightnessMin" /></div>
+                        <div><div class="form-text mb-1">b max</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Brightness_Contrast.BrightnessMax" /></div>
+                        <div><div class="form-text mb-1">c min</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Brightness_Contrast.ContrastMin" /></div>
+                        <div><div class="form-text mb-1">c max</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Brightness_Contrast.ContrastMax" /></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gamma -->
+            <div class="col-12 col-lg-6">
+                <div class="border rounded p-2 h-100">
+                    <div class="d-flex align-items-end gap-2 flex-wrap">
+                        <div class="form-check m-0 me-2">
+                            <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Gamma.Enabled" id="rndGamma" />
+                            <label class="form-check-label ms-1" for="rndGamma">Gamma</label>
+                        </div>
+                        <div><div class="form-text mb-1">min</div><input type="number" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Gamma.Min" /></div>
+                        <div><div class="form-text mb-1">max</div><input type="number" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Gamma.Max" /></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RGB Shift -->
+            <div class="col-12 col-lg-6">
+                <div class="border rounded p-2 h-100">
+                    <div class="d-flex align-items-end gap-2 flex-wrap">
+                        <div class="form-check m-0 me-2">
+                            <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Rgb_Shift.Enabled" id="rndRGB" />
+                            <label class="form-check-label ms-1" for="rndRGB">RGB Shift</label>
+                        </div>
+                        <div><div class="form-text mb-1">Rmin</div><input type="number" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Rgb_Shift.RMin" /></div>
+                        <div><div class="form-text mb-1">Rmax</div><input type="number" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Rgb_Shift.RMax" /></div>
+                        <div><div class="form-text mb-1">Gmin</div><input type="number" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Rgb_Shift.GMin" /></div>
+                        <div><div class="form-text mb-1">Gmax</div><input type="number" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Rgb_Shift.GMax" /></div>
+                        <div><div class="form-text mb-1">Bmin</div><input type="number" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Rgb_Shift.BMin" /></div>
+                        <div><div class="form-text mb-1">Bmax</div><input type="number" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Rgb_Shift.BMax" /></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gaussian Blur -->
+            <div class="col-12 col-lg-6">
+                <div class="border rounded p-2 h-100">
+                    <div class="d-flex align-items-end gap-2 flex-wrap">
+                        <div class="form-check m-0 me-2">
+                            <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Gaussian_Blur.Enabled" id="rndBlur" />
+                            <label class="form-check-label ms-1" for="rndBlur">Gaussian Blur</label>
+                        </div>
+                        <div><div class="form-text mb-1">min</div><input type="number" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Gaussian_Blur.Min" /></div>
+                        <div><div class="form-text mb-1">max</div><input type="number" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Gaussian_Blur.Max" /></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Shift / Scale / Rotate -->
+            <div class="col-12 col-lg-6">
+                <div class="border rounded p-2 h-100">
+                    <div class="d-flex align-items-end gap-2 flex-wrap">
+                        <div class="form-check m-0 me-2">
+                            <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Shift_Scale_Rotate.Enabled" id="rndSSR" />
+                            <label class="form-check-label ms-1" for="rndSSR">Shift / Scale / Rotate</label>
+                        </div>
+                        <div><div class="form-text mb-1">shift</div><input type="number" step="0.01" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Shift_Scale_Rotate.ShiftLimit" /></div>
+                        <div><div class="form-text mb-1">scale</div><input type="number" step="0.01" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Shift_Scale_Rotate.ScaleLimit" /></div>
+                        <div><div class="form-text mb-1">rotate</div><input type="number" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Shift_Scale_Rotate.RotateLimit" /></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- HSV -->
+            <div class="col-12 col-lg-6">
+                <div class="border rounded p-2 h-100">
+                    <div class="d-flex align-items-end gap-2 flex-wrap">
+                        <div class="form-check m-0 me-2">
+                            <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Hue_Saturation_Value.Enabled" id="rndHSV" />
+                            <label class="form-check-label ms-1" for="rndHSV">HSV</label>
+                        </div>
+                        <div><div class="form-text mb-1">Hue</div><input type="number" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Hue_Saturation_Value.Hue" /></div>
+                        <div><div class="form-text mb-1">Sat</div><input type="number" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Hue_Saturation_Value.Sat" /></div>
+                        <div><div class="form-text mb-1">Val</div><input type="number" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Hue_Saturation_Value.Val" /></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gauss Noise -->
+            <div class="col-12 col-lg-6">
+                <div class="border rounded p-2 h-100">
+                    <div class="d-flex align-items-end gap-2 flex-wrap">
+                        <div class="form-check m-0 me-2">
+                            <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Gauss_Noise.Enabled" id="rndNoise" />
+                            <label class="form-check-label ms-1" for="rndNoise">Gauss Noise</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-center my-3">
+    <button class="btn btn-primary btn-lg px-5" @onclick="RunPreview" disabled="@IsBusy">
+        Preview
+    </button>
+</div>
+
+
 @code {
     private bool IsBusy = false;
     private InputFile? fileInput;
@@ -224,15 +285,15 @@
         Fixed = new() { Original = false, Rotate90 = false, Rotate180 = false, Rotate270 = false, HFlip = false, HFlipRotate90 = false, HFlipRotate180 = false, HFlipRotate270 = false },
         Random = new()
         {
-            Rotate = new() { Enabled = false, Limit = 10, P = 0.5 },
-            Affine_Shear = new() { Enabled = false, XMin = -0.1, XMax = 0.1, YMin = -0.1, YMax = 0.1, P = 0.5 },
-            Brightness_Contrast = new() { Enabled = false, BrightnessMin = -0.1, BrightnessMax = 0.1, ContrastMin = -0.1, ContrastMax = 0.1, P = 0.5 },
-            Gamma = new() { Enabled = false, Min = 90, Max = 110, P = 0.5 },
-            Rgb_Shift = new() { Enabled = false, RMin = -10, RMax = 10, GMin = -10, GMax = 10, BMin = -10, BMax = 10, P = 0.5 },
-            Gaussian_Blur = new() { Enabled = false, Min = 3, Max = 5, P = 0.5 },
-            Shift_Scale_Rotate = new() { Enabled = false, ShiftLimit = 0.01, ScaleLimit = 0.01, RotateLimit = 5, BorderMode = 0, P = 0.5 },
-            Hue_Saturation_Value = new() { Enabled = false, Hue = 0, Sat = 0, Val = 0, P = 0.5 },
-            Gauss_Noise = new() { Enabled = false, P = 0.5 }
+            Rotate = new() { Enabled = false, Limit = 15, P = 0.3 },
+            Affine_Shear = new() { Enabled = false, XMin = -1, XMax = 1, YMin = -1, YMax = 1, P = 0.3 },
+            Brightness_Contrast = new() { Enabled = false, BrightnessMin = 0.0, BrightnessMax = 0.1, ContrastMin = 0.0, ContrastMax = 0.1, P = 0.3 },
+            Gamma = new() { Enabled = false, Min = 70, Max = 130, P = 0.5 },
+            Rgb_Shift = new() { Enabled = false, RMin = -5, RMax = 5, GMin = -5, GMax = 5, BMin = -5, BMax = 5, P = 0.3 },
+            Gaussian_Blur = new() { Enabled = false, Min = 2, Max = 4, P = 0.3 },
+            Shift_Scale_Rotate = new() { Enabled = false, ShiftLimit = 0.3, ScaleLimit = 0.0, RotateLimit = 15, BorderMode = 1, P = 0.3 },
+            Hue_Saturation_Value = new() { Enabled = false, Hue = 15, Sat = 25, Val = 10, P = 0.3 },
+            Gauss_Noise = new() { Enabled = false, P = 0.3 }
         }
     };
 
@@ -260,16 +321,16 @@
             var tmpDir = Path.Combine(Env.WebRootPath, "tmp", "preview");
             Directory.CreateDirectory(tmpDir);
 
-            var guid = Guid.NewGuid().ToString("N");
-            var inPath = Path.Combine(tmpDir, $"in_{guid}.jpg");
-            var outPath = Path.Combine(tmpDir, $"out_{guid}.jpg");
-            var cfgPath = Path.Combine(tmpDir, $"cfg_{guid}.json");
+                  // 항상 같은 파일명으로 저장 (덮어쓰기)
+            var inPath = Path.Combine(tmpDir, "in.jpg");
+            var outPath = Path.Combine(tmpDir, "out.jpg");
+            var cfgPath = Path.Combine(tmpDir, "cfg.json");
 
             using (var s = SelectedFile.OpenReadStream(50 * 1024 * 1024))
             using (var fs = File.Create(inPath))
                 await s.CopyToAsync(fs);
 
-            // ✅ fixed + random 모두 JSON에 담아 둠(스크립트가 참조 가능)
+                // ✅ fixed + random 모두 JSON에 담아 둠(스크립트가 참조 가능)
             var cfgObj = new Dictionary<string, object?>
             {
                 ["fixed"] = new Dictionary<string, bool>
@@ -285,17 +346,19 @@
                 },
                 ["random"] = new Dictionary<string, object?>
                 {
-                    ["rotate"] = new Dictionary<string, object?> { ["enabled"] = AugCfg.Random.Rotate.Enabled, ["limit"] = AugCfg.Random.Rotate.Limit, ["p"] = AugCfg.Random.Rotate.P },
-                    ["affine_shear"] = new Dictionary<string, object?> { ["enabled"] = AugCfg.Random.Affine_Shear.Enabled, ["x_min"] = AugCfg.Random.Affine_Shear.XMin, ["x_max"] = AugCfg.Random.Affine_Shear.XMax, ["y_min"] = AugCfg.Random.Affine_Shear.YMin, ["y_max"] = AugCfg.Random.Affine_Shear.YMax, ["p"] = AugCfg.Random.Affine_Shear.P },
-                    ["brightness_contrast"] = new Dictionary<string, object?> { ["enabled"] = AugCfg.Random.Brightness_Contrast.Enabled, ["brightness_min"] = AugCfg.Random.Brightness_Contrast.BrightnessMin, ["brightness_max"] = AugCfg.Random.Brightness_Contrast.BrightnessMax, ["contrast_min"] = AugCfg.Random.Brightness_Contrast.ContrastMin, ["contrast_max"] = AugCfg.Random.Brightness_Contrast.ContrastMax, ["p"] = AugCfg.Random.Brightness_Contrast.P },
-                    ["gamma"] = new Dictionary<string, object?> { ["enabled"] = AugCfg.Random.Gamma.Enabled, ["min"] = AugCfg.Random.Gamma.Min, ["max"] = AugCfg.Random.Gamma.Max, ["p"] = AugCfg.Random.Gamma.P },
-                    ["rgb_shift"] = new Dictionary<string, object?> { ["enabled"] = AugCfg.Random.Rgb_Shift.Enabled, ["r_min"] = AugCfg.Random.Rgb_Shift.RMin, ["r_max"] = AugCfg.Random.Rgb_Shift.RMax, ["g_min"] = AugCfg.Random.Rgb_Shift.GMin, ["g_max"] = AugCfg.Random.Rgb_Shift.GMax, ["b_min"] = AugCfg.Random.Rgb_Shift.BMin, ["b_max"] = AugCfg.Random.Rgb_Shift.BMax, ["p"] = AugCfg.Random.Rgb_Shift.P },
-                    ["gaussian_blur"] = new Dictionary<string, object?> { ["enabled"] = AugCfg.Random.Gaussian_Blur.Enabled, ["min"] = AugCfg.Random.Gaussian_Blur.Min, ["max"] = AugCfg.Random.Gaussian_Blur.Max, ["p"] = AugCfg.Random.Gaussian_Blur.P },
-                    ["shift_scale_rotate"] = new Dictionary<string, object?> { ["enabled"] = AugCfg.Random.Shift_Scale_Rotate.Enabled, ["shift_limit"] = AugCfg.Random.Shift_Scale_Rotate.ShiftLimit, ["scale_limit"] = AugCfg.Random.Shift_Scale_Rotate.ScaleLimit, ["rotate_limit"] = AugCfg.Random.Shift_Scale_Rotate.RotateLimit, ["border_mode"] = AugCfg.Random.Shift_Scale_Rotate.BorderMode, ["p"] = AugCfg.Random.Shift_Scale_Rotate.P },
-                    ["hue_saturation_value"] = new Dictionary<string, object?> { ["enabled"] = AugCfg.Random.Hue_Saturation_Value.Enabled, ["hue"] = AugCfg.Random.Hue_Saturation_Value.Hue, ["sat"] = AugCfg.Random.Hue_Saturation_Value.Sat, ["val"] = AugCfg.Random.Hue_Saturation_Value.Val, ["p"] = AugCfg.Random.Hue_Saturation_Value.P },
-                    ["gauss_noise"] = new Dictionary<string, object?> { ["enabled"] = AugCfg.Random.Gauss_Noise.Enabled, ["p"] = AugCfg.Random.Gauss_Noise.P },
+                    ["rotate"] = new Dictionary<string, object?> { ["enabled"] = AugCfg.Random.Rotate.Enabled, ["limit"] = AugCfg.Random.Rotate.Limit },
+                    ["affine_shear"] = new Dictionary<string, object?> { ["enabled"] = AugCfg.Random.Affine_Shear.Enabled, ["x_min"] = AugCfg.Random.Affine_Shear.XMin, ["x_max"] = AugCfg.Random.Affine_Shear.XMax, ["y_min"] = AugCfg.Random.Affine_Shear.YMin, ["y_max"] = AugCfg.Random.Affine_Shear.YMax },
+                    ["brightness_contrast"] = new Dictionary<string, object?> { ["enabled"] = AugCfg.Random.Brightness_Contrast.Enabled, ["brightness_min"] = AugCfg.Random.Brightness_Contrast.BrightnessMin, ["brightness_max"] = AugCfg.Random.Brightness_Contrast.BrightnessMax, ["contrast_min"] = AugCfg.Random.Brightness_Contrast.ContrastMin, ["contrast_max"] = AugCfg.Random.Brightness_Contrast.ContrastMax },
+                    ["gamma"] = new Dictionary<string, object?> { ["enabled"] = AugCfg.Random.Gamma.Enabled, ["min"] = AugCfg.Random.Gamma.Min, ["max"] = AugCfg.Random.Gamma.Max },
+                    ["rgb_shift"] = new Dictionary<string, object?> { ["enabled"] = AugCfg.Random.Rgb_Shift.Enabled, ["r_min"] = AugCfg.Random.Rgb_Shift.RMin, ["r_max"] = AugCfg.Random.Rgb_Shift.RMax, ["g_min"] = AugCfg.Random.Rgb_Shift.GMin, ["g_max"] = AugCfg.Random.Rgb_Shift.GMax, ["b_min"] = AugCfg.Random.Rgb_Shift.BMin, ["b_max"] = AugCfg.Random.Rgb_Shift.BMax },
+                    ["gaussian_blur"] = new Dictionary<string, object?> { ["enabled"] = AugCfg.Random.Gaussian_Blur.Enabled, ["min"] = AugCfg.Random.Gaussian_Blur.Min, ["max"] = AugCfg.Random.Gaussian_Blur.Max },
+                    ["shift_scale_rotate"] = new Dictionary<string, object?> { ["enabled"] = AugCfg.Random.Shift_Scale_Rotate.Enabled, ["shift_limit"] = AugCfg.Random.Shift_Scale_Rotate.ShiftLimit, ["scale_limit"] = AugCfg.Random.Shift_Scale_Rotate.ScaleLimit, ["rotate_limit"] = AugCfg.Random.Shift_Scale_Rotate.RotateLimit, ["border_mode"] = AugCfg.Random.Shift_Scale_Rotate.BorderMode },
+                    ["hue_saturation_value"] = new Dictionary<string, object?> { ["enabled"] = AugCfg.Random.Hue_Saturation_Value.Enabled, ["hue"] = AugCfg.Random.Hue_Saturation_Value.Hue, ["sat"] = AugCfg.Random.Hue_Saturation_Value.Sat, ["val"] = AugCfg.Random.Hue_Saturation_Value.Val },
+                    ["gauss_noise"] = new Dictionary<string, object?> { ["enabled"] = AugCfg.Random.Gauss_Noise.Enabled }
                 }
             };
+            await File.WriteAllTextAsync(cfgPath, JsonSerializer.Serialize(cfgObj));
+
 
             await File.WriteAllTextAsync(cfgPath, JsonSerializer.Serialize(cfgObj));
 
@@ -307,22 +370,6 @@
                 await JS.InvokeVoidAsync("alert", $"파이썬 스크립트를 찾을 수 없습니다.\n{scriptPath}");
                 return;
             }
-
-            // ✅ Fixed 우선 적용: 여러 개 체크 시 첫 번째만 사용(우선순위)
-            string? fixedName = null;
-            string[] order = new[]
-            {
-            "original","rotate90","rotate180","rotate270",
-            "hflip","hflip_rotate90","hflip_rotate180","hflip_rotate270"
-        };
-            if (AugCfg.Fixed.Original) fixedName = "original";
-            else if (AugCfg.Fixed.Rotate90) fixedName = "rotate90";
-            else if (AugCfg.Fixed.Rotate180) fixedName = "rotate180";
-            else if (AugCfg.Fixed.Rotate270) fixedName = "rotate270";
-            else if (AugCfg.Fixed.HFlip) fixedName = "hflip";
-            else if (AugCfg.Fixed.HFlipRotate90) fixedName = "hflip_rotate90";
-            else if (AugCfg.Fixed.HFlipRotate180) fixedName = "hflip_rotate180";
-            else if (AugCfg.Fixed.HFlipRotate270) fixedName = "hflip_rotate270";
 
             using var proc = new Process();
             proc.StartInfo.FileName = pythonExe;
@@ -353,7 +400,7 @@
                 return;
             }
 
-            AugImageUrl = $"/tmp/preview/{Path.GetFileName(outPath)}?t={DateTimeOffset.Now.ToUnixTimeMilliseconds()}";
+            AugImageUrl = $"/tmp/preview/out.jpg?t={DateTimeOffset.Now.ToUnixTimeMilliseconds()}";
         }
         finally
         {
