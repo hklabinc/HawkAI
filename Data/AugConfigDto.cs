@@ -18,9 +18,9 @@
     public class RandomGamma { public bool Enabled { get; set; } = true; public int Min { get; set; } = 70; public int Max { get; set; } = 130; public double P { get; set; } = 0.3; }
     public class RandomRgbShift { public bool Enabled { get; set; } = false; public int RMin { get; set; } = -5; public int RMax { get; set; } = 5; public int GMin { get; set; } = -5; public int GMax { get; set; } = 5; public int BMin { get; set; } = -5; public int BMax { get; set; } = 5; public double P { get; set; } = 0.3; }
     public class RandomGaussianBlur { public bool Enabled { get; set; } = false; public int Min { get; set; } = 2; public int Max { get; set; } = 4; public double P { get; set; } = 0.3; }
-    public class RandomShiftScaleRotate { public bool Enabled { get; set; } = false; public double ShiftLimit { get; set; } = 0.30; public double ScaleLimit { get; set; } = 0.0; public int RotateLimit { get; set; } = 15; public int BorderMode { get; set; } = 1; public double P { get; set; } = 0.5; }
-    public class RandomHSV { public bool Enabled { get; set; } = false; public int Hue { get; set; } = 15; public int Sat { get; set; } = 25; public int Val { get; set; } = 10; public double P { get; set; } = 0.4; }
-    public class RandomGaussNoise { public bool Enabled { get; set; } = false; public double P { get; set; } = 0.1; }
+    public class RandomShiftScaleRotate { public bool Enabled { get; set; } = false; public double ShiftLimit { get; set; } = 0.30; public double ScaleLimit { get; set; } = 0.0; public int RotateLimit { get; set; } = 15; public int BorderMode { get; set; } = 1; public double P { get; set; } = 0.3; }
+    public class RandomHSV { public bool Enabled { get; set; } = false; public int Hue { get; set; } = 15; public int Sat { get; set; } = 25; public int Val { get; set; } = 10; public double P { get; set; } = 0.3; }
+    public class RandomGaussNoise { public bool Enabled { get; set; } = false; public double P { get; set; } = 0.3; }
 
 
     public class RandomAugConfig
