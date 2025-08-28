@@ -2063,7 +2063,7 @@ else
         {
             { "project_name", selectedProject.Name },
             { "base_dir", exportDir },
-            { "export_zip", $"{exportDir}.zip" },        // ✅ zip 파일 경로 또는 URL
+            { "export_zip", $"https://hawkai.hknu.ac.kr/exports/{exportFolderName}.zip" },  // ✅ URL 전달
             { "model_size", trainModelSize },
             { "epochs", trainEpochs },
             { "batch", trainBatch }
