@@ -24,19 +24,23 @@
                     <span>@(exportSortAscending ? "▲" : "▼")</span>
                 }
             </th>
-            <th @onclick="() => SortExportBy(nameof(ExportRow.AugMultiplier))">
-                Aug Multiplier
-                @if (exportSortColumn == nameof(ExportRow.AugMultiplier))
-                {
-                    <span>@(exportSortAscending ? "▲" : "▼")</span>
-                }
+            <th @onclick="() => SortExportBy(nameof(ExportRow.ImageWidth))">
+                Size (W×H)
             </th>
-            <th @onclick="() => SortExportBy(nameof(ExportRow.AugmentSeed))">
-                Aug Seed
-                @if (exportSortColumn == nameof(ExportRow.AugmentSeed))
-                {
-                    <span>@(exportSortAscending ? "▲" : "▼")</span>
-                }
+            <th @onclick="() => SortExportBy(nameof(ExportRow.Nc))">
+                nc
+            </th>
+            <th @onclick="() => SortExportBy(nameof(ExportRow.ValidRatio))">
+                valid_ratio
+            </th>
+            <th @onclick="() => SortExportBy(nameof(ExportRow.N1))">
+                n1
+            </th>
+            <th @onclick="() => SortExportBy(nameof(ExportRow.N2))">
+                n2
+            </th>
+            <th @onclick="() => SortExportBy(nameof(ExportRow.Seed))">
+                seed
             </th>
             <th @onclick="() => SortExportBy(nameof(ExportRow.TrainCount))">
                 Train Count
@@ -63,8 +67,12 @@
                 <td>@(i + 1)</td>
                 <td>@row.ModelName</td>
                 <td>@row.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</td>
-                <td>@(row.AugMultiplier?.ToString() ?? "")</td>
-                <td>@(row.AugmentSeed?.ToString() ?? "")</td>
+                <td>@($"{row.ImageWidth}×{row.ImageHeight}")</td>
+                <td>@row.Nc</td>
+                <td>@(row.ValidRatio?.ToString("0.##") ?? "")</td>
+                <td>@(row.N1?.ToString() ?? "")</td>
+                <td>@(row.N2?.ToString() ?? "")</td>
+                <td>@(row.Seed?.ToString() ?? "")</td>
                 <td>@row.TrainCount</td>
                 <td>@row.ValidCount</td>
                 <td>
@@ -373,11 +381,16 @@
     {
         public string ModelName { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
-        public int? AugMultiplier { get; set; }
-        public int? AugmentSeed { get; set; }
         public int TrainCount { get; set; }
         public int ValidCount { get; set; }
-        public string FolderName { get; set; } = string.Empty;        
+        public string FolderName { get; set; } = string.Empty;
+        public int ImageWidth { get; set; }
+        public int ImageHeight { get; set; }
+        public int Nc { get; set; }
+        public double? ValidRatio { get; set; }
+        public int? N1 { get; set; }
+        public int? N2 { get; set; }
+        public int? Seed { get; set; }
     }
 
     List<ExportRow> exportInfos = new();
@@ -426,7 +439,7 @@
 
             var modelName = string.Join('_', parts[..^2]);
 
-            // ✅ Admin이 아니면 사용자 프로젝트 prefix와 일치하는지 검사
+            // Admin 아닌 경우 필터링
             if (!isAdmin && !userProjectNames.Any(p => modelName.Equals(p, StringComparison.OrdinalIgnoreCase)))
                 continue;
 
@@ -434,30 +447,51 @@
             if (!File.Exists(yaml)) continue;
 
             int train = 0, valid = 0;
-            int? augMultiplier = null, augmentSeed = null;
+            int imageWidth = 0, imageHeight = 0, nc = 0;
+            double? validRatio = null;
+            int? n1 = null, n2 = null, seed = null;
 
             var lines = File.ReadAllLines(yaml);
             foreach (var line in lines)
             {
-                if (line.Contains("trainCount"))
-                    train = int.Parse(line.Split(':')[1].Trim());
-                if (line.Contains("validCount"))
-                    valid = int.Parse(line.Split(':')[1].Trim());
-                if (line.Contains("augMultiplier"))
-                    augMultiplier = int.Parse(line.Split(':')[1].Trim());
-                if (line.Contains("augmentSeed"))
-                    augmentSeed = int.Parse(line.Split(':')[1].Trim());
+                var trimmed = line.Trim();
+
+                if (trimmed.StartsWith("trainCount"))
+                    train = int.Parse(trimmed.Split(':')[1].Trim());
+                if (trimmed.StartsWith("validCount"))
+                    valid = int.Parse(trimmed.Split(':')[1].Trim());
+
+                if (trimmed.StartsWith("image_width"))
+                    imageWidth = int.Parse(trimmed.Split(':')[1].Trim());
+                if (trimmed.StartsWith("image_height"))
+                    imageHeight = int.Parse(trimmed.Split(':')[1].Trim());
+                if (trimmed.StartsWith("nc"))
+                    nc = int.Parse(trimmed.Split(':')[1].Trim());
+
+                if (trimmed.StartsWith("valid_ratio"))
+                    validRatio = double.Parse(trimmed.Split(':')[1].Trim(), CultureInfo.InvariantCulture);
+                if (trimmed.StartsWith("n1"))
+                    n1 = int.Parse(trimmed.Split(':')[1].Trim());
+                if (trimmed.StartsWith("n2"))
+                    n2 = int.Parse(trimmed.Split(':')[1].Trim());
+                if (trimmed.StartsWith("seed"))
+                    seed = int.Parse(trimmed.Split(':')[1].Trim());
             }
 
             exportInfos.Add(new ExportRow
             {
                 ModelName = modelName,
                 CreatedAt = Directory.GetCreationTime(folder),
-                AugMultiplier = augMultiplier,
-                AugmentSeed = augmentSeed,
                 TrainCount = train,
                 ValidCount = valid,
-                FolderName = folderName
+                FolderName = folderName,
+                ImageWidth = imageWidth,
+                ImageHeight = imageHeight,
+                Nc = nc,
+                ValidRatio = validRatio,
+                N1 = n1,
+                N2 = n2,
+                Seed = seed
             });
         }
     }

@@ -1,11 +1,10 @@
-﻿@page "/projects"
+﻿@page "/projects-Copy"
 @inject HawkAI.Data.ProjectService.IProjectService ProjectService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IWebHostEnvironment Env
 @inject DataDbContext Db
 @inject IJSRuntime JS
 @implements IAsyncDisposable
-@using HawkAI.Data
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.AspNetCore.SignalR.Client;
 @using System.Text.Json
@@ -292,7 +291,7 @@ else
 @if (showExportModal)
 {
     <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header bg-dark text-white">
                     <h5 class="modal-title">Export and Augmentation - @selectedProject?.Name</h5>
@@ -316,251 +315,57 @@ else
                             <img src="/img/loading.gif" alt="Loading..." style="height: 60px;" />
                         </div>
                     }
+
                     @* ✅ 실제 입력 폼 내용 (로딩 시 반투명 처리) *@
                     <div style="position: relative; z-index: 1; opacity:@(isExporting ? "0.5" : "1")">
 
-                        <!-- 기본 옵션 -->
                         <div class="mb-3">
                             <label class="form-label">Image Size</label>
                             <select class="form-select" @bind="selectedImageSize" disabled="@isExporting">
                                 <option value="0">Original Size</option>
                                 <option value="640">640 x 640</option>
                                 <option value="512">512 x 512</option>
+                                <option value="416">416 x 416</option>
+                                <option value="320">320 x 320</option>
                             </select>
                         </div>
 
-                        <div class="d-flex gap-4 flex-wrap align-items-end mb-3">
-                            <div>
-                                <div class="form-text mb-1">Validation Ratio</div>
-                                <input type="number" class="form-control form-control-sm" style="max-width:90px"
-                                       min="0" max="1" step="0.05" @bind="AugCfg.Valid_Ratio" disabled="@isExporting" />
-                            </div>
-                            <div>
-                                <div class="form-text mb-1">n1 (Fixed)</div>
-                                <input type="number" class="form-control form-control-sm" style="max-width:90px"
-                                       min="0" max="20" @bind="AugCfg.N1" disabled="@isExporting" />
-                            </div>
-                            <div>
-                                <div class="form-text mb-1">n2 (Random)</div>
-                                <input type="number" class="form-control form-control-sm" style="max-width:90px"
-                                       min="0" max="100" @bind="AugCfg.N2" disabled="@isExporting" />
-                            </div>
-                            <div>
-                                <div class="form-text mb-1">Seed</div>
-                                <input type="number" class="form-control form-control-sm" style="max-width:90px"
-                                       @bind="AugCfg.Seed" disabled="@isExporting" />
-                            </div>
-                            <div class="form-check ms-auto">
-                                <input class="form-check-input" type="checkbox" id="autoDownload" @bind="enableAutoDownload" disabled="@isExporting" />
-                                <label class="form-check-label" for="autoDownload">Download ZIP</label>
-                            </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="exportSeg" @bind="exportAsSegmentation" />
-                                <label class="form-check-label" for="exportSeg">Segment Label</label>
-                            </div>
+                        <div class="mb-3">
+                            <label class="form-label">Validation Ratio: @($"{validRatioInt}%")</label>
+                            <input type="range" class="form-range" min="10" max="50" step="5" @bind="validRatioInt" disabled="@isExporting" />
                         </div>
 
-                        <!-- Fixed Augmentations -->
-                        <div class="card mb-3">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <strong>Fixed Augmentations</strong>
-                                <span class="badge bg-secondary">
-                                    @($"N_img({N_img}) * N_check({N_check}) * n1({AugCfg.N1}) = {TotalFixedAug}")
-                                </span>
-                            </div>
-                            <div class="card-body">
-                                <div class="row g-2 small">
-                                    <div class="col-6 col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" @bind="AugCfg.Fixed.Original" id="fxOriginal" />
-                                            <label class="form-check-label" for="fxOriginal">Original</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-6 col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" @bind="AugCfg.Fixed.Rotate90" id="fxRot90" />
-                                            <label class="form-check-label" for="fxRot90">Rot90</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-6 col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" @bind="AugCfg.Fixed.Rotate180" id="fxRot180" />
-                                            <label class="form-check-label" for="fxRot180">Rot180</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-6 col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" @bind="AugCfg.Fixed.Rotate270" id="fxRot270" />
-                                            <label class="form-check-label" for="fxRot270">Rot270</label>
-                                        </div>
-                                    </div>
-
-                                    <div class="col-6 col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" @bind="AugCfg.Fixed.HFlip" id="fxHFlip" />
-                                            <label class="form-check-label" for="fxHFlip">HFlip</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-6 col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" @bind="AugCfg.Fixed.HFlipRotate90" id="fxHFlipRot90" />
-                                            <label class="form-check-label" for="fxHFlipRot90">HFlip+Rot90</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-6 col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" @bind="AugCfg.Fixed.HFlipRotate180" id="fxHFlipRot180" />
-                                            <label class="form-check-label" for="fxHFlipRot180">HFlip+Rot180</label>
-                                        </div>
-                                    </div>
-                                    <div class="col-6 col-md-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" @bind="AugCfg.Fixed.HFlipRotate270" id="fxHFlipRot270" />
-                                            <label class="form-check-label" for="fxHFlipRot270">HFlip+Rot270</label>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="mb-3">
+                            <label class="form-label">
+                                Augmentation Multiplier
+                                @if (selectedProject?.ImageCount > 0)
+                                {
+                                    <span class="text-muted">(recommended ≥ @recommendedAugMultiplier, max = @MaxAugMultiplier)</span>
+                                }
+                            </label>
+                            <input type="number" class="form-control" @bind="augMultiplier" min="1" max="@MaxAugMultiplier" disabled="@isExporting" />
                         </div>
 
-                        <!-- Random Augmentations (Core) -->
-                        <div class="card mb-3">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <strong>Random Augmentations</strong>
-                                <span class="badge bg-secondary">
-                                    train = floor(@TotalFixedAug × (1 - @AugCfg.Valid_Ratio)) × (@AugCfg.N2 + 1) = @TrainCount
-                                </span>
-                                <span class="badge bg-secondary ms-2">
-                                    valid = ceil(@TotalFixedAug × @AugCfg.Valid_Ratio) × (@AugCfg.N2 + 1) = @ValidCount
-                                </span>
-                            </div>
-                            <div class="card-body small">
+                        <div class="mb-3">
+                            <label class="form-label">Seed Value (optional)</label>
+                            <input type="number" class="form-control" @bind="augmentSeed" placeholder="e.g. 7" disabled="@isExporting" />
+                        </div>
 
-                                <!-- Rotate -->
-                                <div class="d-flex align-items-end gap-2 flex-wrap mb-2">
-                                    <div class="form-check me-2">
-                                        <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Rotate.Enabled" id="rndRotate" />
-                                        <label class="form-check-label fw-semibold" for="rndRotate">Rotate</label>
-                                    </div>
-                                    <div>
-                                        <div class="form-text mb-1">limit</div>
-                                        <input type="number" class="form-control form-control-sm" style="max-width:90px"
-                                               @bind="AugCfg.Random.Rotate.Limit" />
-                                    </div>
-                                    <div>
-                                        <div class="form-text mb-1">p</div>
-                                        <input type="number" step="0.05" class="form-control form-control-sm" style="max-width:90px"
-                                               @bind="AugCfg.Random.Rotate.P" />
-                                    </div>
-                                </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="exportSeg" @bind="exportAsSegmentation" />
+                            <label class="form-check-label" for="exportSeg">
+                                Save labels in YOLO segmentation format
+                            </label>
+                        </div>
 
-                                <!-- Affine Shear -->
-                                <div class="d-flex align-items-end gap-2 flex-wrap mb-2">
-                                    <div class="form-check me-2">
-                                        <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Affine_Shear.Enabled" id="rndAffine" />
-                                        <label class="form-check-label fw-semibold" for="rndAffine">Affine Shear</label>
-                                    </div>
-                                    <div><div class="form-text mb-1">x min</div><input type="number" step="0.1" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Affine_Shear.XMin" /></div>
-                                    <div><div class="form-text mb-1">x max</div><input type="number" step="0.1" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Affine_Shear.XMax" /></div>
-                                    <div><div class="form-text mb-1">y min</div><input type="number" step="0.1" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Affine_Shear.YMin" /></div>
-                                    <div><div class="form-text mb-1">y max</div><input type="number" step="0.1" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Affine_Shear.YMax" /></div>
-                                    <div><div class="form-text mb-1">p</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Affine_Shear.P" /></div>
-                                </div>
-
-                                <!-- Bright/Contrast -->
-                                <div class="d-flex align-items-end gap-2 flex-wrap mb-2">
-                                    <div class="form-check me-2">
-                                        <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Brightness_Contrast.Enabled" id="rndBC" />
-                                        <label class="form-check-label fw-semibold" for="rndBC">Bright/Contrast</label>
-                                    </div>
-                                    <div><div class="form-text mb-1">bright min</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Brightness_Contrast.BrightnessMin" /></div>
-                                    <div><div class="form-text mb-1">bright max</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Brightness_Contrast.BrightnessMax" /></div>
-                                    <div><div class="form-text mb-1">cont min</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Brightness_Contrast.ContrastMin" /></div>
-                                    <div><div class="form-text mb-1">cont max</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Brightness_Contrast.ContrastMax" /></div>
-                                    <div><div class="form-text mb-1">p</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Brightness_Contrast.P" /></div>
-                                </div>
-
-                                <!-- Gamma -->
-                                <div class="d-flex align-items-end gap-2 flex-wrap">
-                                    <div class="form-check me-2">
-                                        <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Gamma.Enabled" id="rndGamma" />
-                                        <label class="form-check-label fw-semibold" for="rndGamma">Gamma</label>
-                                    </div>
-                                    <div><div class="form-text mb-1">min</div><input type="number" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Gamma.Min" /></div>
-                                    <div><div class="form-text mb-1">max</div><input type="number" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Gamma.Max" /></div>
-                                    <div><div class="form-text mb-1">p</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Gamma.P" /></div>
-                                </div>
-
-                                <!-- Etc Augmentations Toggle -->
-                                <button class="btn btn-link p-0 mb-2 mt-3" type="button" data-bs-toggle="collapse" data-bs-target="#etcAug" aria-expanded="false" aria-controls="etcAug">
-                                  Show More ▼
-                                </button>
-
-                                <div class="collapse" id="etcAug">
-                                    <!-- RGBShift -->
-                                    <div class="d-flex align-items-end gap-2 flex-wrap mb-2">
-                                        <div class="form-check me-2">
-                                            <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Rgb_Shift.Enabled" id="rndRGB" />
-                                            <label class="form-check-label fw-semibold" for="rndRGB">RGBShift</label>
-                                        </div>
-                                        <div><div class="form-text mb-1">R min</div><input type="number" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Rgb_Shift.RMin" /></div>
-                                        <div><div class="form-text mb-1">R max</div><input type="number" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Rgb_Shift.RMax" /></div>
-                                        <div><div class="form-text mb-1">G min</div><input type="number" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Rgb_Shift.GMin" /></div>
-                                        <div><div class="form-text mb-1">G max</div><input type="number" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Rgb_Shift.GMax" /></div>
-                                        <div><div class="form-text mb-1">B min</div><input type="number" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Rgb_Shift.BMin" /></div>
-                                        <div><div class="form-text mb-1">B max</div><input type="number" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Rgb_Shift.BMax" /></div>
-                                        <div><div class="form-text mb-1">p</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:80px" @bind="AugCfg.Random.Rgb_Shift.P" /></div>
-                                    </div>
-
-                                    <!-- GaussianBlur -->
-                                    <div class="d-flex align-items-end gap-2 flex-wrap mb-2">
-                                        <div class="form-check me-2">
-                                            <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Gaussian_Blur.Enabled" id="rndBlur" />
-                                            <label class="form-check-label fw-semibold" for="rndBlur">GaussianBlur</label>
-                                        </div>
-                                        <div><div class="form-text mb-1">min</div><input type="number" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Gaussian_Blur.Min" /></div>
-                                        <div><div class="form-text mb-1">max</div><input type="number" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Gaussian_Blur.Max" /></div>
-                                        <div><div class="form-text mb-1">p</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Gaussian_Blur.P" /></div>
-                                    </div>
-
-                                    <!-- ShiftScaleRotate -->
-                                    <div class="d-flex align-items-end gap-2 flex-wrap mb-2">
-                                        <div class="form-check me-2">
-                                            <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Shift_Scale_Rotate.Enabled" id="rndSSR" />
-                                            <label class="form-check-label fw-semibold" for="rndSSR">ShiftScaleRotate</label>
-                                        </div>
-                                        <div><div class="form-text mb-1">shift</div><input type="number" step="0.01" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Shift_Scale_Rotate.ShiftLimit" /></div>
-                                        <div><div class="form-text mb-1">scale</div><input type="number" step="0.01" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Shift_Scale_Rotate.ScaleLimit" /></div>
-                                        <div><div class="form-text mb-1">rotate</div><input type="number" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Shift_Scale_Rotate.RotateLimit" /></div>
-                                        <div><div class="form-text mb-1">p</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Shift_Scale_Rotate.P" /></div>
-                                    </div>
-
-                                    <!-- HSV -->
-                                    <div class="d-flex align-items-end gap-2 flex-wrap mb-2">
-                                        <div class="form-check me-2">
-                                            <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Hue_Saturation_Value.Enabled" id="rndHSV" />
-                                            <label class="form-check-label fw-semibold" for="rndHSV">HSV</label>
-                                        </div>
-                                        <div><div class="form-text mb-1">Hue</div><input type="number" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Hue_Saturation_Value.Hue" /></div>
-                                        <div><div class="form-text mb-1">Sat</div><input type="number" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Hue_Saturation_Value.Sat" /></div>
-                                        <div><div class="form-text mb-1">Val</div><input type="number" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Hue_Saturation_Value.Val" /></div>
-                                        <div><div class="form-text mb-1">p</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Hue_Saturation_Value.P" /></div>
-                                    </div>
-
-                                    <!-- GaussNoise -->
-                                    <div class="d-flex align-items-end gap-2 flex-wrap">
-                                        <div class="form-check me-2">
-                                            <input class="form-check-input" type="checkbox" @bind="AugCfg.Random.Gauss_Noise.Enabled" id="rndNoise" />
-                                            <label class="form-check-label fw-semibold" for="rndNoise">GaussNoise</label>
-                                        </div>
-                                        <div><div class="form-text mb-1">p</div><input type="number" step="0.05" class="form-control form-control-sm" style="max-width:90px" @bind="AugCfg.Random.Gauss_Noise.P" /></div>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="autoDownload" @bind="enableAutoDownload" disabled="@isExporting" />
+                            <label class="form-check-label" for="autoDownload">
+                                Automatically download ZIP after export
+                            </label>
                         </div>
 
                     </div>
-
                 </div>
 
                 @* ✅ 상태 메시지는 항상 바깥에 보여줌 *@
@@ -788,7 +593,6 @@ else
     [Inject] private HttpClient Http { get; set; } = default!;
     [Inject] private EmailService EmailService { get; set; } = default!;
 
-    private AugConfigDto AugCfg { get; set; } = new();
     private List<ProjectViewModel> projects = new();
     private Dictionary<string, bool> projectHasModelMap = new();
 
@@ -814,10 +618,19 @@ else
     private string mergeProjectName = string.Empty;
     private string mergeLabels = string.Empty;
     private bool allowDuplicateMerge = false;
+
+    private bool exportAsSegmentation = false;  // Export 시 detection / segmentation 선택용
+    private int validRatioInt = 30;  // 기본값 30%
+    private float validRatio => validRatioInt / 100f;
     
     private Project? selectedProject = null;
-    private bool exportAsSegmentation = false;  // Export 시 detection / segmentation 선택용
+    private int augMultiplier = 3;
+    const int MaxAugMultiplier = 40;
     private string augmentStatusMessage = string.Empty;
+    private int? augmentSeed = 7;
+    private int recommendedAugMultiplier => selectedProject?.ImageCount > 0
+        ? (int)Math.Ceiling(10000.0 / (56 * selectedProject.ImageCount) - 1)
+        : 1;
 
     private bool showTrainModal = false;
     private string trainModelSize = "small";
@@ -854,24 +667,6 @@ else
 
     private bool isCopyMode = false; // Copy 모드 여부
     private ProjectViewModel? copySourceProject = null; // 복사할 프로젝트 저장
-
-
-    private int N_img => selectedProject?.Images?.Count ?? 0;   // 예: 프로젝트에 포함된 이미지 수
-    private int N_check => new bool[] {
-        AugCfg.Fixed.Original,
-        AugCfg.Fixed.Rotate90,
-        AugCfg.Fixed.Rotate180,
-        AugCfg.Fixed.Rotate270,
-        AugCfg.Fixed.HFlip,
-        AugCfg.Fixed.HFlipRotate90,
-        AugCfg.Fixed.HFlipRotate180,
-        AugCfg.Fixed.HFlipRotate270
-    }.Count(x => x);  // true인 항목 개수
-    private int TotalFixedAug => N_img * N_check * AugCfg.N1;
-    private int TrainCount =>
-    (int)(Math.Floor(TotalFixedAug * (1 - AugCfg.Valid_Ratio)) * (AugCfg.N2 + 1));
-    private int ValidCount =>
-        (int)(Math.Ceiling(TotalFixedAug * AugCfg.Valid_Ratio) * (AugCfg.N2 + 1));
 
 
     public void Dispose()
@@ -1113,6 +908,8 @@ else
     {
         exportProjectId = projectId;
         selectedProject = projects.FirstOrDefault(p => p.Id == projectId);
+        validRatioInt = 30;
+        augMultiplier = Math.Min(recommendedAugMultiplier, MaxAugMultiplier); 
         augmentStatusMessage = string.Empty;
         showExportModal = true;
     }
@@ -1122,353 +919,204 @@ else
         isExporting = true;
         StateHasChanged();
 
-        // 임시 설정 JSON 경로 (finally에서 삭제)
-        string? cfgPath = null;
+        var project = await Db.Projects.Include(p => p.Images).FirstOrDefaultAsync(p => p.Id == projectId);
+        if (project == null || project.Images.Count == 0) return;
+
+        int labeled = project.Images.Count(img => img.LabelStatus == "Labeled");
+        int total = project.Images.Count;
+        int percent = (int)Math.Round((double)labeled / total * 100);
+
+        if (percent < 100)
+        {
+            await JS.InvokeVoidAsync("alert", $"⚠️ Only {percent}% of images are labeled. Please label all images before exporting.");
+            return;
+        }
+
+        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        var exportFolderName = $"{project.Name}_{timestamp}";
+        var exportDir = Path.Combine(Env.WebRootPath, "exports", exportFolderName);  // 최종 저장 경로
+        Directory.CreateDirectory(exportDir);
+
+        // 📌 중첩 폴더 없이 바로 exportDir 밑에 train/valid 생성
+        var trainImg = Path.Combine(exportDir, "train", "images");
+        var trainLbl = Path.Combine(exportDir, "train", "labels");
+        var validImg = Path.Combine(exportDir, "valid", "images");
+        var validLbl = Path.Combine(exportDir, "valid", "labels");
+
+        Directory.CreateDirectory(trainImg);
+        Directory.CreateDirectory(trainLbl);
+        Directory.CreateDirectory(validImg);
+        Directory.CreateDirectory(validLbl);
+
+        var random = new Random();
+        var images = project.Images.OrderBy(_ => random.Next()).ToList();
+        float validRatio_orignalImages = 0.0f;
+        int splitIndex = (int)(images.Count * (1 - validRatio_orignalImages));
+        var train = images.Take(splitIndex).ToList();
+        var valid = images.Skip(splitIndex).ToList();
+
+        foreach (var image in train.Concat(valid))
+        {
+            var folderType = train.Contains(image) ? "train" : "valid";
+            var imgDest = Path.Combine(exportDir, folderType, "images", image.FileName);
+            var srcImg = Path.Combine(Env.WebRootPath, image.RelativePath);
+
+            if (File.Exists(srcImg))
+            {
+                using var img = SixLabors.ImageSharp.Image.Load<Rgba32>(srcImg);
+                if (selectedImageSize > 0)
+                {
+                    img.Mutate(x => x.Resize(selectedImageSize, selectedImageSize));
+                }
+                await img.SaveAsJpegAsync(imgDest);
+            }
+
+            var labelPath = Path.Combine(exportDir, folderType, "labels", Path.ChangeExtension(image.FileName, ".txt"));
+            if (!string.IsNullOrWhiteSpace(image.LabelData))
+            {
+                var labelLines = new List<string>();
+                var labelList = project.Labels.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()).ToList();
+                var json = JsonDocument.Parse(image.LabelData);
+                foreach (var box in json.RootElement.EnumerateArray())
+                {
+                    var cls = labelList.IndexOf(box.GetProperty("label").GetString() ?? "");
+                    var xMin = box.GetProperty("x").GetDouble();
+                    var yMin = box.GetProperty("y").GetDouble();
+                    var width = box.GetProperty("w").GetDouble();
+                    var height = box.GetProperty("h").GetDouble();
+
+                    if (!exportAsSegmentation)
+                    {
+                        // ✅ 기존 YOLO detection 포맷
+                        var x_center = (xMin + width / 2.0) / image.Width;
+                        var y_center = (yMin + height / 2.0) / image.Height;
+                        var w_norm = width / image.Width;
+                        var h_norm = height / image.Height;
+
+                        labelLines.Add($"{cls} {x_center:F6} {y_center:F6} {w_norm:F6} {h_norm:F6}");
+                    }
+                    else
+                    {
+                        // ✅ YOLO segmentation 포맷 (직사각형 4점 좌표)
+                        var x1 = xMin / image.Width;
+                        var y1 = yMin / image.Height;
+                        var x2 = (xMin + width) / image.Width;
+                        var y2 = yMin / image.Height;
+                        var x3 = (xMin + width) / image.Width;
+                        var y3 = (yMin + height) / image.Height;
+                        var x4 = xMin / image.Width;
+                        var y4 = (yMin + height) / image.Height;
+
+                        labelLines.Add($"{cls} {x1:F6} {y1:F6} {x2:F6} {y2:F6} {x3:F6} {y3:F6} {x4:F6} {y4:F6}");
+                    }
+                }
+                await File.WriteAllLinesAsync(labelPath, labelLines);
+            }
+        }
+
+        var yamlPath = Path.Combine(exportDir, "data.yaml");
+        var yaml =
+            $"train: train/images\n" +
+            $"val: valid/images\n\n" +
+            $"nc: {project.Labels.Split(',', StringSplitOptions.RemoveEmptyEntries).Length}\n" +
+            $"names: [{string.Join(", ", project.Labels.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(x => $"'{x.Trim()}'"))}]\n\n" +
+            $"hklab:\n" +
+            $"  project: {project.Name.ToLower().Replace(" ", "-")}\n" +
+            $"  version: 1\n" +
+            $"  url: https://hawkai.hknu.ac.kr/projects/{projectId}\n" +
+            $"  ratioOfValid: {validRatio}\n" +
+            $"  augMultiplier: {augMultiplier}\n" +
+            $"  augmentSeed: {(augmentSeed.HasValue ? augmentSeed.Value.ToString() : "null")}\n" + 
+            $"  task: {(exportAsSegmentation ? "segment" : "detect")}\n";   
+
+        await File.WriteAllTextAsync(yamlPath, yaml);
+
+        // ✅ Export 완료 후 Augment 수행
+        await TriggerAugmentAfterExport(projectId, exportDir, exportFolderName);
+
+        isExporting = false;
+        StateHasChanged();
+    }
+
+    private async Task TriggerAugmentAfterExport(int projectId, string exportDir, string exportFolderName)
+    {
+        if (selectedProject == null || selectedProject.Id != projectId)
+        {
+            augmentStatusMessage = "❌ No project selected.";
+            return;
+        }
+
+        var payload = new Dictionary<string, object>
+            {
+                { "project_name", selectedProject.Name },
+                { "base_dir", exportDir },
+                { "valid_ratio", validRatio },  // 고정값 or 필요시 추후 설정
+                { "n", augMultiplier },
+                { "session_id", sessionId }     // session ID 추가
+            };
+
+        if (augmentSeed.HasValue)
+        {
+            payload["seed"] = augmentSeed.Value;
+        }
 
         try
         {
-            // 1) 프로젝트/이미지 로드 및 검증
-            var project = await Db.Projects.Include(p => p.Images).FirstOrDefaultAsync(p => p.Id == projectId);
-            if (project == null || project.Images.Count == 0)
+            var response = await Http.PostAsJsonAsync("http://localhost:9001/api/augment", payload);
+
+            if (response.IsSuccessStatusCode)
             {
-                await JS.InvokeVoidAsync("alert", "❌ Project not found or no images.");
-                return;
-            }
-
-            int labeled = project.Images.Count(img => img.LabelStatus == "Labeled");
-            int total = project.Images.Count;
-            int percent = (int)Math.Round((double)labeled / total * 100);
-
-            if (percent < 100)
-            {
-                await JS.InvokeVoidAsync("alert", $"⚠️ Only {percent}% of images are labeled. Please label all images before exporting.");
-                return;
-            }
-
-            // 2) Export 폴더 준비
-            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            var exportFolderName = $"{project.Name}_{timestamp}";
-            var exportDir = Path.Combine(Env.WebRootPath, "exports", exportFolderName);
-            Directory.CreateDirectory(exportDir);
-
-            var trainImg = Path.Combine(exportDir, "train", "images");
-            var trainLbl = Path.Combine(exportDir, "train", "labels");
-            var validImg = Path.Combine(exportDir, "valid", "images");
-            var validLbl = Path.Combine(exportDir, "valid", "labels");
-            Directory.CreateDirectory(trainImg);
-            Directory.CreateDirectory(trainLbl);
-            Directory.CreateDirectory(validImg);
-            Directory.CreateDirectory(validLbl);
-
-            // 3) 이미지/라벨 내보내기 (모두 train/*로 저장)
-            var labelList = project.Labels.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()).ToList();
-
-            foreach (var image in project.Images)
-            {
-                var srcImg = Path.Combine(Env.WebRootPath, image.RelativePath);
-                var imgDest = Path.Combine(trainImg, image.FileName);
-
-                if (File.Exists(srcImg))
+                var result = await response.Content.ReadFromJsonAsync<ServerResponse>();
+                if (result?.status == "success")
                 {
-                    using var img = SixLabors.ImageSharp.Image.Load<Rgba32>(srcImg);
-                    if (selectedImageSize > 0)
-                        img.Mutate(x => x.Resize(selectedImageSize, selectedImageSize));
-                    await img.SaveAsJpegAsync(imgDest);
-                }
+                    // ✅ train/valid 이미지 수 계산
+                    var trainImageDir = Path.Combine(exportDir, "train", "images");
+                    var validImageDir = Path.Combine(exportDir, "valid", "images");
 
-                var labelPath = Path.Combine(trainLbl, Path.ChangeExtension(image.FileName, ".txt"));
-                if (!string.IsNullOrWhiteSpace(image.LabelData))
-                {
-                    var labelLines = new List<string>();
-                    using var jsonDoc = JsonDocument.Parse(image.LabelData);
-                    foreach (var box in jsonDoc.RootElement.EnumerateArray())
+                    int trainCount = Directory.Exists(trainImageDir)
+                        ? Directory.GetFiles(trainImageDir).Count(f => f.EndsWith(".jpg") || f.EndsWith(".jpeg") || f.EndsWith(".png"))
+                        : 0;
+
+                    int validCount = Directory.Exists(validImageDir)
+                        ? Directory.GetFiles(validImageDir).Count(f => f.EndsWith(".jpg") || f.EndsWith(".jpeg") || f.EndsWith(".png"))
+                        : 0;
+
+                    // ✅ data.yaml에 추가 내용 붙이기
+                    var yamlPath = Path.Combine(exportDir, "data.yaml");
+                    await File.AppendAllTextAsync(yamlPath,
+                        $"  trainCount: {trainCount}\n" +
+                        $"  validCount: {validCount}\n");
+
+                    // ✅ augment 성공 후 zip 생성
+                    var zipPath = Path.Combine(Env.WebRootPath, "exports", $"{exportFolderName}.zip");
+                    if (File.Exists(zipPath)) File.Delete(zipPath);
+                    ZipFile.CreateFromDirectory(exportDir, zipPath);
+
+                    // 브라우저에서 자동 다운로드를 위해
+                    if (enableAutoDownload)
                     {
-                        var cls = labelList.IndexOf(box.GetProperty("label").GetString() ?? "");
-                        var xMin = box.GetProperty("x").GetDouble();
-                        var yMin = box.GetProperty("y").GetDouble();
-                        var width = box.GetProperty("w").GetDouble();
-                        var height = box.GetProperty("h").GetDouble();
-
-                        if (!exportAsSegmentation)
-                        {
-                            // YOLO detection (x_center, y_center, w, h) normalized
-                            var x_center = (xMin + width / 2.0) / image.Width;
-                            var y_center = (yMin + height / 2.0) / image.Height;
-                            var w_norm = width / image.Width;
-                            var h_norm = height / image.Height;
-                            labelLines.Add($"{cls} {x_center:F6} {y_center:F6} {w_norm:F6} {h_norm:F6}");
-                        }
-                        else
-                        {
-                            // YOLO segmentation (사각형 4점)
-                            var x1 = xMin / image.Width;
-                            var y1 = yMin / image.Height;
-                            var x2 = (xMin + width) / image.Width;
-                            var y2 = yMin / image.Height;
-                            var x3 = (xMin + width) / image.Width;
-                            var y3 = (yMin + height) / image.Height;
-                            var x4 = xMin / image.Width;
-                            var y4 = (yMin + height) / image.Height;
-                            labelLines.Add($"{cls} {x1:F6} {y1:F6} {x2:F6} {y2:F6} {x3:F6} {y3:F6} {x4:F6} {y4:F6}");
-                        }
+                        var relativeZip = "/exports/" + Path.GetFileName(zipPath);
+                        Navigation.NavigateTo(relativeZip, true);
                     }
-                    await File.WriteAllLinesAsync(labelPath, labelLines);
-                }
-            }
-
-            // 4) Python 증강 스크립트 실행 준비 (UI 값 → AugCfg 반영 및 JSON 생성)
-            augmentStatusMessage = "Starting augmentation...";
-            if (showExportModal) await InvokeAsync(StateHasChanged);
-
-            // 파이썬이 읽을 설정 JSON 구성
-            var pyConfig = new
-            {
-                valid_ratio = AugCfg.Valid_Ratio,
-                n1 = AugCfg.N1,
-                n2 = AugCfg.N2,
-                seed = AugCfg.Seed,
-                fixed_ = new // reserved word 회피를 위해 키명을 fixed_로 사용 (augment_yolo.py에서 fixed로 매핑해 처리해도 됨)
-                {
-                    original = AugCfg.Fixed.Original,
-                    rotate90 = AugCfg.Fixed.Rotate90,
-                    rotate180 = AugCfg.Fixed.Rotate180,
-                    rotate270 = AugCfg.Fixed.Rotate270,
-                    hflip = AugCfg.Fixed.HFlip,
-                    hflip_rotate90 = AugCfg.Fixed.HFlipRotate90,
-                    hflip_rotate180 = AugCfg.Fixed.HFlipRotate180,
-                    hflip_rotate270 = AugCfg.Fixed.HFlipRotate270
-                },
-                random = new
-                {
-                    rotate = new { enabled = AugCfg.Random.Rotate.Enabled, limit = AugCfg.Random.Rotate.Limit, p = AugCfg.Random.Rotate.P },
-                    affine_shear = new { enabled = AugCfg.Random.Affine_Shear.Enabled, x_min = AugCfg.Random.Affine_Shear.XMin, x_max = AugCfg.Random.Affine_Shear.XMax, y_min = AugCfg.Random.Affine_Shear.YMin, y_max = AugCfg.Random.Affine_Shear.YMax, p = AugCfg.Random.Affine_Shear.P },
-                    brightness_contrast = new { enabled = AugCfg.Random.Brightness_Contrast.Enabled, brightness_min = AugCfg.Random.Brightness_Contrast.BrightnessMin, brightness_max = AugCfg.Random.Brightness_Contrast.BrightnessMax, contrast_min = AugCfg.Random.Brightness_Contrast.ContrastMin, contrast_max = AugCfg.Random.Brightness_Contrast.ContrastMax, p = AugCfg.Random.Brightness_Contrast.P },
-                    gamma = new { enabled = AugCfg.Random.Gamma.Enabled, min = AugCfg.Random.Gamma.Min, max = AugCfg.Random.Gamma.Max, p = AugCfg.Random.Gamma.P },
-                    rgb_shift = new { enabled = AugCfg.Random.Rgb_Shift.Enabled, r_min = AugCfg.Random.Rgb_Shift.RMin, r_max = AugCfg.Random.Rgb_Shift.RMax, g_min = AugCfg.Random.Rgb_Shift.GMin, g_max = AugCfg.Random.Rgb_Shift.GMax, b_min = AugCfg.Random.Rgb_Shift.BMin, b_max = AugCfg.Random.Rgb_Shift.BMax, p = AugCfg.Random.Rgb_Shift.P },
-                    gaussian_blur = new { enabled = AugCfg.Random.Gaussian_Blur.Enabled, min = AugCfg.Random.Gaussian_Blur.Min, max = AugCfg.Random.Gaussian_Blur.Max, p = AugCfg.Random.Gaussian_Blur.P },
-                    shift_scale_rotate = new { enabled = AugCfg.Random.Shift_Scale_Rotate.Enabled, shift_limit = AugCfg.Random.Shift_Scale_Rotate.ShiftLimit, scale_limit = AugCfg.Random.Shift_Scale_Rotate.ScaleLimit, rotate_limit = AugCfg.Random.Shift_Scale_Rotate.RotateLimit, border_mode = AugCfg.Random.Shift_Scale_Rotate.BorderMode, p = AugCfg.Random.Shift_Scale_Rotate.P },
-                    hue_saturation_value = new { enabled = AugCfg.Random.Hue_Saturation_Value.Enabled, hue = AugCfg.Random.Hue_Saturation_Value.Hue, sat = AugCfg.Random.Hue_Saturation_Value.Sat, val = AugCfg.Random.Hue_Saturation_Value.Val, p = AugCfg.Random.Hue_Saturation_Value.P },
-                    gauss_noise = new { enabled = AugCfg.Random.Gauss_Noise.Enabled, p = AugCfg.Random.Gauss_Noise.P }
-                }
-            };
-
-            // 임시 JSON 파일 저장
-            var cfgDir = Path.Combine(Env.WebRootPath, "exports");
-            Directory.CreateDirectory(cfgDir);
-            cfgPath = Path.Combine(cfgDir, $"aug_cfg_{Guid.NewGuid():N}.json");
-            await File.WriteAllTextAsync(cfgPath, JsonSerializer.Serialize(pyConfig, new JsonSerializerOptions { WriteIndented = false }));
-
-            // 파이썬 실행
-            string pythonExe = Environment.GetEnvironmentVariable("PYTHON_PATH") ?? "python";
-            var scriptPath = Path.Combine(Env.ContentRootPath, "PythonScripts", "augment_yolo.py");
-
-            if (!File.Exists(scriptPath))
-            {
-                augmentStatusMessage = $"❌ Python script not found: {scriptPath}";
-                return;
-            }
-
-            var args = new List<string>
-        {
-            $"\"{scriptPath}\"",
-            $"--base_dir \"{exportDir}\"",
-            $"--config_json \"{cfgPath}\""
-        };
-
-            using var proc = new System.Diagnostics.Process();
-            proc.StartInfo.FileName = pythonExe;
-            proc.StartInfo.Arguments = string.Join(" ", args);
-            proc.StartInfo.WorkingDirectory = Env.ContentRootPath;
-            proc.StartInfo.UseShellExecute = false;
-            proc.StartInfo.RedirectStandardOutput = true;
-            proc.StartInfo.RedirectStandardError = true;
-            proc.StartInfo.StandardOutputEncoding = System.Text.Encoding.UTF8;
-            proc.StartInfo.StandardErrorEncoding = System.Text.Encoding.UTF8;
-            proc.StartInfo.Environment["PYTHONIOENCODING"] = "utf-8";
-            proc.StartInfo.Environment["PYTHONUTF8"] = "1";
-
-            proc.OutputDataReceived += async (_, e) =>
-            {
-                if (string.IsNullOrWhiteSpace(e.Data)) return;
-                if (e.Data.StartsWith("STATUS:"))
-                {
-                    augmentStatusMessage = e.Data[7..].Trim();
-                    if (showExportModal) await InvokeAsync(StateHasChanged);
                 }
                 else
                 {
-                    Console.WriteLine("[PY] " + e.Data);
+                    augmentStatusMessage = "❌ Unexpected response format.";
                 }
-            };
-            proc.ErrorDataReceived += (_, e) =>
-            {
-                if (!string.IsNullOrWhiteSpace(e.Data))
-                    Console.WriteLine("[PY-ERR] " + e.Data);
-            };
-
-            proc.Start();
-            proc.BeginOutputReadLine();
-            proc.BeginErrorReadLine();
-            await proc.WaitForExitAsync();
-
-            if (proc.ExitCode != 0)
-            {
-                augmentStatusMessage = $"❌ Augmentation process exited with code {proc.ExitCode}";
-                return;
             }
-
-            // 5) 최종 카운트 계산 → data.yaml 생성
-            int CountImgs(string dir) =>
-                Directory.Exists(dir)
-                    ? Directory.GetFiles(dir).Count(f =>
-                        f.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) ||
-                        f.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ||
-                        f.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
-                    : 0;
-
-            var trainCount = CountImgs(Path.Combine(exportDir, "train", "images"));
-            var validCount = CountImgs(Path.Combine(exportDir, "valid", "images"));
-
-            var yamlPath = Path.Combine(exportDir, "data.yaml");
-
-            // augment 섹션용: pyConfig → JsonElement → YAML
-            var pyConfigJson = JsonSerializer.Serialize(pyConfig, new JsonSerializerOptions { WriteIndented = false });
-            using var cfgDoc = JsonDocument.Parse(pyConfigJson);
-            var cfgRoot = cfgDoc.RootElement;
-
-            var sb = new System.Text.StringBuilder();
-            sb.AppendLine("train: train/images");
-            sb.AppendLine("val: valid/images");
-            sb.AppendLine();
-            sb.AppendLine($"nc: {labelList.Count}");
-            sb.AppendLine($"names: [{string.Join(", ", labelList.Select(x => $"'{x}'"))}]");
-            sb.AppendLine();
-            sb.AppendLine("hklab:");
-            sb.AppendLine($"  project: {project.Name.ToLower().Replace(" ", "-")}");                        
-            sb.AppendLine($"  url: https://hawkai.hknu.ac.kr/projects/{projectId}");
-            sb.AppendLine($"  task: {(exportAsSegmentation ? "segment" : "detect")}");
-            int imgW = selectedImageSize > 0 ? selectedImageSize : (project.Images.FirstOrDefault()?.Width ?? 0);
-            int imgH = selectedImageSize > 0 ? selectedImageSize : (project.Images.FirstOrDefault()?.Height ?? 0);
-            sb.AppendLine($"  image_width: {imgW}");
-            sb.AppendLine($"  image_height: {imgH}");            
-            sb.AppendLine($"  trainCount: {trainCount}");
-            sb.AppendLine($"  validCount: {validCount}");
-            sb.AppendLine();
-            sb.AppendLine("augment:"); // ← 여기에 cfg json 내용이 YAML로 붙음
-            sb.Append(JsonToYaml(cfgRoot, 2));
-
-            await File.WriteAllTextAsync(yamlPath, sb.ToString());
-
-
-            // 6) ZIP 생성 및 자동 다운로드(옵션)
-            var zipPath = Path.Combine(Env.WebRootPath, "exports", $"{exportFolderName}.zip");
-            if (File.Exists(zipPath)) File.Delete(zipPath);
-            System.IO.Compression.ZipFile.CreateFromDirectory(exportDir, zipPath);
-
-            if (enableAutoDownload)
+            else
             {
-                var relativeZip = "/exports/" + Path.GetFileName(zipPath);
-                Navigation.NavigateTo(relativeZip, true);
+                var result = await response.Content.ReadFromJsonAsync<ServerResponse>();
+                if (result == null)
+                    augmentStatusMessage = $"❌ Augmentation failed with status code {response.StatusCode}";
             }
-
-            augmentStatusMessage = $"✅ Export & Augment completed (train: {trainCount}, valid: {validCount})";
         }
         catch (Exception ex)
         {
-            augmentStatusMessage = $"❌ Export/Augment failed: {ex.Message}";
-        }
-        finally
-        {
-            // 임시 cfg JSON 정리
-            try
-            {
-                if (!string.IsNullOrEmpty(cfgPath) && File.Exists(cfgPath))
-                    File.Delete(cfgPath);
-            }
-            catch { /* ignore */ }
-
-            isExporting = false;
-            await InvokeAsync(StateHasChanged);
+            augmentStatusMessage = $"❌ Failed to contact augmentation server: {ex.Message}";
         }
     }
 
-    private static string JsonToYaml(JsonElement elem, int indent = 0)
-    {
-        var sb = new System.Text.StringBuilder();
-        string Ind(int i) => new string(' ', i);
-
-        switch (elem.ValueKind)
-        {
-            case JsonValueKind.Object:
-                foreach (var prop in elem.EnumerateObject())
-                {
-                    var v = prop.Value;
-                    sb.Append(Ind(indent)).Append(prop.Name).Append(':');
-                    if (v.ValueKind == JsonValueKind.Object || v.ValueKind == JsonValueKind.Array)
-                    {
-                        sb.AppendLine();
-                        sb.Append(JsonToYaml(v, indent + 2));
-                    }
-                    else
-                    {
-                        sb.Append(' ').Append(ScalarToYaml(v)).AppendLine();
-                    }
-                }
-                break;
-
-            case JsonValueKind.Array:
-                foreach (var item in elem.EnumerateArray())
-                {
-                    if (item.ValueKind == JsonValueKind.Object || item.ValueKind == JsonValueKind.Array)
-                    {
-                        sb.Append(Ind(indent)).Append("- ").AppendLine();
-                        sb.Append(JsonToYaml(item, indent + 2));
-                    }
-                    else
-                    {
-                        sb.Append(Ind(indent)).Append("- ").Append(ScalarToYaml(item)).AppendLine();
-                    }
-                }
-                break;
-
-            default:
-                sb.Append(Ind(indent)).Append(ScalarToYaml(elem)).AppendLine();
-                break;
-        }
-
-        return sb.ToString();
-    }
-
-    private static string ScalarToYaml(JsonElement v)
-    {
-        switch (v.ValueKind)
-        {
-            case JsonValueKind.Number:
-                return v.GetRawText(); // 숫자는 그대로
-            case JsonValueKind.True:
-                return "true";
-            case JsonValueKind.False:
-                return "false";
-            case JsonValueKind.Null:
-                return "null";
-            case JsonValueKind.String:
-                var s = v.GetString() ?? string.Empty;
-                // 특수문자/공백 포함 시 안전하게 쿼팅
-                bool needsQuote = string.IsNullOrEmpty(s)
-                                  || char.IsWhiteSpace(s[0])
-                                  || char.IsWhiteSpace(s[^1])
-                                  || s.IndexOfAny(new[] { ':', '{', '}', '[', ']', ',', '#', '&', '*', '!', '|', '>', '%', '@', '`', '\'', '"' }) >= 0;
-                if (needsQuote)
-                {
-                    // 이스케이프 처리 (더 치열하게 하려면 YAML 이스케이프 규칙 적용)
-                    s = s.Replace("\\", "\\\\").Replace("\"", "\\\"");
-                    return $"\"{s}\"";
-                }
-                return s;
-            default:
-                return v.GetRawText();
-        }
-    }
 
 
     private void OpenEditModal(Project project)
