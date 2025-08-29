@@ -937,32 +937,32 @@ else
         );
 
         // Augment Hub 연결 설정
-        hubConnection = new HubConnectionBuilder()
-            .WithUrl(Navigation.ToAbsoluteUri($"/augmentHub?sessionId={sessionId}"))
-            .WithAutomaticReconnect()
-            .Build();
+        // hubConnection = new HubConnectionBuilder()
+        //     .WithUrl(Navigation.ToAbsoluteUri($"/augmentHub?sessionId={sessionId}"))
+        //     .WithAutomaticReconnect()
+        //     .Build();
 
-        hubConnection.On<string>("ReceiveAugmentStatus", (msg) =>
-        {
-            //Console.WriteLine($"[SignalR] ✅ Received message: {msg}");  // ✅ 디버깅 출력 추가
-            augmentStatusMessage = msg; // 덮어쓰기
+        // hubConnection.On<string>("ReceiveAugmentStatus", (msg) =>
+        // {
+        //     //Console.WriteLine($"[SignalR] ✅ Received message: {msg}");  // ✅ 디버깅 출력 추가
+        //     augmentStatusMessage = msg; // 덮어쓰기
                                         
-            // ✅ 모달이 열려 있는 경우에만 UI 업데이트
-            if (showExportModal)
-            {
-                InvokeAsync(StateHasChanged); // 안전한 쓰레드 전환
-            }
-        });
+        //     // ✅ 모달이 열려 있는 경우에만 UI 업데이트
+        //     if (showExportModal)
+        //     {
+        //         InvokeAsync(StateHasChanged); // 안전한 쓰레드 전환
+        //     }
+        // });
 
-        try
-        {
-            await hubConnection.StartAsync();
-            Console.WriteLine($"[SignalR] 🔗 Connected to augmentHub with sessionId={sessionId}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[SignalR] ❌ Connection failed: {ex.Message}");
-        }
+        // try
+        // {
+        //     await hubConnection.StartAsync();
+        //     Console.WriteLine($"[SignalR] 🔗 Connected to augmentHub with sessionId={sessionId}");
+        // }
+        // catch (Exception ex)
+        // {
+        //     Console.WriteLine($"[SignalR] ❌ Connection failed: {ex.Message}");
+        // }
 
 
         // Train Hub 연결 설정
