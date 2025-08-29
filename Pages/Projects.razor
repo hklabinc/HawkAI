@@ -623,6 +623,16 @@ else
                         </p>
 
                         <div class="mb-3">
+                            <label class="form-label">Server</label>
+                            <select class="form-select" @bind="selectedTrainServer" disabled="@isTraining">
+                                <option value="http://localhost:9002">HawkAI (localhost:9002), RTX 3090 24GB</option>
+                                <option value="http://ictrobot.hknu.ac.kr:9002">ICTRobot (ictrobot:9002), RTX A4000 16GB</option>
+                                <option value="http://sons.hknu.ac.kr:9003">Server1 (sons:9003), RTX 3090 24GB</option>
+                                <option value="http://sons.hknu.ac.kr:9002">Server2 (sons:9002), RTX 4090 24GB</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
                             <label class="form-label">Model Size</label>
                             <select class="form-select" @bind="trainModelSize" disabled="@isTraining">
                                 <option value="nano">Nano</option>
@@ -631,6 +641,15 @@ else
                                 <option value="large">Large</option>
                                 <option value="xlarge">X-Large</option>
                             </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Image Size (Width × Height)</label>
+                            <select class="form-select" @onchange="OnImageSizeChanged" disabled="@isTraining">
+                                <option value="640x640">640 × 640</option>
+                                <option value="800x600" selected>800 × 600</option>   @* ✅ 디폴트 *@
+                                <option value="1024x768">1024 × 768</option>
+                            </select>                            
                         </div>
 
                         <div class="row mb-3">
@@ -643,20 +662,17 @@ else
                                 <input type="number" class="form-control" @bind="trainBatch" min="1" max="128" disabled="@isTraining" />
                             </div>
                             <div class="col">
-                                <label class="form-label">Seed (Optional)</label>
+                                <label class="form-label">Workers</label>
+                                <input type="number"
+                                       class="form-control"
+                                       @bind="trainWorkers"
+                                       min="0" max="16"
+                                       disabled="@isTraining" />
+                            </div>
+                            <div class="col">
+                                <label class="form-label">Seed (Opt.)</label>
                                 <input type="number" class="form-control" @bind="trainSeed" placeholder="e.g. 7" disabled="@isTraining" />
                             </div>
-                        </div>
-
-
-                        <div class="mb-3">
-                            <label class="form-label">Server</label>
-                            <select class="form-select" @bind="selectedTrainServer" disabled="@isTraining">
-                                <option value="http://localhost:9002">HawkAI (RTX 3090 24GB) (localhost:9002)</option>
-                                <option value="http://ictrobot.hknu.ac.kr:9002">ICTRobot (RTX A4000 16GB) (ictrobot:9002)</option>
-                                <option value="http://sons.hknu.ac.kr:9003">Server1 (RTX 3090 24GB) (sons:9003)</option>
-                                <option value="http://sons.hknu.ac.kr:9002">Server2 (RTX 4090 24GB) (sons:9002)</option>
-                            </select>
                         </div>
 
                         <div class="mb-3">
@@ -823,8 +839,11 @@ else
     private string trainModelSize = "small";
     private string trainStatusMessage = string.Empty;
     private DotNetObjectReference<Projects>? sseRef;
+    private int trainImgWidth = 800;
+    private int trainImgHeight = 600;    
     private int trainEpochs = 600;
     private int trainBatch = 32;
+    private int trainWorkers = 2;
     private int? trainSeed = 7;
 
     private bool showBulkDeleteConfirm = false;
@@ -2035,6 +2054,30 @@ else
             RegexOptions.IgnoreCase);
     }
 
+    private void OnImageSizeChanged(ChangeEventArgs e)
+    {
+        var val = e.Value?.ToString();
+        switch (val)
+        {
+            case "640x640":
+                trainImgWidth = 640;
+                trainImgHeight = 640;
+                break;
+            case "800x600":
+                trainImgWidth = 800;
+                trainImgHeight = 600;
+                break;
+            case "1024x768":
+                trainImgWidth = 1024;
+                trainImgHeight = 768;
+                break;
+            default:
+                trainImgWidth = 800;
+                trainImgHeight = 600;
+                break;
+        }
+    }
+
     private async Task TriggerTrain(string exportFolderName)
     {
         if (selectedProject == null)
@@ -2049,24 +2092,19 @@ else
             return;
         }
 
-        var exportDir = Path.Combine(Env.WebRootPath, "exports", exportFolderName);
-        if (!Directory.Exists(exportDir))
-        {
-            trainStatusMessage = $"❌ Export folder not found: {exportDir}";
-            return;
-        }
-
         isTraining = true;
         StateHasChanged(); // UI 즉시 업데이트
 
         var payload = new Dictionary<string, object>
         {
             { "project_name", selectedProject.Name },
-            { "base_dir", exportDir },
             { "export_zip", $"https://hawkai.hknu.ac.kr/exports/{exportFolderName}.zip" },  // ✅ URL 전달
             { "model_size", trainModelSize },
+            { "img_width",  trainImgWidth  },   // YOLO 내부에선 (H,W)로 변환됨
+            { "img_height", trainImgHeight },
             { "epochs", trainEpochs },
-            { "batch", trainBatch }
+            { "batch", trainBatch }, 
+            { "workers", trainWorkers }
         };
 
         if (trainSeed.HasValue)
