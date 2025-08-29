@@ -264,14 +264,18 @@ else
                 {
                     var lines = File.ReadAllLines(argsPath);
 
-                    // Dataset 경로에서 마지막 폴더명만 추출
+                                // Dataset 경로에서 마지막 폴더명만 추출
                     var dataLine = lines.FirstOrDefault(l => l.TrimStart().StartsWith("data:"));
                     if (dataLine != null)
                     {
-                        var path = dataLine.Split(':', 2)[1].Trim().Replace("\"", "").Replace("'", "");
+                        var path = dataLine.Split(':', 2)[1].Trim()
+                                           .Replace("\"", "")
+                                           .Replace("'", "")
+                                           .Replace("\\", "/");  // 백슬래시 → 슬래시
                         var datasetName = Path.GetFileName(Path.GetDirectoryName(path));
                         row["Dataset"] = datasetName ?? "-";
                     }
+
 
                     // Img Size
                     string imgSize = "-";
@@ -279,7 +283,7 @@ else
 
                     if (imgszLine != null && imgszLine.Contains("["))
                     {
-                        // imgsz: [600, 800] 형태
+                                    // imgsz: [600, 800] 형태
                         var match = System.Text.RegularExpressions.Regex.Match(imgszLine, @"\[(\d+),\s*(\d+)\]");
                         if (match.Success)
                         {
@@ -288,11 +292,11 @@ else
                     }
                     else
                     {
-                        // imgsz: 640 (그 다음 줄도 확인 필요 없음)
+                                    // imgsz: 640 (그 다음 줄도 확인 필요 없음)
                         var index = Array.IndexOf(lines, imgszLine);
                         if (index >= 0 && index + 2 < lines.Length && lines[index + 1].Trim().StartsWith("-"))
                         {
-                            // 멀티라인
+                                        // 멀티라인
                             var h = lines[index + 1].Trim().TrimStart('-').Trim();
                             var w = lines[index + 2].Trim().TrimStart('-').Trim();
                             imgSize = $"{w}*{h}";
