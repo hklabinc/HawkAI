@@ -287,7 +287,7 @@ else
                         var match = System.Text.RegularExpressions.Regex.Match(imgszLine, @"\[(\d+),\s*(\d+)\]");
                         if (match.Success)
                         {
-                            imgSize = $"{match.Groups[2].Value}*{match.Groups[1].Value}";
+                            imgSize = $"{match.Groups[2].Value}x{match.Groups[1].Value}";
                         }
                     }
                     else
@@ -299,12 +299,12 @@ else
                                         // 멀티라인
                             var h = lines[index + 1].Trim().TrimStart('-').Trim();
                             var w = lines[index + 2].Trim().TrimStart('-').Trim();
-                            imgSize = $"{w}*{h}";
+                            imgSize = $"{w}x{h}";
                         }
                         else if (imgszLine != null)
                         {
                             var value = imgszLine.Split(':', 2)[1].Trim();
-                            imgSize = $"{value}*{value}";
+                            imgSize = $"{value}x{value}";
                         }
                     }
 
