@@ -39,9 +39,9 @@ else
                 var row = SortedRows.ElementAt(i);
                 <tr>
                     <td>@(i + 1)</td>
-                    <td>@row["모델명"]</td>
-                    <td>@row["사이즈"]</td>
-                    <td>@row["만든날짜"]</td>
+                    <td>@row["Model"]</td>
+                    <td>@row["Size"]</td>
+                    <td>@row["Date"]</td>
                     <td>@row["Epoch"]</td>
                     <td>@row["Precision"]</td>
                     <td>@row["Recall"]</td>
@@ -148,7 +148,7 @@ else
 @code {
     // ===== 기존 필드 =====
     List<Dictionary<string, string>> modelRows = new();
-    string sortColumn = "만든날짜";
+    string sortColumn = "Date";
     bool sortAscending = false;  // 최신순 정렬
 
     List<string> userProjectNames = new();
@@ -159,7 +159,7 @@ else
     string? zippingTarget = null;
 
     string[] Columns = new[] {
-        "모델명", "사이즈", "만든날짜", "Epoch",
+        "Model", "Size", "Date", "Dataset", "Img Size", "Epoch",
         "Precision", "Recall", "mAP50", "mAP50-95",
         "ValBoxLoss", "ValClsLoss"
     };
@@ -240,9 +240,11 @@ else
 
             var row = new Dictionary<string, string>
             {
-                ["모델명"] = modelName,
-                ["사이즈"] = size,
-                ["만든날짜"] = created,
+                ["Model"] = modelName,
+                ["Size"] = size,
+                ["Date"] = created,
+                ["Dataset"] = "-",     // 초기화 후 위에서 수정됨
+                ["Img Size"] = "-",    // 초기화 후 위에서 수정됨
                 ["Epoch"] = "-",
                 ["Precision"] = "-",
                 ["Recall"] = "-",
@@ -252,6 +254,67 @@ else
                 ["ValClsLoss"] = "-",
                 ["폴더명"] = folderName
             };
+
+            var argsPath = Path.Combine(folder, "args.yaml");
+            if (File.Exists(argsPath))
+            {
+                try
+                {
+                    var lines = File.ReadAllLines(argsPath);
+
+                    // Dataset 경로에서 마지막 폴더명만 추출
+                    var dataLine = lines.FirstOrDefault(l => l.TrimStart().StartsWith("data:"));
+                    if (dataLine != null)
+                    {
+                        var path = dataLine.Split(':', 2)[1].Trim().Replace("\"", "").Replace("'", "");
+                        var datasetName = Path.GetFileName(Path.GetDirectoryName(path));
+                        row["Dataset"] = datasetName ?? "-";
+                    }
+
+                    // Img Size
+                    string imgSize = "-";
+                    var imgszLine = lines.FirstOrDefault(l => l.TrimStart().StartsWith("imgsz:"));
+
+                    if (imgszLine != null && imgszLine.Contains("["))
+                    {
+                        // imgsz: [600, 800] 형태
+                        var match = System.Text.RegularExpressions.Regex.Match(imgszLine, @"\[(\d+),\s*(\d+)\]");
+                        if (match.Success)
+                        {
+                            imgSize = $"{match.Groups[2].Value}*{match.Groups[1].Value}";
+                        }
+                    }
+                    else
+                    {
+                        // imgsz: 640 (그 다음 줄도 확인 필요 없음)
+                        var index = Array.IndexOf(lines, imgszLine);
+                        if (index >= 0 && index + 2 < lines.Length && lines[index + 1].Trim().StartsWith("-"))
+                        {
+                            // 멀티라인
+                            var h = lines[index + 1].Trim().TrimStart('-').Trim();
+                            var w = lines[index + 2].Trim().TrimStart('-').Trim();
+                            imgSize = $"{w}*{h}";
+                        }
+                        else if (imgszLine != null)
+                        {
+                            var value = imgszLine.Split(':', 2)[1].Trim();
+                            imgSize = $"{value}*{value}";
+                        }
+                    }
+
+                    row["Img Size"] = imgSize;
+                }
+                catch
+                {
+                    row["Dataset"] = "-";
+                    row["Img Size"] = "-";
+                }
+            }
+            else
+            {
+                row["Dataset"] = "-";
+                row["Img Size"] = "-";
+            }
 
             var csvPath = Path.Combine(folder, "results.csv");
             if (File.Exists(csvPath))

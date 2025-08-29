@@ -1,0 +1,176 @@
+﻿@page "/server-status"
+@inject HttpClient Http
+@using System.Text.Json.Serialization;
+
+<h4>Training Servers Status</h4>
+
+<button class="btn btn-primary mb-3" @onclick="CheckAllServersAsync" disabled="@isLoading">
+    @if (isLoading)
+    {
+        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+        <span>Checking...</span>
+    }
+    else
+    {
+        <span>Check Server Status</span>
+    }
+</button>
+
+<table class="table table-bordered table-striped">
+    <thead>
+        <tr>
+            <th>Server</th>
+            <th>Status</th>          @* training_state["status"] → Message 출력 *@
+            <th>Last Update</th>     @* training_state["last_update"] *@
+            <th>Session ID</th>      @* training_state["session_id"] *@
+            <th>Result</th>          @* training_state["result"] *@
+            <th>Project</th>         @* training_state["project_name"] *@
+            <th>Dataset</th>         @* training_state["dataset_name"] *@
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var entry in serverStatuses)
+        {
+            <tr>
+                <td><strong>@entry.Name</strong><br /><code>@entry.Url</code></td>
+
+                <!-- Status (Message 표시) -->
+                <td class="@GetCss(entry.Status?.Status)">
+                    @entry.Status?.Message
+                </td>
+
+                <!-- Last Update -->
+                <td>@(entry.Status?.LastUpdate ?? "-")</td>
+
+                <!-- Session ID -->
+                <td><code>@(entry.Status?.Session_Id ?? "-")</code></td>
+
+                <!-- Result -->
+                <td>
+                    <div style="max-width: 520px; white-space: pre-wrap; word-break: break-word;">
+                        @entry.Status?.Result
+                    </div>
+                </td>
+
+                <!-- Project -->
+                <td>@(entry.Status?.Project_Name ?? "-")</td>
+
+                <!-- Dataset -->
+                <td>@(entry.Status?.Dataset_Name ?? "-")</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    class ServerEntry
+    {
+        public string Name { get; set; } = "";
+        public string Url { get; set; } = "";
+        public TrainingStatus? Status { get; set; }
+    }
+
+    List<ServerEntry> serverStatuses = new()
+    {
+        new() { Name = "HawkAI",   Url = "http://hawkai.hknu.ac.kr:9002" },
+        new() { Name = "ICTRobot", Url = "http://ictrobot.hknu.ac.kr:9002" },
+        new() { Name = "Server1",  Url = "http://sons.hknu.ac.kr:9003" },
+        new() { Name = "Server2",  Url = "http://sons.hknu.ac.kr:9002" }
+    };
+
+    bool isLoading = false;
+    private PeriodicTimer? _timer;
+    private CancellationTokenSource? _cts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckAllServersAsync(); // 최초 1회 실행
+
+        _cts = new CancellationTokenSource();
+        _timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
+
+        // 주기적 실행 루프
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (await _timer.WaitForNextTickAsync(_cts.Token))
+                {
+                    await InvokeAsync(CheckAllServersAsync);
+                }
+            }
+            catch (OperationCanceledException) { }
+        });
+    }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _timer?.Dispose();
+    }
+
+    private async Task CheckAllServersAsync()
+    {
+        isLoading = true;
+        StateHasChanged();
+
+        var tasks = serverStatuses.Select(async entry =>
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+
+            try
+            {
+                entry.Status = await Http.GetFromJsonAsync<TrainingStatus>(
+                    $"{entry.Url}/api/ping", cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                entry.Status = new TrainingStatus { Status = "error", Message = "⏱️ Timeout (1s)" };
+            }
+            catch
+            {
+                entry.Status = new TrainingStatus { Status = "error", Message = "❌ No Response" };
+            }
+        });
+
+        await Task.WhenAll(tasks);
+        isLoading = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private string GetCss(string? status)
+    {
+        return status switch
+        {
+            "idle" => "table-success",
+            "training" => "table-warning",
+            "error" => "table-danger",
+            _ => "table-secondary"
+        };
+    }
+
+    public class TrainingStatus
+    {
+        [JsonPropertyName("status")]
+        public string Status { get; set; } = "";
+
+        [JsonPropertyName("message")]
+        public string? Message { get; set; }   // Status 칸에서 보여줌
+
+        [JsonPropertyName("last_update")]
+        public string? LastUpdate { get; set; }
+
+        [JsonPropertyName("session_id")]
+        public string? Session_Id { get; set; }
+
+        [JsonPropertyName("result")]
+        public string? Result { get; set; }
+
+        [JsonPropertyName("project_name")]
+        public string? Project_Name { get; set; }
+
+        [JsonPropertyName("dataset_name")]
+        public string? Dataset_Name { get; set; }
+    }
+}
