@@ -478,10 +478,19 @@
                     seed = int.Parse(trimmed.Split(':')[1].Trim());
             }
 
+                // parts 예: ["L1825-03", "20250801", "035619"]
+            var dateStr = parts[^2] + "_" + parts[^1];
+            DateTime createdAt;
+            if (!DateTime.TryParseExact(dateStr, "yyyyMMdd_HHmmss", null, DateTimeStyles.None, out createdAt))
+            {
+                // 파싱 실패 시 fallback → 파일 시스템 생성 시각
+                createdAt = Directory.GetCreationTime(folder);
+            }
+
             exportInfos.Add(new ExportRow
             {
                 ModelName = modelName,
-                CreatedAt = Directory.GetCreationTime(folder),
+                CreatedAt = createdAt,   // ✅ 폴더명 기반 timestamp 사용
                 TrainCount = train,
                 ValidCount = valid,
                 FolderName = folderName,
