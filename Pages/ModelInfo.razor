@@ -42,7 +42,21 @@ else
                     <td>@row["Model"]</td>
                     <td>@row["Size"]</td>
                     <td>@row["Date"]</td>
-                    <td>@row["Dataset"]</td>     
+                    @{
+                        var dataset = row["Dataset"];
+                    }
+                    <td>
+                        @if (!string.IsNullOrEmpty(dataset) && dataset != "-")
+                        {
+                            <a href="javascript:void(0)" @onclick="@(() => ShowDatasetYaml(dataset))">
+                                @dataset
+                            </a>
+                        }
+                        else
+                        {
+                            @dataset
+                        }
+                    </td>
                     <td>@row["Img Size"]</td>
                     <td>@row["Epoch"]</td>
                     <td>@row["Precision"]</td>
@@ -65,6 +79,29 @@ else
         </tbody>
     </table>
 }
+
+@if (showDatasetModal)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.6);">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Dataset: @currentDatasetName</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseDatasetModal"></button>
+                </div>
+                <div class="modal-body">
+                    <pre style="max-height:70vh; overflow:auto; background:#111; color:#ddd; padding:12px; border-radius:8px;">
+    @datasetYamlContent
+                        </pre>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="CloseDatasetModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 
 @if (showFolderModal)
 {
@@ -156,6 +193,11 @@ else
     List<string> userProjectNames = new();
     bool isAdmin = false;
     
+    // ===== Dataset YAML 모달 상태 =====
+    bool showDatasetModal = false;
+    string currentDatasetName = "";
+    string datasetYamlContent = "";
+
     // ZIP 진행 상태
     bool isZipping = false;
     string? zippingTarget = null;
@@ -536,4 +578,36 @@ else
         }
     }
 
+
+    async Task ShowDatasetYaml(string datasetName)
+    {
+        try
+        {
+            currentDatasetName = datasetName;
+            var folderAbs = Path.Combine(Env.WebRootPath, "exports", datasetName);
+            var yamlPath = Path.Combine(folderAbs, "data.yaml");
+
+            if (System.IO.File.Exists(yamlPath))
+            {
+                datasetYamlContent = await File.ReadAllTextAsync(yamlPath);
+            }
+            else
+            {
+                datasetYamlContent = "(data.yaml not found)";
+            }
+            showDatasetModal = true;
+        }
+        catch (Exception ex)
+        {
+            datasetYamlContent = $"[읽기 실패] {ex.Message}";
+            showDatasetModal = true;
+        }
+    }
+
+    void CloseDatasetModal()
+    {
+        showDatasetModal = false;
+        currentDatasetName = "";
+        datasetYamlContent = "";
+    }
 }
