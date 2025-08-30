@@ -3,13 +3,13 @@
     public class FixedAugConfig
     {
         public bool Original { get; set; } = true;
-        public bool Rotate90 { get; set; } = true;
-        public bool Rotate180 { get; set; } = true;
-        public bool Rotate270 { get; set; } = true;
-        public bool HFlip { get; set; } = true;
-        public bool HFlipRotate90 { get; set; } = true;
-        public bool HFlipRotate180 { get; set; } = true;
-        public bool HFlipRotate270 { get; set; } = true;
+        public bool Rotate90 { get; set; } = false;
+        public bool Rotate180 { get; set; } = false;
+        public bool Rotate270 { get; set; } = false;
+        public bool HFlip { get; set; } = false;
+        public bool HFlipRotate90 { get; set; } = false;
+        public bool HFlipRotate180 { get; set; } = false;
+        public bool HFlipRotate270 { get; set; } = false;
     }
 
     public class RandomRotate { public bool Enabled { get; set; } = true; public int Limit { get; set; } = 15; public double P { get; set; } = 0.3; }
