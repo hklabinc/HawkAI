@@ -11,14 +11,14 @@
         <tr>
             <th>No</th>
             <th @onclick="() => SortExportBy(nameof(ExportRow.ModelName))">
-                모델명
+                Model
                 @if (exportSortColumn == nameof(ExportRow.ModelName))
                 {
                     <span>@(exportSortAscending ? "▲" : "▼")</span>
                 }
             </th>
             <th @onclick="() => SortExportBy(nameof(ExportRow.CreatedAt))">
-                만든날짜
+                Date
                 @if (exportSortColumn == nameof(ExportRow.CreatedAt))
                 {
                     <span>@(exportSortAscending ? "▲" : "▼")</span>

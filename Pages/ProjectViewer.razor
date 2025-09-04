@@ -104,43 +104,101 @@ else
 
 @if (showLabelingModal)
 {
+    var currentIndex = images.FindIndex(i => i.Id == selectedImageId);
+    var hasPrev = currentIndex > 0;
+    var hasNext = currentIndex < images.Count - 1;
+
     <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.6);">
         <div class="modal-dialog modal-xl" style="max-height: 95vh;">
             <div class="modal-content" style="max-height: 95vh; display: flex; flex-direction: column;">
                 <div class="modal-header">
-                    <h5 class="modal-title">Label Image</h5>
-                    <button type="button" class="btn-close" @onclick="() => showLabelingModal = false"></button>
+                    <h5 class="modal-title">
+                        Label Image - @GetFileNameById(selectedImageId)
+                    </h5>
+                    
+                    <div class="d-flex align-items-center" style="gap: 8px;">
+                        <button class="btn btn-outline-dark" @onclick="() => showHelpModal = true">❔ 도움말</button>
+                        <button type="button" class="btn-close" @onclick="() => showLabelingModal = false" aria-label="Close"></button>
+                    </div>
                 </div>
                 <div class="modal-body" style="overflow: auto; max-height: 80vh;">
                     <div style="position: relative; width: 100%; max-height: 100%;">
+                                <!-- 이미지와 캔버스 -->
                         <img id="targetImage"
                              src="@selectedImagePath"
                              style="width: 100%; height: auto; max-height: 100%; display: block; object-fit: contain;" />
                         <canvas id="labelCanvas"
                                 style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></canvas>
+
+                                    <!-- Prev 버튼 (왼쪽) -->
+                        @if (hasPrev)
+                        {
+                            <button @onclick="GoToPreviousImage"
+                                    class="btn btn-outline-secondary"
+                                    style="
+                                        position: absolute;
+                                        top: 50%;
+                                        left: 10px;
+                                        transform: translateY(-50%);
+                                        z-index: 2;
+                                        font-size: 3rem;
+                                        padding: 0.5rem 1rem;
+                                        line-height: 1;
+                                    ">
+                                &lt;
+                            </button>
+                        }
+
+                                     <!-- Next 버튼: 다음 이미지가 있을 때만 -->
+                        @if (hasNext)
+                        {
+                            <button @onclick="GoToNextImage"
+                                    class="btn btn-outline-secondary"
+                                    style="
+                                    position: absolute;
+                                    top: 50%;
+                                    right: 10px;
+                                    transform: translateY(-50%);
+                                    z-index: 2;
+                                    font-size: 3rem;
+                                    padding: 0.5rem 1rem;
+                                    line-height: 1;
+                                ">
+                            &gt;
+                            </button>
+                        }
                     </div>
                 </div>
 
-                <div class="modal-footer d-flex justify-content-between align-items-center flex-wrap">
-                    <div class="d-flex align-items-center gap-2">
-                        <button class="btn btn-danger" onclick="clearBoxes()"><span class="oi oi-trash"></span> Clear Boxes</button>
-                        <button class="btn btn-info" @onclick="LoadPreviousLabel"><span class="oi oi-reload"></span> Load Previous Label</button>
-                    </div>
-                    <div class="d-flex align-items-center gap-2 flex-grow-1 justify-content-center">
-                        <label for="labelSelector" class="form-label mb-0">Select label:</label>
-                        <select id="labelSelector" class="form-select" style="max-width: 120px;">
+
+                <div class="modal-footer d-flex align-items-center justify-content-between" style="flex-wrap: nowrap; gap: 8px; overflow-x: auto;">
+
+                    <!-- 좌측 그룹 -->
+                    <div class="d-flex align-items-center" style="gap: 6px; flex-shrink: 0;">
+                        <button class="btn btn-danger" onclick="if (confirm('⚠️ 모든 박스를 삭제하시겠습니까?')) clearBoxes();">
+                            <span class="oi oi-trash"></span> Clear
+                        </button>
+                        <button class="btn btn-info" @onclick="ImportLabelsFromPreviousAsync">
+                            <span class="oi oi-reload"></span> Import
+                        </button>
+                        <input type="number" min="1" class="form-control" style="width: 60px;" @bind="importOffset" />
+                        <button class="btn btn-info" onclick="applyLabelToSelectedBox()">Apply</button>
+                        <select id="labelSelector" class="form-select" style="width: 90px;">
                             @foreach (var label in selectedLabels.Split(',', StringSplitOptions.RemoveEmptyEntries))
                             {
                                 <option value="@label.Trim()">@label.Trim()</option>
                             }
                         </select>
-                        <button class="btn btn-outline-primary" onclick="applyLabelToSelectedBox()">Apply</button>
                     </div>
-                    <div class="d-flex gap-2">
+
+                    <!-- 우측 그룹 -->
+                    <div class="d-flex align-items-center" style="gap: 6px; flex-shrink: 0;">
+                        <button class="btn btn-outline-dark" @onclick="ToggleLabelJsonModal">Show Label</button>
                         <button class="btn btn-secondary" @onclick="() => showLabelingModal = false">Close</button>
-                        <button class="btn btn-primary" onclick="saveLabelData()">Save Labels</button>
+                        <button class="btn btn-primary" onclick="saveLabelData()">Save</button>
                     </div>
                 </div>
+
 
             </div>
         </div>
@@ -169,8 +227,62 @@ else
     </div>
 }
 
+@if (showJsonModal)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title">Label JSON Preview</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showJsonModal = false"></button>
+                </div>
+                <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
+                    <pre style="white-space: pre-wrap;">@labelJsonPreview</pre>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showJsonModal = false">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
 
-
+@if (showHelpModal)
+{
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title">단축키 도움말</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showHelpModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr><th>단축키</th><th>기능 설명</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><kbd>Delete</kbd></td><td>선택된 박스 삭제</td></tr>
+                            <tr><td><kbd>Ctrl + Z</kbd></td><td>실행 취소 (Undo)</td></tr>
+                            <tr><td><kbd>Ctrl + Y</kbd></td><td>다시 실행 (Redo)</td></tr>
+                            <tr><td><kbd>Ctrl + C</kbd></td><td>박스 복사</td></tr>
+                            <tr><td><kbd>Ctrl + V</kbd></td><td>복사된 박스 붙여넣기 (10px 이동)</td></tr>
+                            <tr><td><kbd>Ctrl + X</kbd></td><td>선택된 박스 잘라내기</td></tr>
+                            <tr><td><kbd>C</kbd></td><td>선택된 박스의 라벨 변경</td></tr>
+                            <tr><td><kbd>← / ↑ / → / ↓</kbd></td><td>선택된 박스 이동 (1px)</td></tr>
+                            <tr><td><kbd>Shift + ← / ↑ / → / ↓</kbd></td><td>선택된 박스 크기 조절 (1px)</td></tr>
+                            <tr><td><kbd>Shift + 마우스 드래그</kbd></td><td>여러 개의 박스를 선택</td></tr>
+                            <tr><td><kbd>Shift + 바탕 클릭</kbd></td><td>선택된 박스를 해제</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="() => showHelpModal = false">닫기</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
 
 
 
@@ -186,7 +298,10 @@ else
     private string selectedLabels = string.Empty;
     private bool pendingInitJS = false;
     private DotNetObjectReference<ProjectViewer>? dotNetRef;
-
+    private int importOffset = 1;
+    private bool showJsonModal = false;
+    private string labelJsonPreview = string.Empty;
+    private bool showHelpModal = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -209,6 +324,12 @@ else
             .OrderBy(i => i.FileName)
             .ToListAsync();
         StateHasChanged();
+    }
+
+    private string GetFileNameById(int imageId)
+    {
+        var image = images.FirstOrDefault(i => i.Id == imageId);
+        return image?.FileName ?? "";
     }
 
     private void OpenLabelingModal(string imagePath, int imageId)
@@ -548,29 +669,53 @@ else
         }
     }
 
-    private async Task LoadPreviousLabel()
+    private async Task ImportLabelsFromPreviousAsync()
     {
         int currentId = selectedImageId;
+        int offset = importOffset < 1 ? 1 : importOffset;
+
         var previous = await Db.Images
             .Where(i => i.ProjectId == projectId && i.Id < currentId && i.LabelStatus == "Labeled")
             .OrderByDescending(i => i.Id)
+            .Skip(offset - 1)
             .FirstOrDefaultAsync();
 
         if (previous == null)
         {
-            await JS.InvokeVoidAsync("alert", "❗ No previous labeled image found.");
+            await JS.InvokeVoidAsync("alert", $"❗ {offset}번째 이전의 라벨링된 이미지가 없습니다.");
             return;
         }
 
         if (string.IsNullOrWhiteSpace(previous.LabelData) || previous.LabelData == "[]")
         {
-            await JS.InvokeVoidAsync("alert", "⚠️ Previous image has no label data.");
+            await JS.InvokeVoidAsync("alert", "⚠️ 이전 이미지에 라벨 정보가 없습니다.");
             return;
         }
 
-        // JS에서 initLabelingCanvas 다시 실행
-        await JS.InvokeVoidAsync("initLabelingCanvas", dotNetRef, previous.LabelData);
+        var current = await Db.Images.FindAsync(selectedImageId);
+        string currentLabelData = current?.LabelData ?? "[]";
+
+        try
+        {
+            var prevArray = JsonDocument.Parse(previous.LabelData).RootElement.EnumerateArray().ToList();
+            var currentArray = JsonDocument.Parse(currentLabelData).RootElement.EnumerateArray().ToList();
+
+            var mergedList = new List<JsonElement>();
+            mergedList.AddRange(currentArray);
+            mergedList.AddRange(prevArray);
+
+            string mergedJson = JsonSerializer.Serialize(mergedList);
+
+            // JS에서 initLabelingCanvas 호출
+            await JS.InvokeVoidAsync("initLabelingCanvas", dotNetRef, mergedJson);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[❌] ImportLabelsFromPreviousAsync Error: {ex.Message}");
+            await JS.InvokeVoidAsync("alert", "❌ 이전 라벨 가져오기 중 오류가 발생했습니다.");
+        }
     }
+
 
     private async Task AdjustLabels()
     {
@@ -797,6 +942,60 @@ else
 
         await Db.SaveChangesAsync();
         await LoadImages();
+    }
+    
+    private async Task SaveLabelFromCanvas()
+    {
+        // 현재 이미지 객체
+        var image = await Db.Images.FindAsync(selectedImageId);
+        if (image == null) return;
+
+        // 이미 저장된 JSON 사용 (initLabelingCanvas 호출 시 labelJson 저장 필요)
+        // 또는 텍스트박스/임시 저장소에서 수동으로 데이터 전달받아도 됨
+        // 여기선 간단하게 현재 이미지가 저장된 걸 다시 불러 저장했다고 가정
+        image.LabelStatus = string.IsNullOrWhiteSpace(image.LabelData) || image.LabelData == "[]" ? "Unlabeled" : "Labeled";
+        await Db.SaveChangesAsync();
+    }
+
+    private async Task NavigateLabeling(int direction)
+    {
+        var currentIndex = images.FindIndex(i => i.Id == selectedImageId);
+        var newIndex = currentIndex + direction;
+
+        var nextImage = images[newIndex];
+        selectedImageId = nextImage.Id;
+        selectedImagePath = "/" + nextImage.RelativePath;
+
+        // 모달 닫았다가 다시 열면 OnAfterRenderAsync에서 initLabelingCanvas 호출됨
+        showLabelingModal = false;
+        pendingInitJS = true;  // 다시 JS init 시도하도록 설정
+        await Task.Delay(10);  // UI 상태 갱신을 위한 잠깐의 대기
+        showLabelingModal = true;
+
+        StateHasChanged();
+    }
+
+    private async Task GoToPreviousImage()
+    {
+        await SaveLabelFromCanvas();  // 현재 라벨 저장
+        await NavigateLabeling(-1);   // 이전 이미지로 이동
+    }
+
+    private async Task GoToNextImage()
+    {
+        await SaveLabelFromCanvas();  // 현재 라벨 저장
+        await NavigateLabeling(+1);   // 다음 이미지로 이동
+    }
+
+    private async Task ToggleLabelJsonModal()
+    {
+        if (!showJsonModal)
+        {
+            var image = await Db.Images.FindAsync(selectedImageId);
+            labelJsonPreview = image?.LabelData ?? "{}";
+        }
+
+        showJsonModal = !showJsonModal;
     }
 
 

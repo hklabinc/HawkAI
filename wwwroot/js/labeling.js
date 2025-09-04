@@ -212,7 +212,7 @@
         };
 
         // ✅ w와 h가 0 이상일 때만 박스 추가
-        if (correctedBox.w !== 0 && correctedBox.h !== 0) {
+        if (correctedBox.w >= 5 && correctedBox.h >= 5) {
             redoStack = [];  // ⬅️ redo 비움
             history.push(JSON.parse(JSON.stringify(boxes)));
             boxes.push(correctedBox);
