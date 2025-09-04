@@ -348,7 +348,7 @@ else
         showSavedMessage = true;
         StateHasChanged();  // UI 갱신
 
-        await Task.Delay(1000); // 2초간 표시
+        await Task.Delay(2000); // 2초간 표시
         showSavedMessage = false;
         StateHasChanged();  // 메시지 제거
     }
@@ -474,7 +474,7 @@ else
             Console.WriteLine($"[❌] Error handling annotated image: {ex.Message}");
         }
 
-        //showLabelingModal = false;
+        showLabelingModal = false;
         await LoadImages(); // ✅ 이미지 목록 다시 로딩
     }
 
