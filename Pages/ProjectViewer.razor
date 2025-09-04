@@ -167,6 +167,25 @@ else
                             &gt;
                             </button>
                         }
+
+                        @if (showSavedMessage)
+                        {
+                            <div style="
+                                position: absolute;
+                                top: 50%;
+                                left: 50%;
+                                transform: translate(-50%, -50%);
+                                z-index: 10;
+                                background-color: rgba(0,0,0,0.75);
+                                color: white;
+                                padding: 12px 24px;
+                                border-radius: 10px;
+                                font-size: 1.2rem;
+                                text-align: center;
+                            ">
+                                                ✅ 저장되었습니다
+                            </div>
+                        }
                     </div>
                 </div>
 
@@ -195,7 +214,7 @@ else
                     <div class="d-flex align-items-center" style="gap: 6px; flex-shrink: 0;">
                         <button class="btn btn-outline-dark" @onclick="ToggleLabelJsonModal">Show Label</button>
                         <button class="btn btn-secondary" @onclick="() => showLabelingModal = false">Close</button>
-                        <button class="btn btn-primary" onclick="saveLabelData()">Save</button>
+                        <button class="btn btn-primary" @onclick="SaveLabelDataWithNotification">Save</button>
                     </div>
                 </div>
 
@@ -237,15 +256,32 @@ else
                     <button type="button" class="btn-close btn-close-white" @onclick="() => showJsonModal = false"></button>
                 </div>
                 <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
-                    <pre style="white-space: pre-wrap;">@labelJsonPreview</pre>
+                    @if (!isEditingJson)
+                    {
+                        <pre style="white-space: pre-wrap;">@labelJsonPreview</pre>
+                    }
+                    else
+                    {
+                        <textarea class="form-control" style="height: 300px;" @bind="editedLabelJson"></textarea>
+                    }
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="() => showJsonModal = false">Close</button>
+                    @if (!isEditingJson)
+                    {
+                        <button class="btn btn-warning" @onclick="() => StartEditingJson()">Edit</button>
+                        <button class="btn btn-secondary" @onclick="() => showJsonModal = false">Close</button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-success" @onclick="SaveEditedJsonAsync">Save</button>
+                        <button class="btn btn-secondary" @onclick="() => isEditingJson = false">Cancel</button>
+                    }
                 </div>
             </div>
         </div>
     </div>
 }
+
 
 @if (showHelpModal)
 {
@@ -301,7 +337,21 @@ else
     private int importOffset = 1;
     private bool showJsonModal = false;
     private string labelJsonPreview = string.Empty;
+    private bool isEditingJson = false;
+    private string editedLabelJson = string.Empty;
     private bool showHelpModal = false;
+    bool showSavedMessage = false;
+
+    private async Task SaveLabelDataWithNotification()
+    {
+        await JS.InvokeVoidAsync("saveLabelData"); // 기존 JS 함수 호출
+        showSavedMessage = true;
+        StateHasChanged();  // UI 갱신
+
+        await Task.Delay(1000); // 2초간 표시
+        showSavedMessage = false;
+        StateHasChanged();  // 메시지 제거
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -424,7 +474,7 @@ else
             Console.WriteLine($"[❌] Error handling annotated image: {ex.Message}");
         }
 
-        showLabelingModal = false;
+        //showLabelingModal = false;
         await LoadImages(); // ✅ 이미지 목록 다시 로딩
     }
 
@@ -987,16 +1037,52 @@ else
         await NavigateLabeling(+1);   // 다음 이미지로 이동
     }
 
+    private void StartEditingJson()
+    {
+        editedLabelJson = labelJsonPreview;
+        isEditingJson = true;
+    }
+
+    private async Task SaveEditedJsonAsync()
+    {
+        try
+        {
+            // 유효성 검사 (예: JSON 구문 오류 방지)
+            JsonDocument.Parse(editedLabelJson);
+
+            var image = await Db.Images.FindAsync(selectedImageId);
+            if (image == null) return;
+
+            image.LabelData = editedLabelJson;
+            image.LabelStatus = string.IsNullOrWhiteSpace(editedLabelJson) || editedLabelJson == "[]" ? "Unlabeled" : "Labeled";
+            await Db.SaveChangesAsync();
+
+            showJsonModal = false;
+            isEditingJson = false;
+
+            await LoadImages(); // 이미지 목록 갱신
+
+            // JS 다시 초기화
+            pendingInitJS = true;
+            StateHasChanged();  // UI 리렌더링
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[❌] JSON Save Error: {ex.Message}");
+            await JS.InvokeVoidAsync("alert", "❌ JSON 저장 중 오류 발생!\n" + ex.Message);
+        }
+    }
+
     private async Task ToggleLabelJsonModal()
     {
         if (!showJsonModal)
         {
             var image = await Db.Images.FindAsync(selectedImageId);
             labelJsonPreview = image?.LabelData ?? "{}";
+            isEditingJson = false;
         }
 
         showJsonModal = !showJsonModal;
     }
-
 
 }
