@@ -167,25 +167,6 @@ else
                             &gt;
                             </button>
                         }
-
-                        @if (showSavedMessage)
-                        {
-                            <div style="
-                                position: absolute;
-                                top: 50%;
-                                left: 50%;
-                                transform: translate(-50%, -50%);
-                                z-index: 10;
-                                background-color: rgba(0,0,0,0.75);
-                                color: white;
-                                padding: 12px 24px;
-                                border-radius: 10px;
-                                font-size: 1.2rem;
-                                text-align: center;
-                            ">
-                                                ✅ 저장되었습니다
-                            </div>
-                        }
                     </div>
                 </div>
 
@@ -214,7 +195,7 @@ else
                     <div class="d-flex align-items-center" style="gap: 6px; flex-shrink: 0;">
                         <button class="btn btn-outline-dark" @onclick="ToggleLabelJsonModal">Show Label</button>
                         <button class="btn btn-secondary" @onclick="() => showLabelingModal = false">Close</button>
-                        <button class="btn btn-primary" @onclick="SaveLabelDataWithNotification">Save</button>
+                        <button class="btn btn-primary" onclick="saveLabelData()">Save</button>
                     </div>
                 </div>
 
@@ -340,18 +321,6 @@ else
     private bool isEditingJson = false;
     private string editedLabelJson = string.Empty;
     private bool showHelpModal = false;
-    bool showSavedMessage = false;
-
-    private async Task SaveLabelDataWithNotification()
-    {
-        await JS.InvokeVoidAsync("saveLabelData"); // 기존 JS 함수 호출
-        showSavedMessage = true;
-        StateHasChanged();  // UI 갱신
-
-        await Task.Delay(2000); // 2초간 표시
-        showSavedMessage = false;
-        StateHasChanged();  // 메시지 제거
-    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -1084,5 +1053,7 @@ else
 
         showJsonModal = !showJsonModal;
     }
+
+
 
 }
