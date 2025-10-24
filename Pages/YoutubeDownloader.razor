@@ -4,8 +4,16 @@
 @using System.Diagnostics
 @using System.Text
 
-
 <h3>YouTube Downloader</h3>
+
+<!-- 상단 컨트롤 바: Stop + Now Playing -->
+<div class="d-flex align-items-center gap-3 mb-3">
+    <button class="btn btn-outline-danger" @onclick="StopBgm">⏹ Stop</button>
+    <div>
+        <b>Now Playing:</b>
+        <span>@(string.IsNullOrWhiteSpace(currentPlayingTitle) ? "—" : currentPlayingTitle)</span>
+    </div>
+</div>
 
 <div class="mb-3">
     <input class="form-control" @bind="youtubeUrl" placeholder="Enter YouTube URL..." />
@@ -45,19 +53,21 @@
     <tbody>
         @foreach (var file in files)
                 {
-        <tr>
-            <td>
-                <a href="@($"download/{file.Name}")" download>@file.Name</a>
-            </td>
-            <td>@($"{file.Length / 1024.0:F1} KB")</td>
-            <td>@file.CreationTime.ToString("yyyy-MM-dd HH:mm")</td>
-            <td class="d-flex gap-1">
-                <a class="btn btn-sm btn-primary" href="@($"download/{file.Name}")" target="_blank">Play</a>
-                <button class="btn btn-sm btn-success" @onclick="() => ShowRenameModal(file.Name)">Edit</button>
-                <button class="btn btn-sm btn-danger" @onclick="() => ConfirmDelete(file.Name)">Delete</button>
-            </td>
-        </tr>
-                }
+                var url = $"download/{Uri.EscapeDataString(file.Name)}";
+            <tr>
+                <td>
+                    <a href="@url" download>@file.Name</a>
+                </td>
+                <td>@($"{file.Length / 1024.0:F1} KB")</td>
+                <td>@file.CreationTime.ToString("yyyy-MM-dd HH:mm")</td>
+                <td class="d-flex flex-wrap gap-1">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => DownloadFile(url, file.Name)">Download</button>
+                    <button class="btn btn-sm btn-primary" @onclick="() => PlayFile(url, file.Name)">Play</button>
+                    <button class="btn btn-sm btn-success" @onclick="() => ShowRenameModal(file.Name)">Edit</button>
+                    <button class="btn btn-sm btn-danger" @onclick="() => ConfirmDelete(file.Name)">Delete</button>
+                </td>
+            </tr>
+        }
     </tbody>
 </table>;
 }
@@ -84,20 +94,65 @@
     </div>
 }
 
+<!-- ✅ 중앙 알림(토스트) -->
+@if (showCenterNotice)
+{
+    <div class="position-fixed top-50 start-50 translate-middle" style="z-index: 2000;">
+        <div class="alert alert-success shadow-lg text-center px-4 py-3" role="alert" style="min-width: 320px;">
+            <div class="fw-bold mb-1">✅ 작업 완료</div>
+            <div>@centerNoticeMessage</div>
+        </div>
+    </div>
+}
+
+@if (isDownloading)
+{
+    <div class="position-fixed top-50 start-50 translate-middle" style="z-index: 3000;">
+        <div class="alert alert-warning shadow-lg text-center px-4 py-3" role="alert" style="min-width: 320px;">
+            <div class="fw-bold mb-1">⏳ Downloading...</div>
+            <div>@centerProgressMessage</div>
+        </div>
+    </div>
+}
 
 
 @code {
     private string youtubeUrl = "";
     private string statusMessage = "";
+    private string currentPlayingTitle = ""; // 상단 표시용
     private List<FileInfo> fileInfos = new();
     private string currentSort = nameof(FileInfo.CreationTime);
     private bool sortAscending = false;
     private string renameTarget = "";
     private string newFileName = "";
     private bool showRenameModal = false;
+    private bool isDownloading = false;
+    private string centerProgressMessage = "";
+
 
     private List<FileInfo> mp3Files = new();
     private List<FileInfo> mp4Files = new();
+
+    // 중앙 알림
+    private bool showCenterNotice = false;
+    private string centerNoticeMessage = "";
+
+    private async Task ShowCenterNotice(string message, int ms = 2500)
+    {
+        centerNoticeMessage = message;
+        showCenterNotice = true;
+        StateHasChanged();
+        try
+        {
+            await Task.Delay(ms);
+        }
+        finally
+        {
+            showCenterNotice = false;
+            centerNoticeMessage = "";
+            StateHasChanged();
+        }
+    }
 
     private async Task Download(string type)
     {
@@ -115,13 +170,13 @@
 
         try
         {
-            // ✅ 기존 메시지 지우기 (중요!)
-            statusMessage = "";
+            // ✅ 클릭 즉시 표시
+            statusMessage = $"⏳ Waiting for {type.ToUpper()} download to start...";
+            centerProgressMessage = "🚀 Preparing download... Please wait a moment.";
+            isDownloading = true;
             StateHasChanged();
 
-            statusMessage = $"🔄 Downloading {type.ToUpper()}...";
-            StateHasChanged();
-            await Task.Delay(1);
+            await Task.Delay(300); // 짧은 대기: UI 갱신용
 
             string projectRoot = Path.Combine(AppContext.BaseDirectory, "..", "..", "..");
             string scriptPath = Path.Combine(projectRoot, "PythonScripts");
@@ -130,9 +185,13 @@
             if (!Directory.Exists(outputPath))
                 Directory.CreateDirectory(outputPath);
 
+            string pythonExec = OperatingSystem.IsWindows()
+                    ? "python"
+                    : System.IO.File.Exists("/usr/bin/python3") ? "/usr/bin/python3" : "python3";
+
             var startInfo = new ProcessStartInfo
             {
-                FileName = "python",
+                FileName = pythonExec,
                 Arguments = $"youtube_download.py \"{youtubeUrl}\" \"{outputPath}\" \"{type}\"",
                 WorkingDirectory = scriptPath,
                 RedirectStandardOutput = true,
@@ -147,37 +206,41 @@
             process.Start();
 
             string finalFilename = string.Empty;
-
             while (!process.StandardOutput.EndOfStream)
             {
                 string? line = await process.StandardOutput.ReadLineAsync();
-                if (!string.IsNullOrWhiteSpace(line))
-                {
-                    // ✅ 진행 메시지 갱신
-                    statusMessage = line;
-                    StateHasChanged();
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
 
-                    if (line.EndsWith(".mp3") || line.EndsWith(".mp4"))
-                        finalFilename = line.Trim();
-                }
+                // ✅ Python 로그 → 상태 + 토스트 동기화
+                statusMessage = line;
+                centerProgressMessage = line;
+                await InvokeAsync(StateHasChanged);
+
+                if (line.EndsWith(".mp3") || line.EndsWith(".mp4"))
+                    finalFilename = line.Trim();
             }
 
             await process.WaitForExitAsync();
+            isDownloading = false;
 
-            if (process.ExitCode == 0 && finalFilename != null)
+            if (process.ExitCode == 0 && !string.IsNullOrWhiteSpace(finalFilename))
             {
                 statusMessage = $"✅ Downloaded: {finalFilename}";
-                // await JS.InvokeVoidAsync("triggerFileDownload", $"/download/{Uri.EscapeDataString(finalFilename)}");
+                await ShowCenterNotice($"다운로드 완료: {finalFilename}");
             }
             else
             {
                 string error = await process.StandardError.ReadToEndAsync();
                 statusMessage = $"❌ Error: {error}";
+                await ShowCenterNotice("다운로드 중 오류 발생");
             }
         }
         catch (Exception ex)
         {
+            isDownloading = false;
             statusMessage = $"❌ Exception: {ex.Message}";
+            await ShowCenterNotice("예외 발생으로 실패");
         }
 
         LoadDownloadList();
@@ -194,7 +257,6 @@
                 mp3Files = all.Where(f => f.Extension.ToLower() == ".mp3").ToList();
                 mp4Files = all.Where(f => f.Extension.ToLower() == ".mp4").ToList();
 
-                // 정렬 적용
                 mp3Files = ApplySort(mp3Files).ToList();
                 mp4Files = ApplySort(mp4Files).ToList();
             }
@@ -205,7 +267,6 @@
             mp4Files = new();
         }
     }
-
 
     private string GetFileTypeEmoji(string extension)
     {
@@ -219,13 +280,13 @@
     }
 
     private IEnumerable<FileInfo> ApplySort(IEnumerable<FileInfo> list) =>
-    currentSort switch
-    {
-        nameof(FileInfo.Name) => sortAscending ? list.OrderBy(f => f.Name) : list.OrderByDescending(f => f.Name),
-        nameof(FileInfo.Length) => sortAscending ? list.OrderBy(f => f.Length) : list.OrderByDescending(f => f.Length),
-        nameof(FileInfo.CreationTime) => sortAscending ? list.OrderBy(f => f.CreationTime) : list.OrderByDescending(f => f.CreationTime),
-        _ => list
-    };
+        currentSort switch
+        {
+            nameof(FileInfo.Name) => sortAscending ? list.OrderBy(f => f.Name) : list.OrderByDescending(f => f.Name),
+            nameof(FileInfo.Length) => sortAscending ? list.OrderBy(f => f.Length) : list.OrderByDescending(f => f.Length),
+            nameof(FileInfo.CreationTime) => sortAscending ? list.OrderBy(f => f.CreationTime) : list.OrderByDescending(f => f.CreationTime),
+            _ => list
+        };
 
     private void SortBy(string column)
     {
@@ -260,9 +321,12 @@
         LoadDownloadList();
     }
 
-    protected override void OnInitialized()
+    protected override async void OnInitialized()
     {
         LoadDownloadList();
+        // 페이지 진입 시 현재 재생 상태 동기화
+        await EnsureAudioHost();
+        await SyncCurrentPlayingTitle();
     }
 
     private async Task ConfirmDelete(string fileName)
@@ -275,7 +339,7 @@
     private void ShowRenameModal(string fileName)
     {
         renameTarget = fileName;
-        newFileName = Path.GetFileNameWithoutExtension(fileName); // 기본 이름
+        newFileName = Path.GetFileNameWithoutExtension(fileName);
         showRenameModal = true;
     }
 
@@ -305,5 +369,55 @@
 
         showRenameModal = false;
         LoadDownloadList();
+    }
+
+    // ======================
+    // 🔊 BG 재생 관련
+    // ======================
+    private async Task EnsureAudioHost()
+    {
+        await JS.InvokeVoidAsync("MusicPlayer.ensure");
+        // 기본적으로 무한 반복
+        await JS.InvokeVoidAsync("MusicPlayer.setLoop", true);
+    }
+
+    private async Task PlayFile(string url, string title)
+    {
+        await EnsureAudioHost();
+        await JS.InvokeVoidAsync("MusicPlayer.play", url, title);
+        currentPlayingTitle = title;
+        await ShowCenterNotice($"재생 시작: {title}");
+    }
+
+    private async Task StopBgm()
+    {
+        await JS.InvokeVoidAsync("MusicPlayer.stop");
+        currentPlayingTitle = "";
+    }
+
+    private async Task SyncCurrentPlayingTitle()
+    {
+        try
+        {
+            var info = await JS.InvokeAsync<PlayingInfo>("MusicPlayer.current");
+            currentPlayingTitle = info?.title ?? "";
+        }
+        catch
+        {
+            currentPlayingTitle = "";
+        }
+        StateHasChanged();
+    }
+
+    private async Task DownloadFile(string url, string fileName)
+    {
+        await JS.InvokeVoidAsync("MusicPlayer.download", url, fileName);
+        await ShowCenterNotice($"다운로드 시작: {fileName}", 1500);
+    }
+
+    private class PlayingInfo
+    {
+        public string title { get; set; } = "";
+        public string src { get; set; } = "";
     }
 }
