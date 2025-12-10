@@ -325,6 +325,7 @@ else
                             <select class="form-select" @bind="selectedImageSize" disabled="@isExporting">
                                 <option value="0">Original Size</option>
                                 <option value="640">640 x 640</option>
+                                <option value="480">640 x 480</option>
                                 <option value="512">512 x 512</option>
                             </select>
                         </div>
@@ -2059,6 +2060,10 @@ else
         var val = e.Value?.ToString();
         switch (val)
         {
+            case "640x480":
+                trainImgWidth = 640;
+                trainImgHeight = 480;
+                break;
             case "640x640":
                 trainImgWidth = 640;
                 trainImgHeight = 640;
