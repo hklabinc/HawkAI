@@ -322,11 +322,12 @@ else
                         <!-- 기본 옵션 -->
                         <div class="mb-3">
                             <label class="form-label">Image Size</label>
-                            <select class="form-select" @bind="selectedImageSize" disabled="@isExporting">
-                                <option value="0">Original Size</option>
-                                <option value="640">640 x 640</option>
-                                <option value="480">640 x 480</option>
-                                <option value="512">512 x 512</option>
+                            <select class="form-select" @onchange="OnExportImageSizeChanged" disabled="@isExporting">
+                                <option value="800x600" selected>800 x 600 (Original)</option>
+                                <option value="640x640">640 x 640</option>
+                                <option value="640x480">640 x 480</option>
+                                <option value="512x512">512 x 512</option>
+                                <option value="480x480">480 x 480</option>
                             </select>
                         </div>
 
@@ -647,9 +648,11 @@ else
                         <div class="mb-3">
                             <label class="form-label">Image Size (Width × Height)</label>
                             <select class="form-select" @onchange="OnImageSizeChanged" disabled="@isTraining">
-                                <option value="640x640">640 × 640</option>
-                                <option value="800x600" selected>800 × 600</option>   @* ✅ 디폴트 *@
-                                <option value="1024x768">1024 × 768</option>
+                                <option value="800x640" selected>800 x 600 (Original)</option>
+                                <option value="640x640">640 x 640</option>
+                                <option value="640x480">640 x 480</option>
+                                <option value="512x512">512 x 512</option>
+                                <option value="480x480">480 x 480</option>
                             </select>                            
                         </div>
 
@@ -820,7 +823,9 @@ else
 
     private bool showExportModal = false;
     private int exportProjectId;
-    private int selectedImageSize = 0;
+    private string selectedImageSize = "800x600";
+    private int exportImgWidth = 0;
+    private int exportImgHeight = 0;
 
     private bool showEditModal = false;
     private Project editingProject = new();
@@ -840,7 +845,7 @@ else
     private string trainModelSize = "small";
     private string trainStatusMessage = string.Empty;
     private DotNetObjectReference<Projects>? sseRef;
-    private int trainImgWidth = 800;
+    private int trainImgWidth = 800;    // 기본값은 800x600
     private int trainImgHeight = 600;    
     private int trainEpochs = 600;
     private int trainBatch = 32;
@@ -1191,8 +1196,10 @@ else
                 if (File.Exists(srcImg))
                 {
                     using var img = SixLabors.ImageSharp.Image.Load<Rgba32>(srcImg);
-                    if (selectedImageSize > 0)
-                        img.Mutate(x => x.Resize(selectedImageSize, selectedImageSize));
+                    if (exportImgWidth > 0 && exportImgHeight > 0)
+                    {
+                        img.Mutate(x => x.Resize(exportImgWidth, exportImgHeight));
+                    }
                     await img.SaveAsJpegAsync(imgDest);
                 }
 
@@ -1367,8 +1374,8 @@ else
             sb.AppendLine($"  project: {project.Name.ToLower().Replace(" ", "-")}");                        
             sb.AppendLine($"  url: https://hawkai.hknu.ac.kr/projects/{projectId}");
             sb.AppendLine($"  task: {(exportAsSegmentation ? "segment" : "detect")}");
-            int imgW = selectedImageSize > 0 ? selectedImageSize : (project.Images.FirstOrDefault()?.Width ?? 0);
-            int imgH = selectedImageSize > 0 ? selectedImageSize : (project.Images.FirstOrDefault()?.Height ?? 0);
+            int imgW = exportImgWidth > 0 ? exportImgWidth : (project.Images.FirstOrDefault()?.Width ?? 0);
+            int imgH = exportImgHeight > 0 ? exportImgHeight : (project.Images.FirstOrDefault()?.Height ?? 0);
             sb.AppendLine($"  image_width: {imgW}");
             sb.AppendLine($"  image_height: {imgH}");            
             sb.AppendLine($"  trainCount: {trainCount}");
@@ -2055,32 +2062,24 @@ else
             RegexOptions.IgnoreCase);
     }
 
+    private void OnExportImageSizeChanged(ChangeEventArgs e)
+    {
+        selectedImageSize = e.Value?.ToString() ?? "800x600";
+
+        var parts = selectedImageSize.Split('x');
+        if (parts.Length == 2)
+        {
+            exportImgWidth = int.Parse(parts[0]);
+            exportImgHeight = int.Parse(parts[1]);
+        }
+    }
+
     private void OnImageSizeChanged(ChangeEventArgs e)
     {
-        var val = e.Value?.ToString();
-        switch (val)
-        {
-            case "640x480":
-                trainImgWidth = 640;
-                trainImgHeight = 480;
-                break;
-            case "640x640":
-                trainImgWidth = 640;
-                trainImgHeight = 640;
-                break;
-            case "800x600":
-                trainImgWidth = 800;
-                trainImgHeight = 600;
-                break;
-            case "1024x768":
-                trainImgWidth = 1024;
-                trainImgHeight = 768;
-                break;
-            default:
-                trainImgWidth = 800;
-                trainImgHeight = 600;
-                break;
-        }
+        var size = e.Value?.ToString();
+        var parts = size.Split('x');
+        trainImgWidth = int.Parse(parts[0]);
+        trainImgHeight = int.Parse(parts[1]);
     }
 
     private async Task TriggerTrain(string exportFolderName)
