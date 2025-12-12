@@ -1101,14 +1101,14 @@ else
     {
         createUploadedFiles.Clear();
         var validExtensions = new[] { ".jpg", ".jpeg", ".png", ".bmp" };
-        const long maxSize = 5 * 1024 * 1024; // 5MB
+        const long maxSize = 50 * 1024 * 1024; // 50MB
 
         foreach (var file in e.GetMultipleFiles(500))
         {
             var ext = Path.GetExtension(file.Name).ToLowerInvariant();
             if (!validExtensions.Contains(ext) || file.Size > maxSize)
             {
-                errorMessage = "Only image files (.jpg, .png, .bmp) under 5MB are allowed.";
+                errorMessage = "Only image files (.jpg, .png, .bmp) under 50MB are allowed.";
                 return;
             }
 
