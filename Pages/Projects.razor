@@ -1035,28 +1035,32 @@ else
         var imagePath = Path.Combine(Env.WebRootPath, "datasets", newProjectName, "images");
         Directory.CreateDirectory(imagePath);
 
+        const long maxSize = 50 * 1024 * 1024;
+
         foreach (var file in createUploadedFiles)
         {
+            await using var stream = file.OpenReadStream(maxSize);
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            ms.Position = 0;
+
+            // 이미지 로드
+            using var image = SixLabors.ImageSharp.Image.Load(ms);
+
+            // 파일 저장
             var filePath = Path.Combine(imagePath, file.Name);
-            await using var stream = new FileStream(filePath, FileMode.Create);
-            await file.OpenReadStream().CopyToAsync(stream);
+            await File.WriteAllBytesAsync(filePath, ms.ToArray());
 
-            using var image = await SixLabors.ImageSharp.Image.LoadAsync(file.OpenReadStream());
-
-            var imageEntry = new ImageEntry
-                {
-                    ProjectId = project.Id,
-                    FileName = file.Name,
-                    RelativePath = $"datasets/{newProjectName}/images/{file.Name}",
-                    UploadedAt = DateTime.Now,
-                    UploadedByUserId = userId,
-                    Width = image.Width,
-                    Height = image.Height,
-                    LabelStatus = "Unlabeled",
-                    LabelData = "{}"
-                };
-
-            Db.Images.Add(imageEntry);
+            Db.Images.Add(new ImageEntry
+            {
+                ProjectId = project.Id,
+                FileName = file.Name,
+                RelativePath = $"datasets/{newProjectName}/images/{file.Name}",
+                Width = image.Width,
+                Height = image.Height,
+                LabelStatus = "Unlabeled",
+                LabelData = "{}"
+            });
         }
 
         await Db.SaveChangesAsync();
@@ -1566,11 +1570,14 @@ else
             var uploadPath = Path.Combine(Env.WebRootPath, "datasets", project.Name, "images");
             Directory.CreateDirectory(uploadPath);
 
+            const long maxSize = 50 * 1024 * 1024; // 50MB
+
             foreach (var file in editUploadedFiles)
             {
                 var fileName = Path.GetFileName(file.Name);
                 var savePath = Path.Combine(uploadPath, fileName);
 
+                // ✅ (추가) DB 기존 엔트리 확인
                 var existingEntry = project.Images.FirstOrDefault(img => img.FileName == fileName);
 
                 if (File.Exists(savePath))
@@ -1579,7 +1586,6 @@ else
                     if (!overwrite)
                         continue;
 
-                    // 기존 이미지가 Labeled 상태였다면 images_annotated에서 삭제
                     if (existingEntry != null && existingEntry.LabelStatus == "Labeled")
                     {
                         var annotatedPath = Path.Combine(Env.WebRootPath, "datasets", project.Name, "images_annotated", fileName);
@@ -1590,13 +1596,19 @@ else
                     }
                 }
 
-                await using var stream = File.Create(savePath);
-                await file.OpenReadStream().CopyToAsync(stream);
+                // ✅ 1) 파일 저장 (maxAllowedSize 지정)
+                await using (var readStream = file.OpenReadStream(maxSize))
+                await using (var writeStream = new FileStream(savePath, FileMode.Create))
+                {
+                    await readStream.CopyToAsync(writeStream);
+                }
 
-                using var imageInfo = await SixLabors.ImageSharp.Image.LoadAsync(file.OpenReadStream());
+                // ✅ 2) 이미지 메타데이터 읽기 (maxAllowedSize 지정)
+                await using var imgStream = file.OpenReadStream(maxSize);
+                using var imageInfo = await SixLabors.ImageSharp.Image.LoadAsync(imgStream);
+
                 if (existingEntry != null)
                 {
-                    // 덮어쓰기: 기존 DB 정보 업데이트
                     existingEntry.Width = imageInfo.Width;
                     existingEntry.Height = imageInfo.Height;
                     existingEntry.LabelStatus = "Unlabeled";
@@ -1605,20 +1617,18 @@ else
                 }
                 else
                 {
-                    // 새로 추가
                     Db.Images.Add(new ImageEntry
-                        {
-                            ProjectId = project.Id,
-                            FileName = fileName,
-                            RelativePath = Path.Combine("datasets", project.Name, "images", fileName).Replace("\\", "/"),
-                            LabelStatus = "Unlabeled",
-                            Width = imageInfo.Width,
-                            Height = imageInfo.Height,
-                            UploadedByUserId = project.CreatorUserId
-                        });
+                    {
+                        ProjectId = project.Id,
+                        FileName = fileName,
+                        RelativePath = Path.Combine("datasets", project.Name, "images", fileName).Replace("\\", "/"),
+                        LabelStatus = "Unlabeled",
+                        Width = imageInfo.Width,
+                        Height = imageInfo.Height,
+                        UploadedByUserId = userId
+                    });
                 }
             }
-
             await Db.SaveChangesAsync();
         }
 
