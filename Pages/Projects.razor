@@ -692,14 +692,6 @@ else
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">TFLite Export Input Size</label>
-                            <select class="form-select" @bind="trainTfliteExportImgSize" disabled="@isTraining">
-                                <option value="512x288">512×288 (default)</option>
-                                <option value="640x480">640×480</option>
-                            </select>
-                        </div>
-
-                        <div class="mb-3">
                             <label class="form-label">Notification Email(s)</label>
                             <input class="form-control" @bind="recipientEmails" placeholder="e.g. user1@example.com, user2@example.com" disabled="@isTraining" />                            
                         </div>
@@ -864,7 +856,6 @@ else
     private bool showTrainModal = false;
     private string trainModelSize = "small";
     private string trainTfliteExport = "fp16"; // ✅ 기본 FP16
-    private string trainTfliteExportImgSize = "512x288"; // default
     private string trainStatusMessage = string.Empty;
     private DotNetObjectReference<Projects>? sseRef;
     private int trainImgWidth = 800;    // 기본값은 800x600
@@ -2143,21 +2134,6 @@ else
             { "workers", trainWorkers },
             { "tflite_export", trainTfliteExport }
         };
-
-        int exportW = 512, exportH = 288;
-        var parts = (trainTfliteExportImgSize ?? "512x288").Split('x', 'X');
-        if (parts.Length == 2 &&
-            int.TryParse(parts[0], out var w) &&
-            int.TryParse(parts[1], out var h))
-        {
-            exportW = w;
-            exportH = h;
-        }
-
-        // payload에 추가
-        payload["tflite_export_img_width"] = exportW;
-        payload["tflite_export_img_height"] = exportH;
-
 
         if (trainSeed.HasValue)
             payload["seed"] = trainSeed.Value;
