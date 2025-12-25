@@ -1,0 +1,209 @@
+﻿@page "/airuler"
+
+@inject IJSRuntime JS
+
+<h3>AIRuler</h3>
+
+<div class="airuler-wrap">
+    <!-- 모델/업로드 패널 -->
+    <div class="airuler-top">
+        <div class="airuler-card">
+            <div class="airuler-row">
+                <div>
+                    <div class="airuler-label">Model Project</div>
+                    <div class="airuler-row">
+                        <input id="airulerModelNameInput" class="airuler-input" placeholder="예: Kodak_Portra_400" />
+                        <button id="airulerBtnCreateModel" class="airuler-btn">모델 생성/선택</button>
+                        <button id="airulerBtnRefreshModels" class="airuler-btn">목록 새로고침</button>
+                    </div>
+
+                    <div class="airuler-row" style="margin-top:8px;">
+                        <select id="airulerModelSelect" class="airuler-input" style="min-width:280px;">
+                            <option value="">(모델 선택)</option>
+                        </select>
+                        <button id="airulerBtnLoadServerJson" class="airuler-btn" disabled>서버 JSON 불러오기</button>
+                    </div>
+
+                    <div class="airuler-row" style="margin-top:8px;">
+                        <div class="airuler-label">Current Model:</div>
+                        <div id="airulerCurrentModel" class="airuler-mono">(없음)</div>
+                    </div>
+
+                    <div class="airuler-row" style="margin-top:4px;">
+                        <div class="airuler-label">JSON Download:</div>
+                        <a id="airulerCurrentJsonLink" class="airuler-mono" href="#" target="_blank"></a>
+                    </div>
+                </div>
+
+                <div style="min-width:420px;">
+                    <div class="airuler-label">이미지 업로드(서버)</div>
+                    <div class="airuler-row">
+                        <input id="airulerUploadInput" class="airuler-input" type="file" multiple accept=".png,.jpg,.jpeg,.bmp,.webp" />
+                        <button id="airulerBtnUploadImages" class="airuler-btn">업로드</button>
+                    </div>
+
+                    <div class="airuler-label" style="margin-top:10px;">서버 이미지 목록(클릭하면 불러오기)</div>
+                    <div id="airulerImageList" class="airuler-img-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- python UI와 동일한 상단 버튼들 -->
+    <div class="airuler-toolbar airuler-card">
+        <button id="airulerBtnLoadImage" class="airuler-btn">이미지 불러오기</button>
+        <button id="airulerBtnLoadJson" class="airuler-btn">JSON 불러오기</button>
+        <button id="airulerBtnShowJson" class="airuler-btn">전체 JSON 보기</button>
+        <button id="airulerBtnSaveJson" class="airuler-btn">JSON 저장 (Ctrl+S)</button>
+        <button id="airulerBtnEditRoi" class="airuler-btn">선택 ROI Edit (Ctrl+E)</button>
+        <button id="airulerBtnHelp" class="airuler-btn">도움말</button>
+
+        <div class="airuler-spacer"></div>
+
+        <div class="airuler-label">Hover:</div>
+        <div id="airulerHoverLabel" class="airuler-mono"></div>
+
+        <input id="airulerLocalImageInput" type="file" accept=".png,.jpg,.jpeg,.bmp,.webp" style="display:none;" />
+        <input id="airulerLocalJsonInput" type="file" accept=".json" style="display:none;" />
+    </div>
+
+    <!-- 캔버스(이미지+ROI+Measure) -->
+    <div class="airuler-canvas-wrap airuler-card">
+        <div class="airuler-label">Current Image:</div>
+        <div id="airulerCurrentImage" class="airuler-mono text-muted"></div>
+        <div id="airulerCanvasHost" class="airuler-canvas-host">
+            <canvas id="airulerCanvas"></canvas>
+        </div>
+    </div>
+
+    <!-- 하단 3분할: JSON Viewer / Measure Editor / Status Log -->
+    <div class="airuler-bottom airuler-card">
+        <div class="airuler-col">
+            <div class="airuler-section-title">JSON Viewer</div>
+            <div id="airulerJsonViewerHost" class="airuler-scrollbox">
+                <div id="airulerJsonViewer"></div>
+            </div>
+        </div>
+
+        <div class="airuler-col">
+            <div class="airuler-section-title">Measure Editor</div>
+
+            <div class="airuler-form">
+                <label>Measure 번호:</label>
+                <input id="airulerMeasureIndex" class="airuler-input" />
+
+                <label>Start ROI (예: 1 또는 roi_1):</label>
+                <input id="airulerMeasureStart" class="airuler-input" />
+
+                <label>End ROI (예: 2 또는 roi_2):</label>
+                <input id="airulerMeasureEnd" class="airuler-input" />
+
+                <label>Direction (x / y):</label>
+                <input id="airulerMeasureDirection" class="airuler-input" />
+
+                <label>GT:</label>
+                <input id="airulerMeasureGt" class="airuler-input" />
+
+                <label>Margin:</label>
+                <input id="airulerMeasureMargin" class="airuler-input" value="0.15" />
+            </div>
+
+            <div class="airuler-row" style="margin-top:8px;">
+                <button id="airulerBtnAddMeasure" class="airuler-btn">Measure 추가/수정</button>
+                <button id="airulerBtnDeleteMeasure" class="airuler-btn">Measure 삭제</button>
+            </div>
+
+            <div class="airuler-section-title" style="margin-top:10px;">현재 measure 목록</div>
+            <pre id="airulerMeasureList" class="airuler-prebox"></pre>
+        </div>
+
+        <div class="airuler-col">
+            <div class="airuler-section-title">Status Log</div>
+            <textarea id="airulerStatusLog" class="airuler-log" readonly></textarea>
+
+            <div class="airuler-section-title" style="margin-top:10px;">저장된 JSON 다운로드</div>
+            <div id="airulerSavedJsonList" class="airuler-scrollbox"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ROI Modal -->
+<div id="airulerRoiModal" class="airuler-modal">
+    <div class="airuler-modal-body">
+        <div class="airuler-modal-title" id="airulerRoiModalTitle">ROI 정보 입력 / 수정</div>
+
+        <div class="airuler-form">
+            <label>ROI 번호:</label>
+            <input id="airulerRoiId" class="airuler-input" />
+            <label>Method:</label>
+            <input id="airulerRoiMethod" class="airuler-input" />
+            <label>Parameter:</label>
+            <input id="airulerRoiParam" class="airuler-input" />
+        </div>
+
+        <div class="airuler-row" style="justify-content:flex-end; margin-top:10px;">
+            <button id="airulerRoiCancel" class="airuler-btn">Cancel</button>
+            <button id="airulerRoiOk" class="airuler-btn">OK</button>
+        </div>
+    </div>
+</div>
+
+<!-- Help Modal -->
+<div id="airulerHelpModal" class="airuler-modal">
+    <div class="airuler-modal-body" style="max-width:900px;">
+        <div class="airuler-modal-title">키보드 도움말 (python 버전과 동일)</div>
+        <pre class="airuler-prebox" style="white-space:pre-wrap;">
+=== 키보드/마우스 조작 ===
+
+[기본]
+- 마우스 왼쪽 드래그: 새 ROI 박스 생성
+- 마우스 왼쪽 클릭: ROI 선택
+- 링크 선(Measure) 클릭: 해당 Measure 선택
+- 배경 클릭: 선택 해제
+
+[ROI 이동/크기 변경]
+- 화살표 키: 선택된 ROI를 1px씩 이동
+- Shift + 화살표:
+    Shift+Right : 너비 +1px
+    Shift+Left  : 너비 -1px
+    Shift+Down  : 높이 +1px
+    Shift+Up    : 높이 -1px
+  (좌상단 (x,y)을 기준으로 크기 변경)
+- Delete: 선택된 ROI 삭제
+- Ctrl + C: ROI 복사
+- Ctrl + X: ROI 잘라내기
+- Ctrl + V: ROI 붙여넣기(10px 이동 복제)
+- Ctrl + E: ROI 정보 Edit (ROI 번호/Method/Parameter 수정 가능)
+
+[전체 이미지 확대/이동]
+- Ctrl + '+': 전체 이미지 확대
+- Ctrl + '-': 전체 이미지 축소
+- Ctrl + 화살표: 전체 이미지 화면 내에서 이동(팬)
+
+[Measure 입력]
+- Measure 번호, 시작/끝 ROI, 방향, GT, margin 입력
+- Start/End ROI는 '1' 또는 'roi_1' 형태 가능
+- 'Measure 추가/수정': 동일 번호 있으면 경고 후 덮어쓰기
+- 'Measure 삭제': 입력 번호 삭제
+
+[JSON 보기/저장]
+- ROI 또는 Measure 클릭 시 JSON Viewer에서 해당 위치 하이라이트/스크롤
+- '전체 JSON 보기': 현재 ROI/Measure 정보를 표시
+- 'JSON 저장(Ctrl+S)': 서버에 {모델}.json 저장 + 브라우저 다운로드
+        </pre>
+        <div class="airuler-row" style="justify-content:flex-end; margin-top:10px;">
+            <button id="airulerHelpClose" class="airuler-btn">닫기</button>
+        </div>
+    </div>
+</div>
+
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("airuler.init");
+        }
+    }
+}

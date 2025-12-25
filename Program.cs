@@ -152,6 +152,7 @@ provider.Mappings[".tflite"] = "application/octet-stream";  // TensorFlow Lite
 provider.Mappings[".pb"] = "application/octet-stream";  // TensorFlow SavedModel (protobuf)
 provider.Mappings[".yaml"] = "application/x-yaml";
 provider.Mappings[".yml"] = "application/x-yaml";
+provider.Mappings[".json"] = "application/json";
 
 app.UseStaticFiles(new StaticFileOptions
 {
