@@ -225,6 +225,7 @@
                     <span>JSON</span>
                     <div class="d-flex gap-2 flex-wrap">
                         <button class="btn btn-sm btn-primary" @onclick="GenerateJsonToEditor">Generate JSON</button>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="ApplyJsonEditorAsync">Apply to Viewer</button>
                         <button class="btn btn-sm btn-success" @onclick="SaveJsonAsync" disabled="@string.IsNullOrWhiteSpace(_selectedModel)">Save</button>
                         <button class="btn btn-sm btn-outline-secondary" @onclick="LoadJsonAsync" disabled="@string.IsNullOrWhiteSpace(_selectedModel)">Load</button>
 
@@ -352,6 +353,9 @@
 
     private int _imgW = 0;
     private int _imgH = 0;
+
+    // 이미지 로드 전 JSON Load를 누르면 여기 저장해두었다가 OnImageLoaded에서 적용
+    private string? _pendingJsonToApply;
 
     // View state (Viewer 내부만 적용)
     private double _zoomFactor = 1.0;
@@ -560,6 +564,19 @@
         _imgW = w;
         _imgH = h;
         Log($"Image loaded: {_imgW}x{_imgH}");
+
+        // ✅ 이미지 로드 전에 JSON이 로드되어 대기중이면 지금 적용
+        if (!string.IsNullOrWhiteSpace(_pendingJsonToApply))
+        {
+            var txt = _pendingJsonToApply;
+            _pendingJsonToApply = null;
+
+            if (TryRestoreFromJsonText(txt!, out var err))
+                Log("Pending JSON applied after image load.");
+            else
+                Log($"ERROR: pending JSON apply failed: {err}");
+        }
+
         await PushCanvasStateAsync();
         await InvokeAsync(StateHasChanged);
     }
@@ -1091,18 +1108,37 @@
 
     private async Task LoadJsonAsync()
     {
-        if (string.IsNullOrWhiteSpace(_selectedModel)) return;
-        var model = SanitizeModelName(_selectedModel);
+        if (string.IsNullOrWhiteSpace(_selectedModel))
+            return;
 
+        var model = SanitizeModelName(_selectedModel);
         var path = Path.Combine(ModelsRoot, $"{model}.json");
+
         if (!File.Exists(path))
         {
             Log("WARN: JSON file not found.");
             return;
         }
 
-        _jsonEditorText = await File.ReadAllTextAsync(path, Encoding.UTF8);
-        Log("JSON loaded (text only).");
+        var txt = await File.ReadAllTextAsync(path, Encoding.UTF8);
+        _jsonEditorText = txt;
+
+        // ✅ 이미지가 아직 로드되지 않았으면, 나중에 적용
+        if (_imgW <= 0 || _imgH <= 0)
+        {
+            _pendingJsonToApply = txt;
+            Log("JSON loaded into editor. Image not loaded yet -> will apply after image loads.");
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        // ✅ 즉시 파싱/복원 후 캔버스 반영
+        if (TryRestoreFromJsonText(txt, out var err))
+            Log("JSON loaded and applied to viewer.");
+        else
+            Log($"ERROR: JSON parse/apply failed: {err}");
+
+        await PushCanvasStateAsync();
         await InvokeAsync(StateHasChanged);
     }
 
@@ -1212,6 +1248,149 @@
         return sb.Length == 0 ? "Model" : sb.ToString();
     }
 
+    private bool TryRestoreFromJsonText(string jsonText, out string error)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(jsonText);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                error = "Root JSON is not an object.";
+                return false;
+            }
+
+            RestoreFromJson(doc.RootElement);
+            error = "";
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    private void RestoreFromJson(JsonElement root)
+    {
+        // 현재 상태 초기화
+        _rois.Clear();
+        _measures.Clear();
+        _selectedRoiId = null;
+        _selectedMeasureId = null;
+
+        // ---------- ROI ----------
+        foreach (var prop in root.EnumerateObject())
+        {
+            if (!prop.Name.StartsWith("roi_", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var id = ParseRoiNameToId(prop.Name);
+            if (id is null) continue;
+
+            var obj = prop.Value;
+            if (obj.ValueKind != JsonValueKind.Object) continue;
+
+            // python json은 normalized (0~1) -> px로 환산
+            var xn = ReadDouble(obj, "x", 0);
+            var yn = ReadDouble(obj, "y", 0);
+            var wn = ReadDouble(obj, "w", 0.1);
+            var hn = ReadDouble(obj, "h", 0.1);
+
+            var roi = new Roi
+            {
+                Id = id.Value,
+                X = xn * _imgW,
+                Y = yn * _imgH,
+                W = wn * _imgW,
+                H = hn * _imgH,
+                Method = ReadString(obj, "method", ""),
+                Parameter = ReadNullableDouble(obj, "parameter")
+            };
+
+            ClampRoiToImageInPlace(roi);
+            _rois.Add(roi);
+        }
+
+        // ---------- Measure ----------
+        foreach (var prop in root.EnumerateObject())
+        {
+            if (!prop.Name.StartsWith("measure_", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var idxStr = prop.Name.Substring("measure_".Length);
+            if (!int.TryParse(idxStr, out var mid)) continue;
+
+            var obj = prop.Value;
+            if (obj.ValueKind != JsonValueKind.Object) continue;
+
+            var start = NormalizeRoiName(ReadString(obj, "start", ""));
+            var end = NormalizeRoiName(ReadString(obj, "end", ""));
+
+            var dir = ReadString(obj, "direction", "x");
+            if (dir != "x" && dir != "y") dir = "x";
+
+            // gt/margin은 json에 null일 수도 있으니 안전하게
+            var gt = ReadNullableDouble(obj, "gt") ?? 0;
+            var margin = ReadNullableDouble(obj, "margin") ?? 0;
+
+            _measures[mid] = new Measure
+            {
+                Start = start,
+                End = end,
+                Direction = dir,
+                Gt = gt,
+                Margin = margin
+            };
+        }
+    }
+
+    private static string NormalizeRoiName(string s)
+    {
+        s = (s ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(s)) return "";
+
+        if (s.StartsWith("roi_", StringComparison.OrdinalIgnoreCase))
+            return s;
+
+        if (int.TryParse(s, out var id))
+            return $"roi_{id}";
+
+        return s;
+    }
+
+    private static string ReadString(JsonElement obj, string propName, string defaultValue)
+    {
+        if (!obj.TryGetProperty(propName, out var el)) return defaultValue;
+        if (el.ValueKind == JsonValueKind.String) return el.GetString() ?? defaultValue;
+        return defaultValue;
+    }
+
+    private static double ReadDouble(JsonElement obj, string propName, double defaultValue)
+    {
+        if (!obj.TryGetProperty(propName, out var el)) return defaultValue;
+
+        if (el.ValueKind == JsonValueKind.Number) return el.GetDouble();
+        if (el.ValueKind == JsonValueKind.String && double.TryParse(el.GetString(), out var d)) return d;
+
+        return defaultValue;
+    }
+
+    private static double? ReadNullableDouble(JsonElement obj, string propName)
+    {
+        if (!obj.TryGetProperty(propName, out var el)) return null;
+
+        if (el.ValueKind == JsonValueKind.Null) return null;
+        if (el.ValueKind == JsonValueKind.Number) return el.GetDouble();
+        if (el.ValueKind == JsonValueKind.String)
+        {
+            var s = el.GetString();
+            if (string.IsNullOrWhiteSpace(s)) return null;
+            if (double.TryParse(s, out var d)) return d;
+        }
+
+        return null;
+    }
+
     private int SuggestNextRoiId() => _rois.Count == 0 ? 1 : _rois.Max(r => r.Id) + 1;
 
     private Rect ClampRectToImage(Rect r)
@@ -1300,4 +1479,21 @@
     }
 
     private MeasureFormModel _measureForm = new();
+
+    private async Task ApplyJsonEditorAsync()
+    {
+        if (_imgW <= 0 || _imgH <= 0)
+        {
+            Log("ERROR: Image not loaded. Cannot apply JSON yet.");
+            return;
+        }
+
+        if (TryRestoreFromJsonText(_jsonEditorText ?? "", out var err))
+            Log("JSON editor text applied to viewer.");
+        else
+            Log($"ERROR: JSON editor apply failed: {err}");
+
+        await PushCanvasStateAsync();
+        await InvokeAsync(StateHasChanged);
+    }
 }
