@@ -1,0 +1,752 @@
+﻿@page "/airuler-info"
+@page "/airuler-info/{*SubPath}"
+
+@using System.Text
+@using System.Text.Json
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+
+@inject IWebHostEnvironment Env
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<h3>AIRuler Info</h3>
+
+@if (!_authLoaded)
+{
+    <p><em>Loading...</em></p>
+}
+else if (!_isAuthenticated)
+{
+    <div class="alert alert-warning">
+        로그인 후 사용 가능합니다.
+    </div>
+}
+else
+{
+    <div class="card mb-2">
+        <div class="card-body">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <button class="btn btn-sm btn-outline-primary" @onclick="ReloadAsync">Refresh</button>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="GoUp" disabled="@IsRoot">Up</button>
+
+                <span class="text-muted">
+                    Current: <code>/airuler/@(_currentRelDir)</code>
+                </span>
+
+                <span class="ms-auto text-muted small">
+                    folders: @_dirCount, files: @_fileCount
+                </span>
+            </div>
+
+            <nav class="mt-2" aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item">
+                        <a href="#"
+                           @onclick:preventDefault="true"
+                           @onclick="@(() => NavigateToDir(string.Empty))">
+                            airuler
+                        </a>
+                    </li>
+
+                    @foreach (var crumb in Breadcrumbs)
+                    {
+                        if (crumb.IsLast)
+                        {
+                            <li class="breadcrumb-item active" aria-current="page">@crumb.Name</li>
+                        }
+                        else
+                        {
+                            <li class="breadcrumb-item">
+                                <a href="javascript:void(0)" @onclick="@(() => NavigateToDir(crumb.RelDir))">@crumb.Name</a>
+                            </li>
+                        }
+                    }
+                </ol>
+            </nav>
+
+            @if (!string.IsNullOrWhiteSpace(_statusMessage))
+            {
+                <div class="alert alert-info mt-2 mb-0">@_statusMessage</div>
+            }
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <div class="alert alert-danger mt-2 mb-0">@_errorMessage</div>
+            }
+
+            <hr class="my-3" />
+
+            <div class="d-flex gap-2 align-items-center flex-wrap">
+                <div>
+                    <label class="form-label mb-1">Filter</label>
+                    <input class="form-control form-control-sm" style="min-width:240px;"
+                           placeholder="type to filter..."
+                           @bind="_filter" @bind:event="oninput" />
+                </div>
+
+                <div class="ms-auto">
+                    <span class="text-muted small">
+                        Upload target: <code>/airuler/@(_currentRelDir)</code>
+                    </span>
+                </div>
+            </div>
+
+            <div class="mt-2">
+                @if (_isAdmin)
+                {
+                    <div class="d-flex gap-2 flex-wrap align-items-center">
+                        <InputFile OnChange="OnFilesSelected" multiple />
+                        <button class="btn btn-sm btn-success"
+                                @onclick="UploadAsync"
+                                disabled="@(!_pendingFiles.Any())">
+                            Upload here
+                        </button>
+
+                        @if (_pendingFiles.Any())
+                        {
+                            <span class="text-muted small">
+                                selected: @_pendingFiles.Count file(s)
+                            </span>
+                        }
+                    </div>
+                    <div class="text-muted small mt-1">
+                        Allowed: .jpg .jpeg .png .bmp .webp .json .txt .yaml .yml
+                    </div>
+                }
+                else
+                {
+                    <div class="text-muted small">
+                        업로드는 Admin 권한에서만 가능합니다.
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-2">
+        <!-- Left: file list -->
+        <div class="col-12 col-xl-4">
+            <div class="card">
+                <div class="card-header">Files / Folders</div>
+                <div class="card-body" style="max-height:70vh; overflow:auto;">
+
+                    <ul class="list-group">
+                        @if (Items.Count == 0)
+                        {
+                            <li class="list-group-item text-muted">Empty folder.</li>
+                        }
+                        else
+                        {
+                            @foreach (var it in Items)
+                            {
+                                var isSelected = (SelectedItem?.RelativePath == it.RelativePath && !it.IsDirectory);
+
+                                <li class="list-group-item d-flex justify-content-between align-items-center"
+                                    style="cursor:pointer; @(isSelected ? "background:#eef;" : "")"
+                                    @onclick="() => OnItemClickAsync(it)">
+
+                                    <div style="min-width:0;">
+                                        <div class="text-truncate">
+                                            <strong>
+                                                @if (it.IsDirectory)
+                                                {
+                                                    <span>📁 @it.Name</span>
+                                                }
+                                                else
+                                                {
+                                                    <span>📄 @it.Name</span>
+                                                }
+                                            </strong>
+                                        </div>
+
+                                        @if (!it.IsDirectory)
+                                        {
+                                            <small class="text-muted">
+                                                @it.Ext · @FormatSize(it.Size) · @it.Modified.ToString("yyyy-MM-dd HH:mm:ss")
+                                            </small>
+                                        }
+                                        else
+                                        {
+                                            <small class="text-muted">
+                                                folder · @it.Modified.ToString("yyyy-MM-dd HH:mm:ss")
+                                            </small>
+                                        }
+                                    </div>
+
+                                    @if (!it.IsDirectory)
+                                    {
+                                        <a class="btn btn-sm btn-outline-secondary"
+                                           href="@BuildFileUrl(it.RelativePath)"
+                                           download>
+                                            Download
+                                        </a>
+                                    }
+                                </li>
+                            }
+                        }
+                    </ul>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: preview -->
+        <div class="col-12 col-xl-8">
+            <div class="card">
+                <div class="card-header">Preview</div>
+                <div class="card-body">
+
+                    @if (SelectedItem is null)
+                    {
+                        <div class="text-muted">좌측에서 파일을 선택하세요. (폴더는 클릭 시 이동)</div>
+                    }
+                    else
+                    {
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                            <div>
+                                <div class="fw-bold">@SelectedItem.Name</div>
+                                <div class="text-muted small">
+                                    @SelectedItem.Ext · @FormatSize(SelectedItem.Size) · @SelectedItem.Modified.ToString("yyyy-MM-dd HH:mm:ss")
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-2 flex-wrap">
+                                <a class="btn btn-sm btn-primary"
+                                   href="@BuildFileUrl(SelectedItem.RelativePath)"
+                                   download>
+                                    Download
+                                </a>
+                                <a class="btn btn-sm btn-outline-secondary"
+                                   href="@BuildFileUrl(SelectedItem.RelativePath)"
+                                   target="_blank">
+                                    Open
+                                </a>
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(_previewError))
+                        {
+                            <div class="alert alert-danger">@_previewError</div>
+                        }
+                        else if (IsImage(SelectedItem.Ext))
+                        {
+                            <div class="text-center">
+                                <img src="@BuildFileUrl(SelectedItem.RelativePath)"
+                                     style="max-width:100%; max-height:70vh; object-fit:contain;"
+                                     alt="@SelectedItem.Name" />
+                            </div>
+                        }
+                        else if (IsText(SelectedItem.Ext))
+                        {
+                            <pre style="max-height:70vh; overflow:auto; background:#111; color:#ddd; padding:12px; border-radius:8px;">@_previewText</pre>
+                        }
+                        else
+                        {
+                            <div class="alert alert-info">
+                                미리보기를 지원하지 않는 형식입니다. Download로 확인하세요.
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code
+{
+    // ===== Route Param =====
+    [Parameter] public string? SubPath { get; set; }
+
+    // ===== Auth =====
+    private bool _authLoaded = false;
+    private bool _isAuthenticated = false;
+    private bool _isAdmin = false;
+
+    // ===== Base Paths =====
+    private string AirulerBaseFull => Path.GetFullPath(Path.Combine(Env.WebRootPath, "airuler"));
+
+    // ===== Current Directory State =====
+    private string _currentRelDir = ""; // airuler 아래 상대 경로 (e.g. "models", "images/Kodak_...")
+    private int _dirCount = 0;
+    private int _fileCount = 0;
+
+    // ===== UI State =====
+    private string _filter = "";
+    private string _statusMessage = "";
+    private string _errorMessage = "";
+
+    // File items
+    private sealed class FileItem
+    {
+        public string Name { get; set; } = "";
+        public string RelativePath { get; set; } = ""; // webroot 기준: "airuler/models/a.json"
+        public bool IsDirectory { get; set; } = false;
+        public string Ext { get; set; } = "";
+        public long Size { get; set; } = 0;
+        public DateTime Modified { get; set; } = DateTime.MinValue;
+        public string RelDirForNav { get; set; } = ""; // airuler 아래 상대 경로 (폴더 클릭 이동용)
+    }
+
+    private List<FileItem> _items = new();
+    private FileItem? SelectedItem = null;
+
+    // Preview
+    private string _previewText = "";
+    private string _previewError = "";
+    private const long MaxPreviewBytes = 1024 * 1024; // 1MB
+
+    // Upload
+    private readonly List<IBrowserFile> _pendingFiles = new();
+    private static readonly HashSet<string> AllowedExts = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".jpg",".jpeg",".png",".bmp",".webp",
+        ".json",".txt",".yaml",".yml"
+    };
+
+    // Breadcrumbs
+    private sealed record Breadcrumb(string Name, string RelDir, bool IsLast);
+    private List<Breadcrumb> Breadcrumbs => BuildBreadcrumbs(_currentRelDir);
+
+    private bool IsRoot => string.IsNullOrWhiteSpace(_currentRelDir);
+
+    private List<FileItem> Items =>
+        string.IsNullOrWhiteSpace(_filter)
+        ? _items
+        : _items.Where(x => x.Name.Contains(_filter, StringComparison.OrdinalIgnoreCase)).ToList();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await EnsureAuthAsync();
+
+        if (!_isAuthenticated)
+            return;
+
+        _errorMessage = "";
+        _statusMessage = "";
+
+        // route param -> current rel dir normalize
+        _currentRelDir = NormalizeRelDir(SubPath);
+
+        await LoadDirectoryAsync(_currentRelDir);
+    }
+
+    private async Task EnsureAuthAsync()
+    {
+        if (_authLoaded) return;
+
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        _isAuthenticated = user?.Identity?.IsAuthenticated ?? false;
+        _isAdmin = user?.IsInRole("Admin") ?? false;
+        _authLoaded = true;
+    }
+
+    // ===== Navigation =====
+    private void NavigateToDir(string relDir)
+    {
+        relDir = NormalizeRelDir(relDir);
+
+        var url = BuildPageUrl(relDir);
+        Nav.NavigateTo(url);
+    }
+
+    private void GoUp()
+    {
+        if (IsRoot)
+            return;
+
+        var parent = GetParentRelDir(_currentRelDir);
+        NavigateToDir(parent);
+    }
+
+    private async Task ReloadAsync()
+    {
+        _errorMessage = "";
+        _statusMessage = "";
+        SelectedItem = null;
+        _previewText = "";
+        _previewError = "";
+        await LoadDirectoryAsync(_currentRelDir);
+    }
+
+    private async Task OnItemClickAsync(FileItem it)
+    {
+        if (it.IsDirectory)
+        {
+            NavigateToDir(it.RelDirForNav);
+            return;
+        }
+
+        SelectedItem = it;
+        await LoadPreviewAsync(it);
+    }
+
+    // ===== Directory Listing =====
+    private async Task LoadDirectoryAsync(string relDir)
+    {
+        try
+        {
+            var fullDir = GetSafeFullDir(relDir);
+            if (!Directory.Exists(fullDir))
+            {
+                // 없는 경우는 생성하지 않고 안내만 (원하면 Directory.CreateDirectory(fullDir)로 바꿔도 됨)
+                _items = new();
+                _dirCount = 0;
+                _fileCount = 0;
+                _errorMessage = $"Folder not found: /airuler/{relDir}";
+                return;
+            }
+
+            var dirs = Directory.GetDirectories(fullDir)
+                .Select(d =>
+                {
+                    var name = Path.GetFileName(d);
+                    var di = new DirectoryInfo(d);
+                    return new FileItem
+                    {
+                        Name = name,
+                        IsDirectory = true,
+                        Ext = "",
+                        Size = 0,
+                        Modified = di.LastWriteTime,
+                        RelativePath = "", // directory는 download 없음
+                        RelDirForNav = CombineRel(relDir, name)
+                    };
+                })
+                .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var files = Directory.GetFiles(fullDir)
+                .Select(f =>
+                {
+                    var fi = new FileInfo(f);
+                    var name = Path.GetFileName(f);
+                    var webRel = BuildWebRelativePath(relDir, name); // "airuler/...."
+                    return new FileItem
+                    {
+                        Name = name,
+                        IsDirectory = false,
+                        Ext = Path.GetExtension(name),
+                        Size = fi.Length,
+                        Modified = fi.LastWriteTime,
+                        RelativePath = webRel,
+                        RelDirForNav = ""
+                    };
+                })
+                .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            _dirCount = dirs.Count;
+            _fileCount = files.Count;
+
+            // folders first, then files
+            _items = dirs.Concat(files).ToList();
+
+            // 이전 선택 파일이 현재 폴더에 있으면 유지(선택사항)
+            if (SelectedItem is not null)
+            {
+                var again = _items.FirstOrDefault(x => !x.IsDirectory && x.RelativePath == SelectedItem.RelativePath);
+                if (again is null)
+                {
+                    SelectedItem = null;
+                    _previewText = "";
+                    _previewError = "";
+                }
+                else
+                {
+                    SelectedItem = again;
+                    await LoadPreviewAsync(again);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+
+    // ===== Preview =====
+    private async Task LoadPreviewAsync(FileItem it)
+    {
+        _previewError = "";
+        _previewText = "";
+
+        try
+        {
+            if (IsImage(it.Ext))
+            {
+                // 이미지 미리보기는 <img src=...> 로 충분
+                return;
+            }
+
+            if (!IsText(it.Ext))
+                return;
+
+            var full = GetSafeFullFileFromWebRel(it.RelativePath);
+
+            var fi = new FileInfo(full);
+            if (fi.Length > MaxPreviewBytes)
+            {
+                _previewText = $"(Preview skipped) File is too large: {FormatSize(fi.Length)}. Download to view.";
+                return;
+            }
+
+            var txt = await File.ReadAllTextAsync(full, Encoding.UTF8);
+
+            // json이면 예쁘게
+            if (it.Ext.Equals(".json", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(txt);
+                    txt = JsonSerializer.Serialize(doc.RootElement, new JsonSerializerOptions { WriteIndented = true });
+                }
+                catch
+                {
+                    // 파싱 실패하면 원문 표시
+                }
+            }
+
+            _previewText = txt;
+        }
+        catch (Exception ex)
+        {
+            _previewError = ex.Message;
+        }
+    }
+
+    // ===== Upload =====
+    private void OnFilesSelected(InputFileChangeEventArgs e)
+    {
+        _pendingFiles.Clear();
+        _pendingFiles.AddRange(e.GetMultipleFiles());
+        _statusMessage = $"Selected {_pendingFiles.Count} file(s).";
+        _errorMessage = "";
+    }
+
+    private async Task UploadAsync()
+    {
+        if (!_isAdmin)
+        {
+            _errorMessage = "Upload requires Admin role.";
+            return;
+        }
+
+        if (_pendingFiles.Count == 0)
+            return;
+
+        try
+        {
+            var fullDir = GetSafeFullDir(_currentRelDir);
+            Directory.CreateDirectory(fullDir);
+
+            int ok = 0, skipped = 0;
+
+            foreach (var f in _pendingFiles)
+            {
+                var safeName = SanitizeFileName(Path.GetFileName(f.Name));
+                var ext = Path.GetExtension(safeName);
+
+                if (!AllowedExts.Contains(ext))
+                {
+                    skipped++;
+                    continue;
+                }
+
+                var savePath = MakeUniqueFilePath(fullDir, safeName);
+
+                await using var fs = File.Create(savePath);
+                await f.OpenReadStream(maxAllowedSize: 1024L * 1024L * 1024L).CopyToAsync(fs);
+                ok++;
+            }
+
+            _pendingFiles.Clear();
+            _statusMessage = $"Uploaded {ok} file(s). Skipped {skipped}.";
+            _errorMessage = "";
+
+            await LoadDirectoryAsync(_currentRelDir);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = ex.Message;
+        }
+    }
+
+    // ===== Helpers (Path Safety) =====
+    private string NormalizeRelDir(string? raw)
+    {
+        var s = (raw ?? "").Replace('\\', '/').Trim();
+
+        // route에 "models%2F.." 같은게 들어오는 경우 대비
+        try { s = Uri.UnescapeDataString(s); } catch { /* ignore */ }
+
+        s = s.Replace('\\', '/').Trim('/');
+
+        if (string.IsNullOrWhiteSpace(s))
+            return "";
+
+        // path traversal 단순 차단(추가로 fullpath 검사도 함)
+        if (s.Contains("..", StringComparison.Ordinal) || s.Contains(":", StringComparison.Ordinal))
+            return "";
+
+        return s;
+    }
+
+    private string GetSafeFullDir(string relDir)
+    {
+        relDir = NormalizeRelDir(relDir);
+
+        var baseFull = AirulerBaseFull;
+        var targetFull = Path.GetFullPath(Path.Combine(baseFull, relDir));
+
+        if (!targetFull.StartsWith(baseFull, StringComparison.Ordinal))
+            throw new InvalidOperationException("Invalid path (outside airuler).");
+
+        return targetFull;
+    }
+
+    private string GetSafeFullFileFromWebRel(string webRel)
+    {
+        // webRel: "airuler/...."
+        var rel = (webRel ?? "").Replace('\\', '/').Trim('/');
+        if (!rel.StartsWith("airuler/", StringComparison.OrdinalIgnoreCase) && !rel.Equals("airuler", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Invalid web-relative path.");
+
+        // webRel을 webroot에 붙이되, 최종적으로 airuler 하위인지 재검증
+        var full = Path.GetFullPath(Path.Combine(Env.WebRootPath, rel));
+        if (!full.StartsWith(AirulerBaseFull, StringComparison.Ordinal))
+            throw new InvalidOperationException("Invalid file path (outside airuler).");
+
+        return full;
+    }
+
+    private string BuildWebRelativePath(string relDirUnderAiruler, string fileName)
+    {
+        relDirUnderAiruler = NormalizeRelDir(relDirUnderAiruler);
+        fileName = Path.GetFileName(fileName);
+
+        // webroot 기준 상대경로: "airuler/{relDir}/file"
+        var parts = new List<string> { "airuler" };
+        if (!string.IsNullOrWhiteSpace(relDirUnderAiruler))
+            parts.AddRange(relDirUnderAiruler.Split('/', StringSplitOptions.RemoveEmptyEntries));
+        parts.Add(fileName);
+
+        return string.Join('/', parts);
+    }
+
+    private string BuildFileUrl(string webRel)
+    {
+        // "airuler/models/a b.json" => "/airuler/models/a%20b.json"
+        var rel = (webRel ?? "").Replace('\\', '/').Trim('/');
+        var segs = rel.Split('/', StringSplitOptions.RemoveEmptyEntries).Select(Uri.EscapeDataString);
+        return "/" + string.Join('/', segs);
+    }
+
+    private string BuildPageUrl(string relDir)
+    {
+        relDir = NormalizeRelDir(relDir);
+        if (string.IsNullOrWhiteSpace(relDir))
+            return "/airuler-info";
+
+        var segs = relDir.Split('/', StringSplitOptions.RemoveEmptyEntries).Select(Uri.EscapeDataString);
+        return "/airuler-info/" + string.Join('/', segs);
+    }
+
+    private static string CombineRel(string a, string b)
+    {
+        a = (a ?? "").Replace('\\', '/').Trim('/');
+        b = (b ?? "").Replace('\\', '/').Trim('/');
+
+        if (string.IsNullOrWhiteSpace(a)) return b;
+        if (string.IsNullOrWhiteSpace(b)) return a;
+        return $"{a}/{b}";
+    }
+
+    private static string GetParentRelDir(string rel)
+    {
+        rel = (rel ?? "").Replace('\\', '/').Trim('/');
+        if (string.IsNullOrWhiteSpace(rel)) return "";
+
+        var parts = rel.Split('/', StringSplitOptions.RemoveEmptyEntries).ToList();
+        if (parts.Count <= 1) return "";
+        parts.RemoveAt(parts.Count - 1);
+        return string.Join('/', parts);
+    }
+
+    private static List<Breadcrumb> BuildBreadcrumbs(string relDir)
+    {
+        relDir = (relDir ?? "").Replace('\\', '/').Trim('/');
+        if (string.IsNullOrWhiteSpace(relDir))
+            return new List<Breadcrumb>();
+
+        var parts = relDir.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var list = new List<Breadcrumb>();
+
+        var acc = "";
+        for (int i = 0; i < parts.Length; i++)
+        {
+            acc = string.IsNullOrWhiteSpace(acc) ? parts[i] : $"{acc}/{parts[i]}";
+            list.Add(new Breadcrumb(parts[i], acc, i == parts.Length - 1));
+        }
+        return list;
+    }
+
+    private static bool IsImage(string ext)
+    {
+        ext = (ext ?? "").ToLowerInvariant();
+        return ext is ".jpg" or ".jpeg" or ".png" or ".bmp" or ".webp";
+    }
+
+    private static bool IsText(string ext)
+    {
+        ext = (ext ?? "").ToLowerInvariant();
+        return ext is ".json" or ".txt" or ".yaml" or ".yml";
+    }
+
+    private static string FormatSize(long size)
+    {
+        if (size < 1024) return $"{size} B";
+        double kb = size / 1024.0;
+        if (kb < 1024) return $"{kb:0.0} KB";
+        double mb = kb / 1024.0;
+        if (mb < 1024) return $"{mb:0.0} MB";
+        double gb = mb / 1024.0;
+        return $"{gb:0.00} GB";
+    }
+
+    private static string SanitizeFileName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "file";
+
+        var invalid = Path.GetInvalidFileNameChars();
+        var sb = new StringBuilder(name.Length);
+        foreach (var ch in name)
+        {
+            sb.Append(invalid.Contains(ch) ? '_' : ch);
+        }
+
+        return sb.ToString();
+    }
+
+    private static string MakeUniqueFilePath(string dir, string fileName)
+    {
+        var baseName = Path.GetFileNameWithoutExtension(fileName);
+        var ext = Path.GetExtension(fileName);
+        var path = Path.Combine(dir, fileName);
+
+        if (!File.Exists(path))
+            return path;
+
+        for (int i = 1; i <= 9999; i++)
+        {
+            var candidate = Path.Combine(dir, $"{baseName}_{i}{ext}");
+            if (!File.Exists(candidate))
+                return candidate;
+        }
+
+        // 최후: timestamp
+        var ts = DateTime.Now.ToString("yyyyMMdd_HHmmssfff");
+        return Path.Combine(dir, $"{baseName}_{ts}{ext}");
+    }
+}
