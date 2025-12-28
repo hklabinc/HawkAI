@@ -97,19 +97,101 @@ namespace HawkAI.Data.UpdateService
                 .ToList();
         }
 
+        //public async Task<ReleaseInfo> SaveAsync(
+        //    string packageName,
+        //    int versionCode,
+        //    string versionName,
+        //    IFormFile apk,
+        //    CancellationToken ct = default)
+        //{
+        //    ValidatePackageName(packageName);
+
+        //    if (versionCode <= 0) throw new ArgumentException("versionCode must be > 0");
+        //    if (apk is null) throw new ArgumentNullException(nameof(apk));
+        //    if (apk.Length <= 0) throw new ArgumentException("빈 파일");
+        //    if (!apk.FileName.EndsWith(".apk", StringComparison.OrdinalIgnoreCase))
+        //        throw new ArgumentException("apk 파일만 허용");
+
+        //    var dir = PackageDir(packageName);
+        //    Directory.CreateDirectory(dir);
+
+        //    var apkPath = ApkPath(packageName, versionCode);
+        //    if (File.Exists(apkPath))
+        //        throw new InvalidOperationException($"이미 같은 versionCode({versionCode})의 APK가 존재합니다.");
+
+        //    // 저장하면서 SHA-256 동시에 계산 (재읽기 없이)
+        //    using var hasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        //    long total = 0;
+
+        //    await using (var input = apk.OpenReadStream())
+        //    await using (var output = File.Create(apkPath))
+        //    {
+        //        var buffer = new byte[128 * 1024];
+        //        while (true)
+        //        {
+        //            var read = await input.ReadAsync(buffer.AsMemory(0, buffer.Length), ct);
+        //            if (read <= 0) break;
+
+        //            hasher.AppendData(buffer, 0, read);
+        //            await output.WriteAsync(buffer.AsMemory(0, read), ct);
+        //            total += read;
+        //        }
+        //        await output.FlushAsync(ct);
+        //    }
+
+        //    var shaHex = Convert.ToHexString(hasher.GetHashAndReset()).ToLowerInvariant();
+        //    var info = new ReleaseInfo(
+        //        PackageName: packageName,
+        //        VersionCode: versionCode,
+        //        VersionName: versionName ?? "",
+        //        ApkFileName: $"app_{versionCode}.apk",
+        //        Sha256: shaHex,
+        //        Size: total,
+        //        UploadedAtUtc: DateTimeOffset.UtcNow
+        //    );
+
+        //    // 버전별 메타데이터 + latest.json 갱신
+        //    await File.WriteAllTextAsync(ReleaseJsonPath(packageName, versionCode), JsonSerializer.Serialize(info, _jsonOptions), ct);
+        //    await File.WriteAllTextAsync(LatestJsonPath(packageName), JsonSerializer.Serialize(info, _jsonOptions), ct);
+
+        //    return info;
+        //}
+
         public async Task<ReleaseInfo> SaveAsync(
             string packageName,
             int versionCode,
             string versionName,
             IFormFile apk,
             CancellationToken ct = default)
+            {
+                    // ✅ API 업로드는 IFormFile → Stream 버전으로 위임
+                await using var stream = apk.OpenReadStream();
+                return await SaveAsync(
+                    packageName,
+                    versionCode,
+                    versionName,
+                    apk.FileName,
+                    stream,
+                    apk.Length,
+                    ct);
+        }
+
+            // ✅ Blazor InputFile(IBrowserFile)에서도 사용할 수 있는 Stream 버전
+        public async Task<ReleaseInfo> SaveAsync(
+            string packageName,
+            int versionCode,
+            string versionName,
+            string originalFileName,
+            Stream apkStream,
+            long length,
+            CancellationToken ct = default)
         {
             ValidatePackageName(packageName);
 
             if (versionCode <= 0) throw new ArgumentException("versionCode must be > 0");
-            if (apk is null) throw new ArgumentNullException(nameof(apk));
-            if (apk.Length <= 0) throw new ArgumentException("빈 파일");
-            if (!apk.FileName.EndsWith(".apk", StringComparison.OrdinalIgnoreCase))
+            if (length <= 0) throw new ArgumentException("빈 파일");
+            if (string.IsNullOrWhiteSpace(originalFileName) ||
+                !originalFileName.EndsWith(".apk", StringComparison.OrdinalIgnoreCase))
                 throw new ArgumentException("apk 파일만 허용");
 
             var dir = PackageDir(packageName);
@@ -119,17 +201,15 @@ namespace HawkAI.Data.UpdateService
             if (File.Exists(apkPath))
                 throw new InvalidOperationException($"이미 같은 versionCode({versionCode})의 APK가 존재합니다.");
 
-            // 저장하면서 SHA-256 동시에 계산 (재읽기 없이)
             using var hasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-            long total = 0;
 
-            await using (var input = apk.OpenReadStream())
+            long total = 0;
             await using (var output = File.Create(apkPath))
             {
                 var buffer = new byte[128 * 1024];
                 while (true)
                 {
-                    var read = await input.ReadAsync(buffer.AsMemory(0, buffer.Length), ct);
+                    var read = await apkStream.ReadAsync(buffer.AsMemory(0, buffer.Length), ct);
                     if (read <= 0) break;
 
                     hasher.AppendData(buffer, 0, read);
@@ -140,6 +220,7 @@ namespace HawkAI.Data.UpdateService
             }
 
             var shaHex = Convert.ToHexString(hasher.GetHashAndReset()).ToLowerInvariant();
+
             var info = new ReleaseInfo(
                 PackageName: packageName,
                 VersionCode: versionCode,
@@ -150,12 +231,19 @@ namespace HawkAI.Data.UpdateService
                 UploadedAtUtc: DateTimeOffset.UtcNow
             );
 
-            // 버전별 메타데이터 + latest.json 갱신
-            await File.WriteAllTextAsync(ReleaseJsonPath(packageName, versionCode), JsonSerializer.Serialize(info, _jsonOptions), ct);
-            await File.WriteAllTextAsync(LatestJsonPath(packageName), JsonSerializer.Serialize(info, _jsonOptions), ct);
+            await File.WriteAllTextAsync(
+                ReleaseJsonPath(packageName, versionCode),
+                JsonSerializer.Serialize(info, _jsonOptions),
+                ct);
+
+            await File.WriteAllTextAsync(
+                LatestJsonPath(packageName),
+                JsonSerializer.Serialize(info, _jsonOptions),
+                ct);
 
             return info;
         }
+
 
         public FileStream OpenApkRead(string packageName, int versionCode)
         {

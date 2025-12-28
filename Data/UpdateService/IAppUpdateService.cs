@@ -18,6 +18,16 @@ namespace HawkAI.Data.UpdateService
             IFormFile apk,
             CancellationToken ct = default);
 
+        // ✅ 추가(Blazor InputFile/IBrowserFile용)
+        Task<ReleaseInfo> SaveAsync(
+            string packageName,
+            int versionCode,
+            string versionName,
+            string originalFileName,
+            Stream apkStream,
+            long length,
+            CancellationToken ct = default);
+
         FileStream OpenApkRead(string packageName, int versionCode);
     }
 }

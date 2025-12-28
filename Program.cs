@@ -89,7 +89,7 @@ builder.Services.AddSignalR(hubOptions =>
 builder.Services.AddServerSideBlazor()
     .AddHubOptions(options =>
     {
-        options.MaximumReceiveMessageSize = 1024 * 1024 * 100; // 100MB 등 충분히 크게
+        options.MaximumReceiveMessageSize = 1024 * 1024 * 300; // 300MB 등 충분히 크게
     });
 
 builder.Services.Configure<FormOptions>(options =>
