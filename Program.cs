@@ -5,6 +5,7 @@ using HawkAI.Data.EventService;
 using HawkAI.Data.GameService;
 using HawkAI.Data.ProjectService;
 using HawkAI.Data.SuperHeroService;
+using HawkAI.Data.UpdateService;
 using HawkAI.Hubs;
 using HawkAI.Services;
 using Microsoft.AspNetCore.Components;
@@ -19,6 +20,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using MQTTnet;
 using System.Net.Http;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -49,6 +51,11 @@ builder.Services.AddScoped<IEventService, EventService>();
 builder.Services.AddScoped<IGameService, GameService>();
 builder.Services.AddScoped<ISuperHeroService, SuperHeroService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
+
+builder.Services.Configure<ReleaseStorageOptions>(
+    builder.Configuration.GetSection("ReleaseStorage"));
+
+builder.Services.AddSingleton<IAppUpdateService, FileSystemAppUpdateService>();
 
 
 /************ 인증, 구글인증 관련 ************/

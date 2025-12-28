@@ -1,0 +1,105 @@
+﻿@page "/releases"
+@using System.Linq
+@using HawkAI.Data.UpdateService
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject IAppUpdateService Updates
+
+<h3>APK Releases</h3>
+
+<p class="text-muted">
+    Storage: <code>@Updates.RootPath</code>
+</p>
+
+@if (_loading)
+{
+    <p>Loading...</p>
+}
+else if (_rows.Count == 0)
+{
+    <p>업로드된 릴리즈가 없습니다.</p>
+}
+else
+{
+    @foreach (var pkg in _rows.GroupBy(x => x.PackageName).OrderBy(g => g.Key))
+    {
+        <h5 class="mt-4">@pkg.Key</h5>
+
+        <table class="table table-sm table-striped">
+            <thead>
+                <tr>
+                    <th>VersionCode</th>
+                    <th>VersionName</th>
+                    <th>Uploaded (Local)</th>
+                    <th>Size</th>
+                    <th>SHA-256</th>
+                    <th>Links</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in pkg.OrderByDescending(x => x.VersionCode))
+                {
+                    <tr>
+                        <td>@r.VersionCode</td>
+                        <td>@r.VersionName</td>
+                        <td>@r.UploadedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td>@FormatBytes(r.Size)</td>
+                        <td><code>@ShortHash(r.Sha256)</code></td>
+                        <td>
+                            <a href="@GetApkUrl(r)" target="_blank">APK</a>
+                            |
+                            <a href="@GetJsonUrl(r)" target="_blank">JSON</a>
+                            |
+                            <a href="@GetLatestUrl(r.PackageName)" target="_blank">Latest</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    private bool _loading = true;
+    private List<ReleaseInfo> _rows = new List<ReleaseInfo>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _loading = true;
+        _rows = (await Updates.GetAllAsync()).ToList();
+        _loading = false;
+    }
+
+    private static string ShortHash(string sha256)
+    {
+        if (string.IsNullOrWhiteSpace(sha256))
+            return string.Empty;
+
+        if (sha256.Length <= 12)
+            return sha256;
+
+        return sha256.Substring(0, 12) + "...";
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        const double KB = 1024.0;
+        const double MB = 1024.0 * 1024.0;
+        const double GB = 1024.0 * 1024.0 * 1024.0;
+
+        if (bytes < 0) return "?";
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < (long)MB) return (bytes / KB).ToString("0.0") + " KB";
+        if (bytes < (long)GB) return (bytes / MB).ToString("0.0") + " MB";
+        return (bytes / GB).ToString("0.00") + " GB";
+    }
+
+    private static string GetApkUrl(ReleaseInfo r)
+        => "/api/releases/apk/" + r.PackageName + "/" + r.VersionCode;
+
+    private static string GetJsonUrl(ReleaseInfo r)
+        => "/api/releases/metadata/" + r.PackageName + "/" + r.VersionCode;
+
+    private static string GetLatestUrl(string packageName)
+        => "/api/releases/latest/" + packageName;
+}
