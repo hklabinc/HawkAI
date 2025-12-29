@@ -59,7 +59,7 @@ namespace HawkAI.Controllers
             var info = await _updates.GetLatestAsync(packageName, ct);
             if (info is null) return NotFound();
 
-            var baseUrl = $"{Request.Scheme}://{Request.Host}";
+            var baseUrl = $"https://{Request.Host}";
             var apkUrl = $"{baseUrl}/api/releases/apk/{packageName}/{info.VersionCode}";
 
             return Ok(new
