@@ -160,6 +160,7 @@ provider.Mappings[".pb"] = "application/octet-stream";  // TensorFlow SavedModel
 provider.Mappings[".yaml"] = "application/x-yaml";
 provider.Mappings[".yml"] = "application/x-yaml";
 provider.Mappings[".json"] = "application/json";
+provider.Mappings[".apk"] = "application/vnd.android.package-archive"; // APK
 
 app.UseStaticFiles(new StaticFileOptions
 {
