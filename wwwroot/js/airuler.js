@@ -156,9 +156,7 @@ window.airulerCanvas = (() => {
         if (!Number.isFinite(zoom) || zoom <= 0) zoom = 1.0;
 
         // 필요하면 여기서 중앙정렬 pan도 계산 가능 (아래 3) 참고)
-        const panX = Math.round((vw - iw * zoom) / 2);
-        const panY = Math.round((vh - ih * zoom) / 2);
-        return { zoom, panX, panY };
+        return { zoom, panX: 0, panY: 0 };
     }
 
     function draw() {
