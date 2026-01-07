@@ -425,6 +425,39 @@
     }
 
     // =================== Viewer Transform ===================
+    private bool _fitOnNextImageLoad = false;
+
+    private sealed class FitTransform
+    {
+        public double Zoom { get; set; }
+        public int PanX { get; set; }
+        public int PanY { get; set; }
+    }
+
+    private async Task FitViewToViewerAsync()
+    {
+        if (!_jsInited) return;
+
+        FitTransform fit;
+        try
+        {
+            fit = await JS.InvokeAsync<FitTransform>("airulerCanvas.getFitTransform");
+        }
+        catch
+        {
+            return;
+        }
+
+        var z = fit?.Zoom ?? 1.0;
+        if (double.IsNaN(z) || double.IsInfinity(z) || z <= 0) z = 1.0;
+
+        _zoomFactor = z;
+        _panX = fit?.PanX ?? 0;
+        _panY = fit?.PanY ?? 0;
+
+        await ApplyTransformAsync();
+    }
+
     private async Task ApplyTransformAsync()
     {
         if (!_jsInited) return;
@@ -499,10 +532,29 @@
             .OrderBy(f => f)
             .ToList()!;
 
+        bool selectedNewImage = false;
+
+        // ✅ 기존 선택 이미지가 없어졌으면 첫 이미지로 교체(옵션이지만 안정적)
+        if (!string.IsNullOrWhiteSpace(_selectedImage) && !_images.Contains(_selectedImage))
+        {
+            _selectedImage = null;
+            _currentImageUrl = null;
+        }
+
         if (_images.Count > 0 && string.IsNullOrWhiteSpace(_selectedImage))
-            await SelectImageAsync(_images[0]);
+        {
+            selectedNewImage = true;
+            await SelectImageAsync(_images[0]); // 여기서 _fitOnNextImageLoad=true가 켜지고, OnImageLoaded에서 fit됨
+        }
 
         await InvokeAsync(StateHasChanged);
+
+        // ✅ Reload images처럼 "선택은 그대로"인 경우: 지금 즉시 fit
+        if (!selectedNewImage && !string.IsNullOrWhiteSpace(_selectedImage) && _currentImageUrl is not null)
+        {
+            await FitViewToViewerAsync();
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     private async Task SelectImageAsync(string file)
@@ -511,6 +563,7 @@
 
         _selectedImage = file;
         _currentImageUrl = $"/airuler/images/{Uri.EscapeDataString(_selectedModel)}/{Uri.EscapeDataString(file)}";
+        _fitOnNextImageLoad = true;     // 로드 끝나면 fit
 
         // 이미지 바꾸면 view 초기화(줌/팬은 Viewer만 적용)
         _zoomFactor = 1.0;
@@ -575,6 +628,13 @@
                 Log("Pending JSON applied after image load.");
             else
                 Log($"ERROR: pending JSON apply failed: {err}");
+        }
+
+        // ✅ 새 이미지가 로드된 경우에만 자동 fit
+        if (_fitOnNextImageLoad)
+        {
+            _fitOnNextImageLoad = false;
+            await FitViewToViewerAsync();
         }
 
         await PushCanvasStateAsync();

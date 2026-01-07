@@ -136,6 +136,31 @@ window.airulerCanvas = (() => {
         transformHost.style.transform = `translate(${x}px, ${y}px) scale(${z})`;
     }
 
+    function getFitTransform() {
+        // 기본값
+        const fallback = { zoom: 1.0, panX: 0, panY: 0 };
+
+        if (!viewerHost || !img) return fallback;
+
+        // viewer의 "보이는 영역" (scrollbar 제외)
+        const vw = Math.max(0, (viewerHost.clientWidth || 0) - 2);   // -2는 1~2px 오차로 스크롤 생기는 것 방지
+        const vh = Math.max(0, (viewerHost.clientHeight || 0) - 2);
+
+        // 이미지의 "기본 레이아웃" 크기 (transform scale 영향 X)
+        const iw = img.clientWidth || img.naturalWidth || 0;
+        const ih = img.clientHeight || img.naturalHeight || 0;
+
+        if (vw <= 0 || vh <= 0 || iw <= 0 || ih <= 0) return fallback;
+
+        let zoom = Math.min(vw / iw, vh / ih);
+        if (!Number.isFinite(zoom) || zoom <= 0) zoom = 1.0;
+
+        // 필요하면 여기서 중앙정렬 pan도 계산 가능 (아래 3) 참고)
+        const panX = Math.round((vw - iw * zoom) / 2);
+        const panY = Math.round((vh - ih * zoom) / 2);
+        return { zoom, panX, panY };
+    }
+
     function draw() {
         if (!ctx || !canvas || !img) return;
 
@@ -302,15 +327,15 @@ window.airulerCanvas = (() => {
 
         // image load
         on(img, "load", () => {
-            // wait a tick for layout
             requestAnimationFrame(() => {
                 resizeCanvasToImage();
                 autoFitViewerHeightIfNeeded();
-            });
 
-            try {
-                dotNet?.invokeMethodAsync("OnImageLoaded", img.naturalWidth || 0, img.naturalHeight || 0);
-            } catch { /* ignore */ }
+                // ✅ layout 안정화 이후 콜백
+                try {
+                    dotNet?.invokeMethodAsync("OnImageLoaded", img.naturalWidth || 0, img.naturalHeight || 0);
+                } catch { /* ignore */ }
+            });
         });
 
         // ROI drag create
@@ -447,5 +472,5 @@ window.airulerCanvas = (() => {
         userResized = false;
     }
 
-    return { init, setState, setTransform, draw, dispose };
+    return { init, setState, setTransform, getFitTransform, draw, dispose };
 })();
