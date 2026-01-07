@@ -426,6 +426,7 @@
 
     // =================== Viewer Transform ===================
     private bool _fitOnNextImageLoad = false;
+    private int _jsInitAttempts = 0;
 
     private sealed class FitTransform
     {
@@ -438,7 +439,7 @@
     {
         if (!_jsInited) return;
 
-        FitTransform fit;
+        FitTransform? fit;
         try
         {
             fit = await JS.InvokeAsync<FitTransform>("airulerCanvas.getFitTransform");
@@ -532,25 +533,18 @@
             .OrderBy(f => f)
             .ToList()!;
 
-        bool selectedNewImage = false;
-
-        // ✅ 기존 선택 이미지가 없어졌으면 첫 이미지로 교체(옵션이지만 안정적)
-        if (!string.IsNullOrWhiteSpace(_selectedImage) && !_images.Contains(_selectedImage))
-        {
-            _selectedImage = null;
-            _currentImageUrl = null;
-        }
+        bool selectedNew = false;
 
         if (_images.Count > 0 && string.IsNullOrWhiteSpace(_selectedImage))
         {
-            selectedNewImage = true;
-            await SelectImageAsync(_images[0]); // 여기서 _fitOnNextImageLoad=true가 켜지고, OnImageLoaded에서 fit됨
+            selectedNew = true;
+            await SelectImageAsync(_images[0]); // 여기서 _fitOnNextImageLoad=true → OnImageLoaded에서 fit
         }
 
         await InvokeAsync(StateHasChanged);
 
-        // ✅ Reload images처럼 "선택은 그대로"인 경우: 지금 즉시 fit
-        if (!selectedNewImage && !string.IsNullOrWhiteSpace(_selectedImage) && _currentImageUrl is not null)
+        // ✅ Reload images처럼 "선택은 그대로"면 지금 바로 fit
+        if (!selectedNew && !string.IsNullOrWhiteSpace(_selectedImage) && _currentImageUrl is not null)
         {
             await FitViewToViewerAsync();
             await InvokeAsync(StateHasChanged);

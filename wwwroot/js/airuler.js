@@ -137,26 +137,56 @@ window.airulerCanvas = (() => {
     }
 
     function getFitTransform() {
-        // 기본값
         const fallback = { zoom: 1.0, panX: 0, panY: 0 };
 
-        if (!viewerHost || !img) return fallback;
+        if (!viewerHost || !transformHost || !img) return fallback;
 
-        // viewer의 "보이는 영역" (scrollbar 제외)
-        const vw = Math.max(0, (viewerHost.clientWidth || 0) - 2);   // -2는 1~2px 오차로 스크롤 생기는 것 방지
-        const vh = Math.max(0, (viewerHost.clientHeight || 0) - 2);
+        const vw = viewerHost.clientWidth || 0;
+        const vh = viewerHost.clientHeight || 0;
 
-        // 이미지의 "기본 레이아웃" 크기 (transform scale 영향 X)
         const iw = img.clientWidth || img.naturalWidth || 0;
         const ih = img.clientHeight || img.naturalHeight || 0;
 
         if (vw <= 0 || vh <= 0 || iw <= 0 || ih <= 0) return fallback;
 
+        // ✅ "짤리지 않게 전체가 보이도록" = contain
         let zoom = Math.min(vw / iw, vh / ih);
+
         if (!Number.isFinite(zoom) || zoom <= 0) zoom = 1.0;
 
-        // 필요하면 여기서 중앙정렬 pan도 계산 가능 (아래 3) 참고)
-        return { zoom, panX: 0, panY: 0 };
+        // (권장) 아주 미세한 여유를 줘서 1px 오차로 스크롤/잘림 방지
+        zoom = zoom * 0.999;
+
+        // ✅ 원하는 정렬:
+        // - 가운데 정렬(권장)
+        const targetLeft = Math.round((vw - iw * zoom) / 2);
+        const targetTop = Math.round((vh - ih * zoom) / 2);
+
+        // - 만약 "무조건 좌상단(왼쪽 붙이기)" 원하면 위 2줄을 아래로 교체:
+        // const targetLeft = 0;
+        // const targetTop  = 0;
+
+        // transformHost가 레이아웃 상 어디에 놓여있는지(기본 위치) 측정
+        const prevTransform = transformHost.style.transform;
+        const prevOrigin = transformHost.style.transformOrigin;
+
+        transformHost.style.transformOrigin = "0 0";
+        transformHost.style.transform = "translate(0px, 0px) scale(1)";
+
+        const vRect = viewerHost.getBoundingClientRect();
+        const tRect = transformHost.getBoundingClientRect();
+        const baseLeft = Math.round(tRect.left - vRect.left);
+        const baseTop = Math.round(tRect.top - vRect.top);
+
+        // 원복(측정 중 화면 튐 최소화)
+        transformHost.style.transform = prevTransform;
+        transformHost.style.transformOrigin = prevOrigin || "0 0";
+
+        // ✅ 최종적으로 원하는 위치(target)로 맞추는 pan
+        const panX = targetLeft - baseLeft;
+        const panY = targetTop - baseTop;
+
+        return { zoom, panX, panY };
     }
 
     function draw() {
@@ -309,6 +339,9 @@ window.airulerCanvas = (() => {
 
         viewerHost = viewerHostId ? document.getElementById(viewerHostId) : null;
         transformHost = transformHostId ? document.getElementById(transformHostId) : null;
+        if (transformHost) {
+            transformHost.style.transformOrigin = "0 0";
+        }
         splitter = splitterId ? document.getElementById(splitterId) : null;
 
         if (!canvas || !img) return;
@@ -329,7 +362,7 @@ window.airulerCanvas = (() => {
                 resizeCanvasToImage();
                 autoFitViewerHeightIfNeeded();
 
-                // ✅ layout 안정화 이후 콜백
+                // ✅ layout 안정화 후 콜백
                 try {
                     dotNet?.invokeMethodAsync("OnImageLoaded", img.naturalWidth || 0, img.naturalHeight || 0);
                 } catch { /* ignore */ }
