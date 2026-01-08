@@ -212,7 +212,7 @@ window.airulerCanvas = (() => {
 
                 const isSel = (state.selectedMeasureId === m.id);
                 ctx.strokeStyle = isSel ? "red" : "yellow";
-                ctx.lineWidth = isSel ? 3 : 2;
+                ctx.lineWidth = isSel ? 2 : 1;
                 ctx.setLineDash([]);
                 ctx.beginPath();
                 ctx.moveTo(sx, sy);
@@ -232,12 +232,12 @@ window.airulerCanvas = (() => {
             const isRed = (state.selectedRoiId === r.id) || selectedByMeasure;
 
             ctx.strokeStyle = isRed ? "red" : "lime";
-            ctx.lineWidth = isRed ? 3 : 2;
+            ctx.lineWidth = isRed ? 2 : 1;
             ctx.setLineDash([]);
             ctx.strokeRect(sx, sy, sw, sh);
 
             ctx.fillStyle = isRed ? "red" : "lime";
-            ctx.font = "bold 16px sans-serif";
+            ctx.font = "10px sans-serif";
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             ctx.fillText(String(r.id), sx + sw / 2, sy + sh / 2);
