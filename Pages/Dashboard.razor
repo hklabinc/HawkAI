@@ -223,10 +223,10 @@ else
 
 @code {
     [CascadingParameter]
-    private Task<AuthenticationState> authenticationStateTask { get; set; }
+    private Task<AuthenticationState> authenticationStateTask { get; set; } = default!;
 
     [Inject]
-    UserManager<IdentityUser> userManager { get; set; }
+    UserManager<IdentityUser> userManager { get; set; } = default!;
 
     private IEnumerable<Camera> Cameras { get; set; } = new List<Camera>();
     public bool IsLoading { get; set; }
@@ -234,7 +234,7 @@ else
     private int numOfCameras = 0;
     private List<MqttMsg> rxMqttMsgList = new List<MqttMsg>();
     private List<string> camIdList = new List<string>();
-    private MqttMsg[] rxMqttMsgArray;    
+    private MqttMsg[] rxMqttMsgArray = Array.Empty<MqttMsg>();    
 
     // Create a new MQTT client.
     private static MqttFactory factory = new MqttFactory();
@@ -263,8 +263,8 @@ else
     public class SelectProperty
     {
         public int Id { get; set; }
-        public string Key { get; set; }
-        public string Value { get; set; }
+        public string Key { get; set; } = string.Empty;
+        public string Value { get; set; } = string.Empty;
     }
     //public List<SelectProperty> ScaleProp { get; set; }
 
@@ -283,7 +283,7 @@ else
         set
         {
             scaleValue = value;
-            ControlScale(scaleValue);
+            _ = ControlScale(scaleValue);
         }
     }
 
@@ -302,7 +302,7 @@ else
         set
         {
             intervalValue = value;
-            ControlInterval(intervalValue);
+            _ = ControlInterval(intervalValue);
         }
     }
 
@@ -320,7 +320,7 @@ else
         set
         {
             thresholdValue = value;
-            ControlThreshold(thresholdValue);
+            _ = ControlThreshold(thresholdValue);
         }
     }
 
@@ -331,8 +331,8 @@ else
         {
             var user = (await authenticationStateTask).User;
             var currentUser = await userManager.GetUserAsync(user);
-            userId = currentUser.Id;
-            userEmail = currentUser.Email;
+            userId = currentUser!.Id;
+            userEmail = currentUser!.Email!;
             topicSubUser = TOPIC_SUB + "/" + userId;
             topicPubUser = TOPIC_PUB + "/" + userId;
 
@@ -429,7 +429,7 @@ else
                         string? label = mqttmsg.label;
                         string? image = mqttmsg.image;
 
-                        int camIdx = camIdList.IndexOf(addr);
+                        int camIdx = camIdList.IndexOf(addr ?? string.Empty);
                         //int camIdx = camIdList.IndexOf(addr?? "n/a");
                         //if (addr == "asdf")
                         //    camIdx = 7;

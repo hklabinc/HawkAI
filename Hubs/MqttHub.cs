@@ -58,7 +58,8 @@ namespace HawkAI.Hubs
                         MqttMsg? mqttmsg = JsonSerializer.Deserialize<MqttMsg>(jsonUtf8Bytes);
                         if (mqttmsg is not null)
                         {                                
-                            Console.WriteLine($"[HHCHOI] Rx Event: {mqttmsg.type}, {mqttmsg.time}, {mqttmsg.addr}, {mqttmsg.label}, {mqttmsg.image.Substring(0, Math.Min(60, mqttmsg.image.Length))}");
+            var imgPreview = (mqttmsg.image ?? string.Empty);
+            Console.WriteLine($"[hhchoi] Rx: {mqttmsg.addr} {mqttmsg.label} {mqttmsg.time}  {imgPreview.Substring(0, Math.Min(60, imgPreview.Length))}");
 
                             if (mqttmsg.type == "event" && mqttmsg.label == "fire")     // fire인 경우만 저장하고 FCM으로 전송 (TBD!)
                             {
@@ -67,7 +68,7 @@ namespace HawkAI.Hubs
                                 if (isFCM)
                                 {
                                     string projectPath = AppDomain.CurrentDomain.BaseDirectory.Split(new string[] { @"bin\" }, StringSplitOptions.None)[0];
-                                    FirebaseApp app = null;
+            FirebaseApp app;
                                     Console.WriteLine("[HHCHOI] projectPath: " + projectPath);
                                     try
                                     {
@@ -97,7 +98,7 @@ namespace HawkAI.Hubs
                                         Token = registrationToken,
                                         Notification = new Notification()
                                         {
-                                            Title = mqttmsg.label,
+                        Title = mqttmsg.label ?? string.Empty,
                                             Body = mqttmsg.addr + " at " + mqttmsg.time
                                         }
                                     };
@@ -113,10 +114,10 @@ namespace HawkAI.Hubs
                                 // DB Create (DB에 저장) - FCM보다 뒤에 있어야!! - DB 저장하고 되돌아 오지 않음!!
                                 Event savedEvent = new Event
                                 {
-                                    Addr = mqttmsg.addr,
-                                    Time = mqttmsg.time,
-                                    Label = mqttmsg.label,
-                                    Image = mqttmsg.image,
+                    Addr = mqttmsg.addr ?? string.Empty,
+                    Time = mqttmsg.time ?? string.Empty,
+                    Label = mqttmsg.label ?? string.Empty,
+                                    Image = mqttmsg.image ?? string.Empty,
                                     User = user
                                 };
                                 await _event.CreateEvent(savedEvent);

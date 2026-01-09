@@ -41,10 +41,10 @@ else
 
 @code {
     [CascadingParameter]
-    private Task<AuthenticationState> authenticationStateTask { get; set; }
+    private Task<AuthenticationState> authenticationStateTask { get; set; } = default!;
 
     [Inject]
-    UserManager<IdentityUser> userManager { get; set; }
+    UserManager<IdentityUser> userManager { get; set; } = default!;
 
     [Parameter]
     public int? Id { get; set; }
@@ -59,11 +59,11 @@ else
         btnText = Id == null ? "Save New Camera" : "Update Camera";
 
         var user = (await authenticationStateTask).User;
-        if (user.Identity.IsAuthenticated)
+        if (user.Identity?.IsAuthenticated == true)
         {
             var currentUser = await userManager.GetUserAsync(user);
-            string currentUserId = currentUser.Id;
-            string currentUserEmail = currentUser.Email;
+            string currentUserId = currentUser!.Id;
+            string currentUserEmail = currentUser!.Email!;
             //var currentUserPhone = currentUser.PhoneNumber;
             //var currentUserEmailConfirmed = currentUser.EmailConfirmed;
 

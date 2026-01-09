@@ -29,13 +29,13 @@ else
     <div class="mb-3" style="max-width: 1000px;">
         <!-- 이름 및 통계 -->
         <p class="card-text mb-2">
-            <strong style="font-size: 1.5rem;">@project.Name</strong>
+            <strong style="font-size: 1.5rem;">@project!.Name</strong>
             @{
                 int labeledCount = images.Count(i => i.LabelStatus == "Labeled");
             }
             <span class="text-muted ms-2" style="font-size: 0.95rem;">
                 (@labeledCount labeled / @images.Count images) |
-                Labels: @project.Labels |
+                Labels: @project!.Labels |
                 Created at @project.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")
             </span>
         </p>
@@ -333,7 +333,7 @@ else
 
         await LoadImages();
         isLoading = false;
-        selectedLabels = project.Labels;
+        selectedLabels = project!.Labels;
     }
 
     private async Task LoadImages()
@@ -364,7 +364,8 @@ else
         if (showLabelingModal && pendingInitJS)
         {
             var image = await Db.Images.FindAsync(selectedImageId);
-            var labelData = string.IsNullOrWhiteSpace(image?.LabelData) || image?.LabelData == "{}" ? "[]" : image.LabelData;
+            var labelDataRaw = image?.LabelData;
+            var labelData = string.IsNullOrWhiteSpace(labelDataRaw) || labelDataRaw == "{}" ? "[]" : labelDataRaw!;
 
             dotNetRef = DotNetObjectReference.Create(this);
             await JS.InvokeVoidAsync("initLabelingCanvas", dotNetRef, labelData);
@@ -410,7 +411,7 @@ else
                     ? SystemFonts.CreateFont("Arial", 16)
                     : SystemFonts.CreateFont("DejaVu Sans", 16);
                 var colorMap = new[] { Color.Blue, Color.Green, Color.Red, Color.Orange, Color.Purple };
-                var labelList = project.Labels.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()).ToList();
+                var labelList = project!.Labels.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()).ToList();
                 var labelBoxes = JsonDocument.Parse(labelJson).RootElement;
 
                 foreach (var box in labelBoxes.EnumerateArray())
@@ -487,7 +488,7 @@ else
             await LoadImages();
 
             // 이미지 수 등 프로젝트 관련 정보 업데이트 (예: image count 감소 등)
-            project.ImageCount = await Db.Images.CountAsync(i => i.ProjectId == projectId);
+            project!.ImageCount = await Db.Images.CountAsync(i => i.ProjectId == projectId);
             await Db.SaveChangesAsync();
         }
         catch (Exception ex)
@@ -503,7 +504,7 @@ else
         var selected = images.Where(i => i.IsSelected).ToList();
         if (selected.Count == 0)
         {
-            JS.InvokeVoidAsync("alert", "⚠️ Please select at least one image to delete.");
+            _ = JS.InvokeVoidAsync("alert", "⚠️ Please select at least one image to delete.");
             return;
         }
 
@@ -541,7 +542,7 @@ else
         showDeleteConfirm = false;
         await LoadImages();
 
-        project.ImageCount = await Db.Images.CountAsync(i => i.ProjectId == projectId);
+        project!.ImageCount = await Db.Images.CountAsync(i => i.ProjectId == projectId);
         await Db.SaveChangesAsync();
     }
 
@@ -550,14 +551,14 @@ else
     {
         try
         {
-            var imagesFolder = System.IO.Path.Combine(Env.WebRootPath, "datasets", project.Name, "images");
+            var imagesFolder = System.IO.Path.Combine(Env.WebRootPath, "datasets", project!.Name, "images");
             if (!Directory.Exists(imagesFolder))
             {
                 await JS.InvokeVoidAsync("alert", "Images folder not found.");
                 return;
             }
 
-            var zipFileName = $"{project.Name}.zip";
+            var zipFileName = $"{project!.Name}.zip";
             var zipPath = System.IO.Path.Combine(Env.WebRootPath, "temp", zipFileName);
 
             // 임시 폴더 생성
@@ -590,19 +591,19 @@ else
 
         try
         {
-            var imageDir = System.IO.Path.Combine(Env.WebRootPath, "datasets", project.Name, "images");
-            var annotatedDir = System.IO.Path.Combine(Env.WebRootPath, "datasets", project.Name, "images_annotated");
+            var imageDir = System.IO.Path.Combine(Env.WebRootPath, "datasets", project!.Name, "images");
+            var annotatedDir = System.IO.Path.Combine(Env.WebRootPath, "datasets", project!.Name, "images_annotated");
             var scriptPath = System.IO.Path.Combine(Env.ContentRootPath, "PythonScripts", "auto_labeling.py");
 
             Directory.CreateDirectory(annotatedDir); // ✅ Ensure annotated folder exists
 
             // ✅ Labels에서 첫 번째 라벨만 사용
-            var firstLabel = project.Labels.Split(',', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? "film";
+            var firstLabel = project!.Labels.Split(',', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? "film";
 
             var startInfo = new ProcessStartInfo
             {
                 FileName = "python",
-                // Arguments = $"\"{scriptPath}\" \"{imageDir}\" \"{project.Name}\"",
+                // Arguments = $"\"{scriptPath}\" \"{imageDir}\" \"{project!.Name}\"",
                 // Arguments = $"\"{scriptPath}\" \"{imageDir}\" \"film\"",
                 Arguments = $"\"{scriptPath}\" \"{imageDir}\" \"{firstLabel}\"",
                 RedirectStandardOutput = true,
@@ -626,7 +627,7 @@ else
             }
 
             var jsonResult = JsonDocument.Parse(output).RootElement;
-            var labelList = project.Labels.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()).ToList();
+            var labelList = project!.Labels.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()).ToList();
             var colors = new[] { Color.Blue, Color.Green, Color.Red, Color.Orange, Color.Purple };
             var font = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                 ? SystemFonts.CreateFont("Arial", 16)
@@ -770,7 +771,7 @@ else
                         ["y"] = y,
                         ["w"] = w,
                         ["h"] = h,
-                        ["label"] = label
+                        ["label"] = label ?? string.Empty
                     };
 
                     if (label == "film")
@@ -782,7 +783,7 @@ else
                 // 기본은 모두 유지
                 updatedBoxes.AddRange(filmBoxes);
 
-                if (project.Name == "L2017-07")
+                if (project!.Name == "L2017-07")
                 {
                     foreach (var box in filmBoxes)
                     {
@@ -802,7 +803,7 @@ else
                         updatedBoxes.Add(new Dictionary<string, object> { ["x"] = x + leftW + midW, ["y"] = baseY, ["w"] = rightW, ["h"] = subH, ["label"] = "good" });
                     }
                 }
-                else if (project.Name == "L2018-07" && nonFilmBoxes.Count == 2)
+                else if (project!.Name == "L2018-07" && nonFilmBoxes.Count == 2)
                 {
                     // 왼쪽 박스: x 작은 값 기준
                     var sorted = nonFilmBoxes.OrderBy(b => Convert.ToDouble(b["x"])).ToList();
@@ -847,7 +848,7 @@ else
                         });
                     }
                 }
-                else if (project.Name == "L0625-12" && nonFilmBoxes.Count == 3)
+                else if (project!.Name == "L0625-12" && nonFilmBoxes.Count == 3)
                 {
                     // y값 기준으로 위-중간-아래 순으로 정렬
                     var sortedByY = nonFilmBoxes.OrderBy(b => Convert.ToDouble(b["y"])).ToList();
@@ -872,11 +873,11 @@ else
                             ["y"] = y,
                             ["w"] = newW,
                             ["h"] = h,
-                            ["label"] = label
+                            ["label"] = label ?? string.Empty
                         });
                     }
                 }
-                else if (project.Name == "L1570-07" && nonFilmBoxes.Count == 3)
+                else if (project!.Name == "L1570-07" && nonFilmBoxes.Count == 3)
                 {
                     // y 기준 정렬 (위 → 중간 → 아래)
                     var sortedByY = nonFilmBoxes.OrderBy(b => Convert.ToDouble(b["y"])).ToList();
@@ -901,7 +902,7 @@ else
                             ["y"] = y,
                             ["w"] = w,
                             ["h"] = h,
-                            ["label"] = label
+                            ["label"] = label ?? string.Empty
                         });
                     }
                 }

@@ -23,10 +23,8 @@
 </main>
 
 @code {
-    SocketIO? client = null;
 
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
@@ -36,6 +34,8 @@
             // wwwroot/js/webrtc.js
             // await _jsRuntime.InvokeVoidAsync("ConnectClient");   // 8089 안열어 놓음 - 에러 떠서 일단 주석처리
         }
+
+        return Task.CompletedTask;
     }
 
     //// Call C# method from java scrpit
@@ -44,7 +44,7 @@
     //    await _jsRuntime.InvokeVoidAsync("OnCreateClient", DotNetObjectReference.Create(this));
     //}
 
-    
+
     //[JSInvokable]
     //public async Task<SocketIO> CreateClient()
     //{

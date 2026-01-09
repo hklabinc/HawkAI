@@ -93,9 +93,9 @@ else
 
 @code {
     [CascadingParameter]
-    private Task<AuthenticationState> authenticationStateTask { get; set; }
+    private Task<AuthenticationState> authenticationStateTask { get; set; } = default!;
 
-    [Inject] private UserManager<IdentityUser> userManager { get; set; }
+    [Inject] private UserManager<IdentityUser> userManager { get; set; } = default!;
 
     private IEnumerable<Event> objEvents { get; set; } = new List<Event>();
     public bool IsLoading { get; set; }
@@ -118,9 +118,9 @@ else
 
         var user = (await authenticationStateTask).User;
         var currentUser = await userManager.GetUserAsync(user);
-        string currentUserId = currentUser.Id;
-        var roles = await userManager.GetRolesAsync(currentUser);
-        string roleName = roles.FirstOrDefault();
+        string currentUserId = currentUser!.Id;
+        var roles = await userManager.GetRolesAsync(currentUser!);
+        string roleName = roles.FirstOrDefault() ?? string.Empty;
 
         objEvents = roleName == "Admin"
             ? await EventService.GetAllEvents()
@@ -133,13 +133,13 @@ else
     private void HandleDelete(int id)
     {
         DeleteEventId = id;
-        _jsRuntime.InvokeVoidAsync("ShowDeleteConfirmationModal");
+        _ = _jsRuntime.InvokeVoidAsync("ShowDeleteConfirmationModal");
     }
 
     private void HandleDeleteAll()
     {
         DeleteEventId = 0;
-        _jsRuntime.InvokeVoidAsync("ShowDeleteConfirmationModal");
+        _ = _jsRuntime.InvokeVoidAsync("ShowDeleteConfirmationModal");
     }
 
     private void ToggleView()

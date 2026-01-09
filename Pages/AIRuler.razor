@@ -426,7 +426,6 @@
 
     // =================== Viewer Transform ===================
     private bool _fitOnNextImageLoad = false;
-    private int _jsInitAttempts = 0;
 
     private sealed class FitTransform
     {
@@ -481,6 +480,7 @@
         _models = Directory.GetDirectories(ImagesRoot)
             .Select(Path.GetFileName)
             .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x!)
             .OrderBy(x => x)
             .ToList();
 
@@ -529,9 +529,10 @@
 
         _images = Directory.GetFiles(dir)
             .Select(Path.GetFileName)
-            .Where(f => f != null && IsImageFile(f))
+            .Where(f => !string.IsNullOrWhiteSpace(f) && IsImageFile(f))
+            .Select(f => f!)
             .OrderBy(f => f)
-            .ToList()!;
+            .ToList();
 
         bool selectedNew = false;
 

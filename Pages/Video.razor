@@ -89,9 +89,6 @@
     private bool IsShow = true;
     private string ShowOrHide = "Hide";
 
-    protected override async void OnInitialized()
-    {        
-    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)      // DB 내용이 많은 경우에는 이렇게 처리하는 것이 좋음
     {
@@ -102,7 +99,7 @@
     }
 
 
-    async Task<string> getUserId()
+    private async Task<string?> getUserId()
     {
         var user = (await _authenticationStateProvider.GetAuthenticationStateAsync()).User;
         var UserId = user.FindFirst(u => u.Type.Contains("nameidentifier"))?.Value;
@@ -111,14 +108,15 @@
 
     private async Task SendVideo()
     {        
-        string userId = await getUserId();
+        string? userId = await getUserId();
         await _JsRuntime.InvokeVoidAsync("SendVideo", userId);      // 자바스크립트 함수 SendVideo을 호출
     }
 
-    private async Task ShowHideControl()
+    private Task ShowHideControl()
     {
         IsShow = !IsShow;
-        ShowOrHide = IsShow ? "Hide" : "Show";        
+        ShowOrHide = IsShow ? "Hide" : "Show";
+        return Task.CompletedTask;
     }
 
     private async Task DefaultParameter()
