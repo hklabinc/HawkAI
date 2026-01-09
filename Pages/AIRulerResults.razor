@@ -1,0 +1,508 @@
+@page "/airuler-results"
+
+@using System.Text
+@using System.Text.Json
+@using SixLabors.ImageSharp
+@using SixLabors.ImageSharp.Metadata.Profiles.Exif
+
+@inject IWebHostEnvironment Env
+
+<h3>AIRuler Results</h3>
+
+<div class="mb-2 d-flex align-items-center gap-2 flex-wrap">
+    <button class="btn btn-sm btn-outline-primary" @onclick="Reload">Refresh</button>
+    <span class="text-muted small">@_items.Count file(s) in <code>wwwroot/airuler/results</code></span>
+    @if (!string.IsNullOrWhiteSpace(_loadError))
+    {
+        <span class="text-danger small">@_loadError</span>
+    }
+</div>
+
+<div class="row g-2">
+
+    <!-- Left: list -->
+    <div class="col-12 col-xl-4">
+        <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <span>Result Images</span>
+                <span class="small text-muted">(click to view JSON)</span>
+            </div>
+            <div class="card-body p-2" style="max-height: 75vh; overflow: auto;">
+                @if (_items.Count == 0)
+                {
+                    <div class="text-muted">No result files found.</div>
+                }
+                else
+                {
+                    @foreach (var it in _items)
+                    {
+                        var selected = (_selected?.FileName == it.FileName);
+                        <div class="d-flex align-items-center border rounded p-1 mb-2 @(selected ? "bg-light" : "")"
+                             style="cursor:pointer;"
+                             @onclick="(() => Select(it))">
+
+                            <img src="@it.Url" style="width:72px; height:72px; object-fit:cover;" />
+
+                            <div class="ms-2" style="min-width: 0;">
+                                <div style="font-size: 0.92rem; word-break: break-all;"><b>@it.FileName</b></div>
+                                <div class="small text-muted">
+                                    @FormatBytes(it.SizeBytes) · @it.LastWriteLocal
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Right: details -->
+    <div class="col-12 col-xl-8">
+        <div class="card">
+            <div class="card-header">Details</div>
+            <div class="card-body">
+                @if (_selected == null)
+                {
+                    <div class="text-muted">Select an image on the left to view its embedded JSON (EXIF UserComment).</div>
+                }
+                else
+                {
+                    <div class="mb-2">
+                        <img src="@_selected.Url" style="max-width: 100%; height: auto; border: 1px solid #eee;" />
+                    </div>
+
+                    <div class="mb-3">
+                        <div><b>File</b>: @_selected.FileName</div>
+                        <div><b>URL</b>: <a href="@_selected.Url" target="_blank">Open image</a></div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(_selectedJsonError))
+                    {
+                        <div class="alert alert-warning">
+                            <b>JSON extract failed</b><br />
+                            @_selectedJsonError
+                        </div>
+                    }
+                    else if (_selectedJsonDoc == null)
+                    {
+                        <div class="text-muted">No JSON loaded.</div>
+                    }
+                    else
+                    {
+                        <div class="row g-2">
+                            <div class="col-12 col-lg-6">
+                                <h5>Parsed Summary</h5>
+                                <table class="table table-sm">
+                                    <tbody>
+                                        <tr><th style="width: 190px;">schema</th><td>@_summary.Schema</td></tr>
+                                        <tr><th>modelName</th><td>@_summary.ModelName</td></tr>
+                                        <tr><th>measurementMethod</th><td>@_summary.MeasurementMethod</td></tr>
+                                        <tr><th>detectedFilms</th><td>@_summary.DetectedFilms</td></tr>
+                                        @if (_summary.MeasurementMethod == "RULER")
+                                        {
+                                            <tr><th>pixelsPerMm(H)</th><td>@_summary.PixelsPerMmH</td></tr>
+                                            <tr><th>pixelsPerMm(V)</th><td>@_summary.PixelsPerMmV</td></tr>
+                                        }
+                                        else if (_summary.MeasurementMethod == "GRID")
+                                        {
+                                            <tr><th>gridPitch(mm)</th><td>@_summary.GridPitchMm</td></tr>
+                                            <tr><th>gridJsonPath</th><td style="word-break: break-all;">@_summary.GridJsonPath</td></tr>
+                                        }
+                                        <tr><th>timestamp</th><td>@_summary.TimestampLocal</td></tr>
+                                    </tbody>
+                                </table>
+
+                                @if (_summary.LogsPreview?.Count > 0)
+                                {
+                                    <h6 class="mt-3">Logs (preview)</h6>
+                                    <pre style="max-height: 260px; overflow: auto; background: #fafafa; border: 1px solid #eee; padding: 8px;">@string.Join('\n', _summary.LogsPreview)</pre>
+                                }
+                            </div>
+
+                            <div class="col-12 col-lg-6">
+                                <h5>Raw JSON (EXIF UserComment)</h5>
+                                <pre style="max-height: 520px; overflow: auto; background: #fafafa; border: 1px solid #eee; padding: 8px;">@_selectedJsonPretty</pre>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+
+    private sealed record ResultItem(
+        string FileName,
+        string Url,
+        long SizeBytes,
+        DateTime LastWriteUtc
+    )
+    {
+        public string LastWriteLocal => LastWriteUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+    }
+
+    private sealed record ResultSummary(
+        string Schema,
+        string ModelName,
+        string MeasurementMethod,
+        int DetectedFilms,
+        string? PixelsPerMmH,
+        string? PixelsPerMmV,
+        string? GridPitchMm,
+        string? GridJsonPath,
+        string TimestampLocal,
+        List<string>? LogsPreview
+    );
+
+    private List<ResultItem> _items = new();
+    private ResultItem? _selected;
+
+    private string? _loadError;
+
+    private string? _selectedJsonError;
+    private JsonDocument? _selectedJsonDoc;
+    private string _selectedJsonPretty = "";
+
+    private ResultSummary _summary = new(
+        Schema: "",
+        ModelName: "",
+        MeasurementMethod: "",
+        DetectedFilms: 0,
+        PixelsPerMmH: null,
+        PixelsPerMmV: null,
+        GridPitchMm: null,
+        GridJsonPath: null,
+        TimestampLocal: "",
+        LogsPreview: null
+    );
+
+    protected override void OnInitialized()
+    {
+        Reload();
+    }
+
+    private void Reload()
+    {
+        _loadError = null;
+        _selected = null;
+        _selectedJsonError = null;
+        _selectedJsonDoc?.Dispose();
+        _selectedJsonDoc = null;
+        _selectedJsonPretty = "";
+
+        var dir = ResultsDir();
+        try
+        {
+            Directory.CreateDirectory(dir);
+
+            _items = Directory
+                .GetFiles(dir)
+                .Where(IsImage)
+                .Select(p => new FileInfo(p))
+                .OrderByDescending(fi => fi.LastWriteTimeUtc)
+                .Select(fi => new ResultItem(
+                    FileName: fi.Name,
+                    Url: $"/airuler/results/{Uri.EscapeDataString(fi.Name)}",
+                    SizeBytes: fi.Length,
+                    LastWriteUtc: fi.LastWriteTimeUtc
+                ))
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _items = new();
+            _loadError = ex.Message;
+        }
+    }
+
+    private void Select(ResultItem it)
+    {
+        _selected = it;
+        _selectedJsonError = null;
+        _selectedJsonDoc?.Dispose();
+        _selectedJsonDoc = null;
+        _selectedJsonPretty = "";
+
+        try
+        {
+            var path = Path.Combine(ResultsDir(), it.FileName);
+            if (!System.IO.File.Exists(path))
+            {
+                _selectedJsonError = "File not found on server.";
+                return;
+            }
+
+            var json = TryReadExifUserCommentJson(path, out var err);
+            if (json == null)
+            {
+                _selectedJsonError = err ?? "EXIF(UserComment) not found.";
+                return;
+            }
+
+            // JSON parse
+            _selectedJsonDoc = JsonDocument.Parse(json);
+
+            // pretty
+            _selectedJsonPretty = JsonSerializer.Serialize(
+                _selectedJsonDoc.RootElement,
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                }
+            );
+
+            _summary = BuildSummary(_selectedJsonDoc.RootElement);
+        }
+        catch (Exception ex)
+        {
+            _selectedJsonError = ex.Message;
+        }
+    }
+
+    private string ResultsDir() => Path.Combine(Env.WebRootPath, "airuler", "results");
+
+    private static bool IsImage(string path)
+    {
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        return ext is ".jpg" or ".jpeg" or ".png" or ".bmp" or ".webp";
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} B";
+        var kb = bytes / 1024.0;
+        if (kb < 1024) return $"{kb:0.0} KB";
+        var mb = kb / 1024.0;
+        if (mb < 1024) return $"{mb:0.0} MB";
+        var gb = mb / 1024.0;
+        return $"{gb:0.0} GB";
+    }
+
+    private static string? TryReadExifUserCommentJson(string filePath, out string? error)
+    {
+        error = null;
+
+        try
+        {
+            using var image = Image.Load(filePath);
+            var exif = image.Metadata.ExifProfile;
+            if (exif == null)
+            {
+                error = "EXIF profile not found.";
+                return null;
+            }
+
+            // NOTE:
+            // 일부 프로젝트에서는 `GetValue(...)` 호출이 Microsoft.Extensions.Configuration의
+            // `ConfigurationBinder.GetValue<T>()` 확장메서드로 잘못 바인딩되면서
+            // "형식 인수를 유추할 수 없습니다" 컴파일 오류가 발생할 수 있습니다.
+            // (Razor/GlobalUsings 조합에 따라 발생)
+            // 그래서 ImageSharp ExifProfile의 저장된 Values 컬렉션을 순회하여
+            // UserComment 태그를 찾는 방식으로 구현합니다(버전 호환성↑).
+
+            object? exifValueObj = null;
+            try
+            {
+                var valuesProp = exif.GetType().GetProperty("Values");
+                var valuesEnum = valuesProp?.GetValue(exif) as System.Collections.IEnumerable;
+                if (valuesEnum != null)
+                {
+                    foreach (var item in valuesEnum)
+                    {
+                        if (item == null) continue;
+                        var tagProp = item.GetType().GetProperty("Tag");
+                        var tag = tagProp?.GetValue(item);
+                        if (tag == null) continue;
+
+                        // Tag.ToString() == "UserComment" 형태를 기대
+                        if (string.Equals(tag.ToString(), "UserComment", StringComparison.OrdinalIgnoreCase))
+                        {
+                            exifValueObj = item;
+                            break;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // ignore (fallback below)
+            }
+
+            if (exifValueObj == null)
+            {
+                error = "EXIF(UserComment) tag not found.";
+                return null;
+            }
+
+            object? vValueObj = null;
+            try
+            {
+                // ImageSharp ExifValue<T>는 보통 `Value` 프로퍼티에 실제 값을 가집니다.
+                vValueObj = exifValueObj.GetType().GetProperty("Value")?.GetValue(exifValueObj);
+            }
+            catch
+            {
+                // ignore
+            }
+
+            string raw;
+            if (vValueObj is string s)
+            {
+                raw = s;
+            }
+            else if (vValueObj is byte[] bytes)
+            {
+                raw = DecodeExifUserComment(bytes);
+            }
+            else
+            {
+                raw = vValueObj?.ToString() ?? "";
+            }
+
+            // 정리: null 문자/앞뒤 공백 제거
+            raw = raw.Trim('\0', ' ', '\t', '\r', '\n');
+
+            // 일부 구현체에서 prefix가 섞여 들어오는 경우가 있어 JSON 시작 위치를 찾는다.
+            var idx = raw.IndexOf('{');
+            if (idx > 0) raw = raw.Substring(idx);
+
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                error = "EXIF(UserComment) value is empty.";
+                return null;
+            }
+
+            return raw;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return null;
+        }
+    }
+
+    // Exif UserComment (Undefined bytes) decode
+    // - Exif spec uses 8-byte prefix: "ASCII\0\0\0", "UNICODE\0", "JIS\0..."
+    private static string DecodeExifUserComment(byte[] bytes)
+    {
+        if (bytes.Length == 0) return "";
+
+        if (bytes.Length >= 8)
+        {
+            var prefix = Encoding.ASCII.GetString(bytes, 0, 8).TrimEnd('\0').ToUpperInvariant();
+            var payload = bytes.Skip(8).ToArray();
+
+            if (prefix.StartsWith("ASCII"))
+            {
+                return Encoding.UTF8.GetString(payload).TrimEnd('\0');
+            }
+
+            if (prefix.StartsWith("UNICODE"))
+            {
+                // 대부분 Android는 UTF-16LE로 들어오지만, 혹시 몰라 양쪽을 시도.
+                var s1 = Encoding.Unicode.GetString(payload).TrimEnd('\0');
+                if (s1.Contains('{')) return s1;
+
+                var s2 = Encoding.BigEndianUnicode.GetString(payload).TrimEnd('\0');
+                return s2;
+            }
+
+            // unknown prefix: try UTF-8 from payload
+            var s = Encoding.UTF8.GetString(payload).TrimEnd('\0');
+            if (s.Contains('{')) return s;
+        }
+
+        // fallback: decode whole bytes as UTF-8
+        return Encoding.UTF8.GetString(bytes).TrimEnd('\0');
+    }
+
+    private static ResultSummary BuildSummary(JsonElement root)
+    {
+        static string GetString(JsonElement e, string name)
+        {
+            if (e.TryGetProperty(name, out var p) && p.ValueKind == JsonValueKind.String)
+                return p.GetString() ?? "";
+            return "";
+        }
+
+        static int GetInt(JsonElement e, string name)
+        {
+            if (e.TryGetProperty(name, out var p) && p.ValueKind == JsonValueKind.Number && p.TryGetInt32(out var v))
+                return v;
+            return 0;
+        }
+
+        static string? GetNumberAsString(JsonElement e, string name)
+        {
+            if (e.TryGetProperty(name, out var p) && p.ValueKind == JsonValueKind.Number)
+                return p.GetDouble().ToString("0.###");
+            return null;
+        }
+
+        var schema = GetString(root, "schema");
+        var modelName = GetString(root, "modelName");
+        var detectedFilms = GetInt(root, "detectedFilms");
+
+        var measurementMethod = GetString(root, "measurementMethod");
+        if (string.IsNullOrWhiteSpace(measurementMethod))
+        {
+            // schema로 추정
+            measurementMethod = schema.Contains("Grid", StringComparison.OrdinalIgnoreCase) ? "GRID" : "RULER";
+        }
+
+        string? pxH = null;
+        string? pxV = null;
+
+        if (measurementMethod == "RULER" && root.TryGetProperty("pixelsPerMm", out var ppm) && ppm.ValueKind == JsonValueKind.Object)
+        {
+            pxH = GetNumberAsString(ppm, "h");
+            pxV = GetNumberAsString(ppm, "v");
+        }
+
+        string? pitchMm = null;
+        string? gridJsonPath = null;
+        if (measurementMethod == "GRID" && root.TryGetProperty("grid", out var grid) && grid.ValueKind == JsonValueKind.Object)
+        {
+            pitchMm = GetNumberAsString(grid, "pitchMm");
+            if (grid.TryGetProperty("gridJsonPath", out var gp) && gp.ValueKind == JsonValueKind.String)
+                gridJsonPath = gp.GetString();
+        }
+
+        var tsLocal = "";
+        if (root.TryGetProperty("timestampMs", out var t) && t.ValueKind == JsonValueKind.Number && t.TryGetInt64(out var ms))
+        {
+            try
+            {
+                tsLocal = DateTimeOffset.FromUnixTimeMilliseconds(ms).ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+            }
+            catch { /* ignore */ }
+        }
+
+        List<string>? logsPreview = null;
+        if (root.TryGetProperty("logs", out var logs) && logs.ValueKind == JsonValueKind.Array)
+        {
+            logsPreview = new List<string>();
+            foreach (var x in logs.EnumerateArray().Take(50))
+            {
+                if (x.ValueKind == JsonValueKind.String)
+                    logsPreview.Add(x.GetString() ?? "");
+            }
+        }
+
+        return new ResultSummary(
+            Schema: schema,
+            ModelName: modelName,
+            MeasurementMethod: measurementMethod,
+            DetectedFilms: detectedFilms,
+            PixelsPerMmH: pxH,
+            PixelsPerMmV: pxV,
+            GridPitchMm: pitchMm,
+            GridJsonPath: gridJsonPath,
+            TimestampLocal: tsLocal,
+            LogsPreview: logsPreview
+        );
+    }
+}

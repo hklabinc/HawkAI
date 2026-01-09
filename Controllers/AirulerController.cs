@@ -22,6 +22,7 @@ namespace HawkAI.Controllers
         private string AirulerRoot => Path.Combine(_env.WebRootPath, "airuler");
         private string ModelsDir => Path.Combine(AirulerRoot, "models");
         private string ImagesDir => Path.Combine(AirulerRoot, "images");
+        private string ResultsDir => Path.Combine(AirulerRoot, "results");
 
         private string SanitizeModelName(string raw)
         {
@@ -45,14 +46,108 @@ namespace HawkAI.Controllers
             Directory.CreateDirectory(AirulerRoot);
             Directory.CreateDirectory(ModelsDir);
             Directory.CreateDirectory(ImagesDir);
+            Directory.CreateDirectory(ResultsDir);
         }
 
         private string ModelImagesDir(string modelName) => Path.Combine(ImagesDir, modelName);
+
+        private static string ResultsUrl(string fileName)
+            => $"/airuler/results/{Uri.EscapeDataString(fileName)}";
 
         private static bool IsImageExt(string path)
         {
             var ext = Path.GetExtension(path).ToLowerInvariant();
             return ext is ".png" or ".jpg" or ".jpeg" or ".bmp" or ".webp";
+        }
+
+        // =========================
+        // AIRuler Results (DCIM/AIRulerResult 업로드 대상)
+        // =========================
+
+        /// <summary>
+        /// ✅ 서버에 저장된 결과 이미지 목록
+        /// - 정적 파일 경로: /airuler/results/{file}
+        /// </summary>
+        [HttpGet("results")]
+        public IActionResult ListResults()
+        {
+            EnsureBaseDirs();
+
+            if (!Directory.Exists(ResultsDir))
+                return Ok(Array.Empty<object>());
+
+            var files = Directory.GetFiles(ResultsDir)
+                .Where(IsImageExt)
+                .Select(p => new FileInfo(p))
+                .OrderByDescending(fi => fi.LastWriteTimeUtc)
+                .Select(fi => new
+                {
+                    fileName = fi.Name,
+                    url = ResultsUrl(fi.Name),
+                    sizeBytes = fi.Length,
+                    lastWriteUtc = fi.LastWriteTimeUtc
+                })
+                .ToList();
+
+            return Ok(files);
+        }
+
+        /// <summary>
+        /// ✅ 결과 이미지 업로드
+        /// - 저장 위치: wwwroot/airuler/results/
+        /// - 주의: EXIF(UserComment) JSON이 포함된 JPEG를 그대로 저장해야 하므로 재인코딩 금지.
+        /// </summary>
+        [HttpPost("upload-results")]
+        [RequestSizeLimit(500 * 1024 * 1024)]
+        public async Task<IActionResult> UploadResults([FromForm] List<IFormFile> files)
+        {
+            EnsureBaseDirs();
+
+            if (files == null || files.Count == 0)
+                return BadRequest("No files.");
+
+            Directory.CreateDirectory(ResultsDir);
+
+            int saved = 0;
+            var savedFiles = new List<string>();
+
+            foreach (var f in files)
+            {
+                if (f.Length <= 0) continue;
+
+                var originalName = Path.GetFileName(f.FileName);
+                var ext = Path.GetExtension(originalName).ToLowerInvariant();
+                if (!(ext is ".png" or ".jpg" or ".jpeg" or ".bmp" or ".webp"))
+                    continue;
+
+                var baseName = Path.GetFileNameWithoutExtension(originalName);
+                var safeBase = UnsafeChars.Replace(baseName.Replace(' ', '_'), "");
+                if (string.IsNullOrWhiteSpace(safeBase)) safeBase = "result";
+
+                var targetName = safeBase + ext;
+                var targetPath = Path.Combine(ResultsDir, targetName);
+
+                int idx = 1;
+                while (System.IO.File.Exists(targetPath))
+                {
+                    targetName = $"{safeBase}_{idx}{ext}";
+                    targetPath = Path.Combine(ResultsDir, targetName);
+                    idx++;
+                }
+
+                await using var stream = new FileStream(targetPath, FileMode.Create);
+                await f.CopyToAsync(stream);
+
+                saved++;
+                savedFiles.Add(targetName);
+            }
+
+            return Ok(new
+            {
+                success = true,
+                saved,
+                files = savedFiles
+            });
         }
 
         // ✅ 모델(프로젝트) 목록
