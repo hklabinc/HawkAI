@@ -1,4 +1,4 @@
-﻿@page "/airuler-modeler"
+@page "/airuler-modeler"
 @using System.Text
 @using System.Text.Json
 @using System.Text.Encodings.Web
@@ -15,7 +15,7 @@
                 <div class="me-2"><b>AIRuler Viewer</b></div>
 
                 <span class="ms-auto airuler-hint">
-                    (ROI: Arrow 이동 / Shift+Arrow 크기 / Delete 삭제 / Ctrl+C,X,V,E View: Ctrl+'+' 확대 / Ctrl+'-' 축소 / Ctrl+Arrow 팬 (Viewer만))
+                    (ROI: Arrow 이동 / Shift+Arrow 크기 / Delete 삭제 / Ctrl+C,X,V View: Ctrl+'+' 확대 / Ctrl+'-' 축소 / Ctrl+Arrow 팬 (Viewer만))
                 </span>
             </div></div>
 
@@ -113,16 +113,57 @@
         <!-- 2) ROI -->
         <div class="col-12 col-xl-3">
             <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span>ROI</span>
-                    <div class="d-flex gap-2">
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="OpenEditSelectedRoi" disabled="@(_selectedRoiId is null)">Edit (Ctrl+E)</button>
-                        <button class="btn btn-sm btn-outline-danger" @onclick="DeleteSelectedRoiAsync" disabled="@(_selectedRoiId is null)">Delete</button>
-                    </div>
-                </div>
+                <div class="card-header">ROI</div>
 
                 <div class="card-body">
-                    <div style="max-height:360px; overflow:auto; border:1px solid #eee; padding:6px;">
+                    <div class="mb-2">
+                        <label class="form-label">ROI ID</label>
+                        <input class="form-control" type="number" step="1" @bind="_roiEditor.IdText" placeholder="e.g. 1" />
+                    </div>
+
+                    <div class="row g-1 mb-2">
+                        <div class="col-3">
+                            <label class="form-label">X</label>
+                            <input class="form-control" type="number" step="1" @bind="_roiEditor.XText" />
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label">Y</label>
+                            <input class="form-control" type="number" step="1" @bind="_roiEditor.YText" />
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label">W</label>
+                            <input class="form-control" type="number" step="1" @bind="_roiEditor.WText" />
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label">H</label>
+                            <input class="form-control" type="number" step="1" @bind="_roiEditor.HText" />
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label">Method</label>
+                        <select class="form-select" @bind="_roiEditor.Method">
+                            @foreach (var m in RoiMethodOptions)
+                            {
+                                <option value="@m">@m</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label">Parameter</label>
+                        <input class="form-control" type="number" step="0.01" min="0" max="1" @bind="_roiEditor.ParameterText" />
+                        <div class="form-text">default=0.5, 0~1 (작을수록 어두운쪽 bias)</div>
+                    </div>
+
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button class="btn btn-sm btn-primary" @onclick="AddOrUpdateRoiAsync">Add/Update</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="DeleteRoiAsync" disabled="@(_selectedRoiId is null && string.IsNullOrWhiteSpace(_roiEditor.IdText))">Delete</button>
+                    </div>
+
+                    <hr />
+
+                    <div style="height:320px; min-height:120px; resize:vertical; overflow:auto; border:1px solid #eee; padding:6px;">
                         @foreach (var r in _rois.OrderBy(r => r.Id))
                         {
                             <button class="btn btn-sm @(r.Id == _selectedRoiId ? "btn-danger" : "btn-light")"
@@ -146,37 +187,42 @@
                         <input class="form-control" @bind="_measureForm.IndexText" placeholder="e.g. CP1, CP2, No.3-1" />
                     </div>
 
-                    <div class="mb-2">
-                        <label class="form-label">Start ROI</label>
-                        <input class="form-control" @bind="_measureForm.StartText" placeholder="e.g. 1 or roi_1" />
+                    <div class="row g-1 mb-2">
+                        <div class="col-4">
+                            <label class="form-label">Start ROI</label>
+                            <input class="form-control" @bind="_measureForm.StartText" placeholder="e.g. 1 or roi_1" />
+                        </div>
+
+                        <div class="col-4">
+                            <label class="form-label">End ROI</label>
+                            <input class="form-control" @bind="_measureForm.EndText" placeholder="e.g. 2 or roi_2" />
+                        </div>
+
+                        <div class="col-4">
+                            <label class="form-label">Dir</label>
+                            <select class="form-select" @bind="_measureForm.Direction">
+                                <option value="x">x</option>
+                                <option value="y">y</option>
+                                <option value="xy">xy</option>
+                            </select>
+                        </div>
                     </div>
 
-                    <div class="mb-2">
-                        <label class="form-label">End ROI</label>
-                        <input class="form-control" @bind="_measureForm.EndText" placeholder="e.g. 2 or roi_2" />
-                    </div>
+                    <div class="row g-1 mb-2">
+                        <div class="col-4">
+                            <label class="form-label">GT</label>
+                            <input class="form-control" @bind="_measureForm.GtText" placeholder="e.g. 0.85" />
+                        </div>
 
-                    <div class="mb-2">
-                        <label class="form-label">Direction</label>
-                        <select class="form-select" @bind="_measureForm.Direction">
-                            <option value="x">x</option>
-                            <option value="y">y</option>
-                        </select>
-                    </div>
+                        <div class="col-4">
+                            <label class="form-label">Margin</label>
+                            <input class="form-control" @bind="_measureForm.MarginText" placeholder="e.g. 0.1" />
+                        </div>
 
-                    <div class="mb-2">
-                        <label class="form-label">GT</label>
-                        <input class="form-control" @bind="_measureForm.GtText" placeholder="e.g. 0.85" />
-                    </div>
-
-                    <div class="mb-2">
-                        <label class="form-label">Margin</label>
-                        <input class="form-control" @bind="_measureForm.MarginText" placeholder="e.g. 0.1" />
-                    </div>
-
-                    <div class="mb-2">
-                        <label class="form-label">Adjust</label>
-                        <input class="form-control" @bind="_measureForm.AdjustText" placeholder="e.g. +0.1, -0.2, *0.12, /1.1" />
+                        <div class="col-4">
+                            <label class="form-label">Adjust</label>
+                            <input class="form-control" @bind="_measureForm.AdjustText" placeholder="+-*/숫자" />
+                        </div>
                     </div>
 
                     <div class="d-flex gap-2 flex-wrap">
@@ -186,7 +232,7 @@
 
                     <hr />
 
-                    <div style="max-height:320px; overflow:auto; border:1px solid #eee; padding:6px;">
+                    <div style="height:320px; min-height:120px; resize:vertical; overflow:auto; border:1px solid #eee; padding:6px;">
                         @foreach (var mid in GetOrderedMeasureIds())
                         {
                             var m = _measures[mid];
@@ -223,93 +269,13 @@
                     </div>
                 </div>
                 <div class="card-body">
-                    <textarea class="airuler-json form-control" @bind="_jsonEditorText"></textarea>
+                    <textarea class="airuler-json form-control" style="height:520px; resize:vertical;" @bind="_jsonEditorText"></textarea>
                 </div>
             </div>
         </div>
 
     </div>
 </div>
-
-<!-- ROI Create Modal -->
-@if (_showRoiCreateModal)
-{
-    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5>Create ROI</h5>
-                    <button class="btn-close" @onclick="CloseRoiModal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-2">
-                        <label class="form-label">ROI ID</label>
-                        <input class="form-control" @bind="_roiForm.IdText" />
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label">Method</label>
-                        <input class="form-control" @bind="_roiForm.Method" placeholder="(optional)" />
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label">Parameter</label>
-                        <input class="form-control" @bind="_roiForm.ParameterText" placeholder="(optional)" />
-                    </div>
-
-                    <div class="small text-muted">
-                        Rect(px): x=@((int)_pendingRect.X), y=@((int)_pendingRect.Y), w=@((int)_pendingRect.W), h=@((int)_pendingRect.H)
-                    </div>
-
-                    @if (!string.IsNullOrWhiteSpace(_roiModalError))
-                    {
-                        <div class="alert alert-danger mt-2">@_roiModalError</div>
-                    }
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="CloseRoiModal">Cancel</button>
-                    <button class="btn btn-primary" @onclick="ConfirmCreateRoiAsync">Create</button>
-                </div>
-            </div>
-        </div>
-    </div>
-}
-
-<!-- ROI Edit Modal -->
-@if (_showRoiEditModal && _selectedRoiId is not null)
-{
-    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5>Edit ROI (roi_@_selectedRoiId)</h5>
-                    <button class="btn-close" @onclick="CloseRoiEditModal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-2">
-                        <label class="form-label">ROI ID</label>
-                        <input class="form-control" @bind="_roiForm.IdText" />
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label">Method</label>
-                        <input class="form-control" @bind="_roiForm.Method" />
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label">Parameter</label>
-                        <input class="form-control" @bind="_roiForm.ParameterText" />
-                    </div>
-
-                    @if (!string.IsNullOrWhiteSpace(_roiModalError))
-                    {
-                        <div class="alert alert-danger mt-2">@_roiModalError</div>
-                    }
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="CloseRoiEditModal">Close</button>
-                    <button class="btn btn-primary" @onclick="ConfirmEditRoiAsync">Apply</button>
-                </div>
-            </div>
-        </div>
-    </div>
-}
 
 @code
 {
@@ -351,12 +317,24 @@ private int? _selectedRoiId = null;
     // Upload
     private readonly List<IBrowserFile> _pendingFiles = new();
 
-    // Modals
-    private bool _showRoiCreateModal = false;
-    private bool _showRoiEditModal = false;
-    private string _roiModalError = "";
-    private RoiFormModel _roiForm = new();
-    private Rect _pendingRect;
+    // ROI Methods
+    private static readonly string[] RoiMethodOptions = new[]
+    {
+        "line_x_by_prob",
+        "line_y_by_prob",
+        "curve_x",
+        "curve_y",
+        "corner",
+        "cross",
+        "round",
+        "line_x_by_level",
+        "line_y_by_level"
+    };
+
+    private const string DefaultRoiMethod = "line_x_by_prob";
+
+    // ROI editor (inline)
+    private RoiEditorModel _roiEditor = new();
 
     // JS interop
     private DotNetObjectReference<AIRulerModeler>? _dotNetRef;
@@ -366,6 +344,9 @@ private int? _selectedRoiId = null;
     {
         Directory.CreateDirectory(ImagesRoot);
         Directory.CreateDirectory(ModelsRoot);
+
+        ResetRoiEditor();
+
         await RefreshModelsAsync();
     }
 
@@ -673,17 +654,45 @@ private async Task UploadSelectedFilesAsync()
     {
         if (_imgW <= 0 || _imgH <= 0) return;
 
-        _pendingRect = ClampRectToImage(new Rect(x, y, w, h));
+        var rect = ClampRectToImage(new Rect(x, y, w, h));
+        var rid = SuggestNextRoiId();
 
-        _roiModalError = "";
-        _roiForm = new RoiFormModel
+        EnsureRoiEditorDefaults();
+
+        // Create ROI immediately (no modal). Values are px in editor; JSON is normalized at Generate JSON.
+        var method = string.IsNullOrWhiteSpace(_roiEditor.Method) ? DefaultRoiMethod : _roiEditor.Method.Trim();
+        if (Array.IndexOf(RoiMethodOptions, method) < 0)
+            method = DefaultRoiMethod;
+
+        var param = 0.5;
+        if (!string.IsNullOrWhiteSpace(_roiEditor.ParameterText) && double.TryParse(_roiEditor.ParameterText.Trim(), out var p))
+            param = p;
+
+        // clamp 0~1
+        if (param < 0) param = 0;
+        if (param > 1) param = 1;
+
+        var roi = new Roi
         {
-            IdText = SuggestNextRoiId().ToString(),
-            Method = "",
-            ParameterText = ""
+            Id = rid,
+            X = rect.X,
+            Y = rect.Y,
+            W = rect.W,
+            H = rect.H,
+            Method = method,
+            Parameter = param
         };
 
-        _showRoiCreateModal = true;
+        ClampRoiToImageInPlace(roi);
+
+        _rois.Add(roi);
+        _selectedRoiId = rid;
+        _selectedMeasureId = null;
+
+        LoadRoiIntoEditor(roi);
+
+        Log($"roi_{rid} created");
+        await PushCanvasStateAsync();
         await InvokeAsync(StateHasChanged);
     }
 
@@ -696,6 +705,9 @@ private async Task UploadSelectedFilesAsync()
         {
             _selectedRoiId = hitRoi.Id;
             _selectedMeasureId = null;
+
+            LoadRoiIntoEditor(hitRoi);
+
             Log($"Selected roi_{hitRoi.Id}");
             await PushCanvasStateAsync();
             await InvokeAsync(StateHasChanged);
@@ -760,7 +772,7 @@ private async Task UploadSelectedFilesAsync()
         {
             if (key == "Delete")
             {
-                await DeleteSelectedRoiAsync();
+                await DeleteRoiAsync();
                 return true;
             }
 
@@ -779,13 +791,6 @@ private async Task UploadSelectedFilesAsync()
                 await PasteRoiOffsetAsync();
                 return true;
             }
-            if (ctrl && key.Equals("e", StringComparison.OrdinalIgnoreCase))
-            {
-                OpenEditSelectedRoi();
-                await InvokeAsync(StateHasChanged);
-                return true;
-            }
-
             // ROI move/resize: Arrow / Shift+Arrow
             if (key.StartsWith("Arrow", StringComparison.Ordinal))
             {
@@ -814,6 +819,11 @@ private async Task UploadSelectedFilesAsync()
     {
         _selectedRoiId = id;
         _selectedMeasureId = null;
+
+        var roi = _rois.FirstOrDefault(r => r.Id == id);
+        if (roi is not null)
+            LoadRoiIntoEditor(roi);
+
         Log($"Selected roi_{id}");
         await PushCanvasStateAsync();
         await InvokeAsync(StateHasChanged);
@@ -824,45 +834,6 @@ private async Task UploadSelectedFilesAsync()
         _selectedMeasureId = id;
         _selectedRoiId = null;
         Log($"Selected measure_{id}");
-        await PushCanvasStateAsync();
-        await InvokeAsync(StateHasChanged);
-    }
-
-    private void OpenEditSelectedRoi()
-    {
-        if (_selectedRoiId is null) return;
-        var roi = _rois.FirstOrDefault(r => r.Id == _selectedRoiId.Value);
-        if (roi is null) return;
-
-        _roiModalError = "";
-        _roiForm = new RoiFormModel
-        {
-            IdText = roi.Id.ToString(),
-            Method = roi.Method ?? "",
-            ParameterText = roi.Parameter?.ToString() ?? ""
-        };
-        _showRoiEditModal = true;
-    }
-
-    private async Task DeleteSelectedRoiAsync()
-    {
-        if (_selectedRoiId is null) return;
-        var rid = _selectedRoiId.Value;
-
-        var roi = _rois.FirstOrDefault(r => r.Id == rid);
-        if (roi is null) return;
-
-        _rois.Remove(roi);
-        _selectedRoiId = null;
-
-        // ROI 참조 measure 제거
-        var toDelete = _measures
-            .Where(kv => ParseRoiNameToId(kv.Value.Start) == rid || ParseRoiNameToId(kv.Value.End) == rid)
-            .Select(kv => kv.Key)
-            .ToList();
-        foreach (var mid in toDelete) _measures.Remove(mid);
-
-        Log($"roi_{rid} deleted");
         await PushCanvasStateAsync();
         await InvokeAsync(StateHasChanged);
     }
@@ -881,7 +852,7 @@ private async Task UploadSelectedFilesAsync()
     private async Task CutSelectedRoiAsync()
     {
         CopySelectedRoi();
-        await DeleteSelectedRoiAsync();
+        await DeleteRoiAsync();
         Log("Cut ROI");
     }
 
@@ -899,6 +870,8 @@ private async Task UploadSelectedFilesAsync()
         _rois.Add(pasted);
         _selectedRoiId = newId;
         _selectedMeasureId = null;
+
+        LoadRoiIntoEditor(pasted);
 
         Log($"Pasted roi_{newId}");
         await PushCanvasStateAsync();
@@ -927,121 +900,209 @@ private async Task UploadSelectedFilesAsync()
         }
 
         ClampRoiToImageInPlace(roi);
+        LoadRoiIntoEditor(roi);
     }
 
-    // =================== ROI Create/Edit Modals ===================
-    private void CloseRoiModal()
+    // =================== ROI (Inline Editor) ===================
+    private void ResetRoiEditor()
     {
-        _showRoiCreateModal = false;
-        _roiModalError = "";
-    }
-
-    private void CloseRoiEditModal()
-    {
-        _showRoiEditModal = false;
-        _roiModalError = "";
-    }
-
-    private async Task ConfirmCreateRoiAsync()
-    {
-        if (!int.TryParse((_roiForm.IdText ?? "").Trim(), out var rid))
+        _roiEditor = new RoiEditorModel
         {
-            _roiModalError = "ROI ID must be an integer.";
-            return;
-        }
-        if (_rois.Any(r => r.Id == rid))
-        {
-            _roiModalError = $"roi_{rid} already exists.";
-            return;
-        }
-
-        double? param = null;
-        if (!string.IsNullOrWhiteSpace(_roiForm.ParameterText))
-        {
-            if (!double.TryParse(_roiForm.ParameterText, out var p))
-            {
-                _roiModalError = "Parameter must be a number.";
-                return;
-            }
-            param = p;
-        }
-
-        var roi = new Roi
-        {
-            Id = rid,
-            X = _pendingRect.X,
-            Y = _pendingRect.Y,
-            W = _pendingRect.W,
-            H = _pendingRect.H,
-            Method = _roiForm.Method?.Trim() ?? "",
-            Parameter = param
+            IdText = "",
+            XText = "",
+            YText = "",
+            WText = "",
+            HText = "",
+            Method = DefaultRoiMethod,
+            ParameterText = "0.5"
         };
-        ClampRoiToImageInPlace(roi);
-
-        _rois.Add(roi);
-        _selectedRoiId = rid;
-        _selectedMeasureId = null;
-
-        _showRoiCreateModal = false;
-
-        Log($"roi_{rid} created");
-        await PushCanvasStateAsync();
-        await InvokeAsync(StateHasChanged);
     }
 
-    private async Task ConfirmEditRoiAsync()
+    private void EnsureRoiEditorDefaults()
     {
-        if (_selectedRoiId is null) return;
-        var oldId = _selectedRoiId.Value;
+        if (string.IsNullOrWhiteSpace(_roiEditor.Method))
+            _roiEditor.Method = DefaultRoiMethod;
 
-        var roi = _rois.FirstOrDefault(r => r.Id == oldId);
-        if (roi is null) return;
+        if (string.IsNullOrWhiteSpace(_roiEditor.ParameterText))
+            _roiEditor.ParameterText = "0.5";
+    }
 
-        if (!int.TryParse((_roiForm.IdText ?? "").Trim(), out var newId))
+    private void LoadRoiIntoEditor(Roi roi)
+    {
+        _roiEditor.IdText = roi.Id.ToString();
+        _roiEditor.XText = ((int)Math.Round(roi.X)).ToString();
+        _roiEditor.YText = ((int)Math.Round(roi.Y)).ToString();
+        _roiEditor.WText = ((int)Math.Round(roi.W)).ToString();
+        _roiEditor.HText = ((int)Math.Round(roi.H)).ToString();
+        _roiEditor.Method = string.IsNullOrWhiteSpace(roi.Method) ? DefaultRoiMethod : roi.Method!;
+        _roiEditor.ParameterText = (roi.Parameter ?? 0.5).ToString("0.###");
+    }
+
+    private async Task AddOrUpdateRoiAsync()
+    {
+        if (_imgW <= 0 || _imgH <= 0)
         {
-            _roiModalError = "ROI ID must be an integer.";
+            Log("ERROR: image not loaded.");
             return;
         }
-        if (newId != oldId && _rois.Any(r => r.Id == newId))
+
+        EnsureRoiEditorDefaults();
+
+        // ID
+        if (!int.TryParse((_roiEditor.IdText ?? "").Trim(), out var newId))
         {
-            _roiModalError = $"roi_{newId} already exists.";
+            Log("ERROR: ROI ID must be an integer.");
             return;
         }
 
-        double? param = null;
-        if (!string.IsNullOrWhiteSpace(_roiForm.ParameterText))
+        // x,y,w,h (px)
+        if (!double.TryParse((_roiEditor.XText ?? "").Trim(), out var x)) { Log("ERROR: X must be a number."); return; }
+        if (!double.TryParse((_roiEditor.YText ?? "").Trim(), out var y)) { Log("ERROR: Y must be a number."); return; }
+        if (!double.TryParse((_roiEditor.WText ?? "").Trim(), out var w)) { Log("ERROR: W must be a number."); return; }
+        if (!double.TryParse((_roiEditor.HText ?? "").Trim(), out var h)) { Log("ERROR: H must be a number."); return; }
+
+        if (w <= 0 || h <= 0)
         {
-            if (!double.TryParse(_roiForm.ParameterText, out var p))
-            {
-                _roiModalError = "Parameter must be a number.";
-                return;
-            }
-            param = p;
+            Log("ERROR: W/H must be > 0.");
+            return;
         }
 
-        // rename: measure 참조 업데이트
-        if (newId != oldId)
+        // method
+        var method = (_roiEditor.Method ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(method))
+            method = DefaultRoiMethod;
+
+        if (Array.IndexOf(RoiMethodOptions, method) < 0)
         {
-            foreach (var m in _measures.Values)
+            Log($"ERROR: Invalid method: {method}");
+            return;
+        }
+
+        // parameter (0~1)
+        double param;
+        var pText = (_roiEditor.ParameterText ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(pText))
+        {
+            param = 0.5;
+        }
+        else if (!double.TryParse(pText, out param))
+        {
+            Log("ERROR: Parameter must be a number.");
+            return;
+        }
+        else if (param < 0 || param > 1)
+        {
+            Log("ERROR: Parameter must be between 0 and 1.");
+            return;
+        }
+
+        Roi? target = null;
+
+        // if selected ROI exists -> update that ROI (rename allowed)
+        if (_selectedRoiId is not null)
+        {
+            var oldId = _selectedRoiId.Value;
+            target = _rois.FirstOrDefault(r => r.Id == oldId);
+
+            if (target is not null && newId != oldId)
             {
-                if (ParseRoiNameToId(m.Start) == oldId) m.Start = $"roi_{newId}";
-                if (ParseRoiNameToId(m.End) == oldId) m.End = $"roi_{newId}";
+                if (_rois.Any(r => r.Id == newId))
+                {
+                    Log($"ERROR: roi_{newId} already exists.");
+                    return;
+                }
+
+                // update measures referencing old roi id
+                foreach (var m in _measures.Values)
+                {
+                    if (ParseRoiNameToId(m.Start) == oldId) m.Start = $"roi_{newId}";
+                    if (ParseRoiNameToId(m.End) == oldId) m.End = $"roi_{newId}";
+                }
+
+                target.Id = newId;
+                _selectedRoiId = newId;
             }
-            roi.Id = newId;
+        }
+
+        // no selection or selected not found -> update/create by id
+        if (target is null)
+        {
+            target = _rois.FirstOrDefault(r => r.Id == newId);
+            if (target is null)
+            {
+                target = new Roi { Id = newId };
+                _rois.Add(target);
+            }
             _selectedRoiId = newId;
         }
 
-        roi.Method = _roiForm.Method?.Trim() ?? "";
-        roi.Parameter = param;
+        target.X = x;
+        target.Y = y;
+        target.W = w;
+        target.H = h;
+        target.Method = method;
+        target.Parameter = param;
 
-        _showRoiEditModal = false;
+        ClampRoiToImageInPlace(target);
 
-        Log($"roi edited");
+        _selectedMeasureId = null;
+
+        LoadRoiIntoEditor(target);
+
+        Log($"roi_{target.Id} added/updated");
+
         await PushCanvasStateAsync();
         await InvokeAsync(StateHasChanged);
     }
 
-        // =================== Measure ===================
+    private async Task DeleteRoiAsync()
+    {
+        int? rid = null;
+
+        if (_selectedRoiId is not null)
+        {
+            rid = _selectedRoiId.Value;
+        }
+        else if (int.TryParse((_roiEditor.IdText ?? "").Trim(), out var parsed))
+        {
+            rid = parsed;
+        }
+
+        if (rid is null)
+        {
+            Log("ERROR: Select ROI or enter ROI ID first.");
+            return;
+        }
+
+        await DeleteRoiByIdAsync(rid.Value);
+    }
+
+    private async Task DeleteRoiByIdAsync(int rid)
+    {
+        var roi = _rois.FirstOrDefault(r => r.Id == rid);
+        if (roi is null)
+        {
+            Log($"WARN: roi_{rid} not found.");
+            return;
+        }
+
+        _rois.Remove(roi);
+        if (_selectedRoiId == rid) _selectedRoiId = null;
+
+        // ROI 참조 measure 제거
+        var toDelete = _measures
+            .Where(kv => ParseRoiNameToId(kv.Value.Start) == rid || ParseRoiNameToId(kv.Value.End) == rid)
+            .Select(kv => kv.Key)
+            .ToList();
+        foreach (var mid in toDelete) _measures.Remove(mid);
+
+        Log($"roi_{rid} deleted");
+
+        await PushCanvasStateAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // =================== Measure ===================
     private async Task AddOrUpdateMeasureAsync()
     {
         var idx = NormalizeMeasureId(_measureForm.IndexText);
@@ -1325,9 +1386,8 @@ private string? FindMeasureNearPoint(double x, double y, double thresholdPx)
         _selectedRoiId = null;
         _selectedMeasureId = null;
         _jsonEditorText = "";
-        _roiModalError = "";
-        _showRoiCreateModal = false;
-        _showRoiEditModal = false;
+
+        ResetRoiEditor();
     }
 
     private static bool IsImageFile(string name)
@@ -1590,9 +1650,13 @@ private static string ReadString(JsonElement obj, string propName, string defaul
 
     private readonly record struct Rect(double X, double Y, double W, double H);
 
-    private sealed class RoiFormModel
+    private sealed class RoiEditorModel
     {
         public string IdText { get; set; } = "";
+        public string XText { get; set; } = "";
+        public string YText { get; set; } = "";
+        public string WText { get; set; } = "";
+        public string HText { get; set; } = "";
         public string Method { get; set; } = "";
         public string ParameterText { get; set; } = "";
     }
