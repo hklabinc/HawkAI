@@ -1,0 +1,389 @@
+@page "/airuler-result/{ModelName}"
+
+@using System.Text.Json
+@using HawkAI.Data
+@using HawkAI.Data.AirulerResultService
+@using Microsoft.EntityFrameworkCore
+
+@inject DataDbContext Db
+@inject IWebHostEnvironment Env
+@inject IJSRuntime JS
+
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <h4 class="mb-0">
+        <strong>@ModelName</strong>
+        <span class="text-muted" style="font-size: 0.95rem;">(@_records.Count)</span>
+    </h4>
+
+    <div class="d-flex gap-2">
+        <a class="btn btn-sm btn-outline-secondary" href="/airuler-result">Back</a>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="ReloadAsync">Refresh</button>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(_loadError))
+{
+    <div class="alert alert-warning mt-2">@_loadError</div>
+}
+@if (!string.IsNullOrWhiteSpace(_statusMessage))
+{
+    <div class="text-muted small mt-2">@_statusMessage</div>
+}
+
+@if (string.IsNullOrWhiteSpace(ModelName))
+{
+    <div class="text-muted mt-3">Invalid model name.</div>
+}
+else if (_records.Count == 0 && string.IsNullOrWhiteSpace(_loadError))
+{
+    <div class="text-muted mt-3">No records for this model.</div>
+}
+else if (_records.Count > 0)
+{
+    <div class="table-responsive mt-3" style="max-height: 75vh; overflow:auto;">
+        <table class="table table-sm table-hover align-middle">
+            <thead class="table-light" style="position: sticky; top: 0; z-index: 1;">
+                <tr>
+                    <th style="width: 56px;"><strong>No</strong></th>
+                    <th style="min-width: 220px;"><strong>Image</strong></th>
+                    <th style="min-width: 260px;"><strong>Info</strong></th>
+                    <th style="width: 70px;"><strong>Film</strong></th>
+                    @foreach (var col in _measureColumns)
+                    {
+                        <th style="min-width: 110px; white-space: nowrap;">
+                            <strong>@col.Index</strong>
+                            @if (!string.IsNullOrWhiteSpace(col.Gt))
+                            {
+                                <span class="text-muted" style="font-size: 0.85rem;">(@col.Gt)</span>
+                            }
+                        </th>
+                    }
+                    <th style="width: 120px;"><strong>Actions</strong></th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (var recIdx = 0; recIdx < _records.Count; recIdx++)
+                {
+                    var r = _records[recIdx];
+                    var no = recIdx + 1;
+
+                    var filmRows = r.Films.Count > 0 ? r.Films : new List<FilmRowVm> { new FilmRowVm { Film = 0 } };
+                    var rowspan = filmRows.Count;
+
+                    for (var i = 0; i < filmRows.Count; i++)
+                    {
+                        var film = filmRows[i];
+
+                        <tr>
+                            @if (i == 0)
+                            {
+                                <td rowspan="@rowspan" style="vertical-align: top;">@no</td>
+
+                                <td rowspan="@rowspan" style="vertical-align: top;">
+                                    <a class="btn btn-link p-0 text-start" href="@r.DetailPageUrl" style="text-decoration:none;">
+                                        <div class="d-flex align-items-center" style="gap: 8px;">
+                                            <img src="@r.ThumbnailUrl" style="width: 96px; height: 72px; object-fit: cover; border: 1px solid #eee;" />
+                                            <div style="min-width:0;">
+                                                <div style="word-break: break-all;"><b>@r.Entity.FileName</b></div>
+                                                <div class="small text-muted">click to open</div>
+                                            </div>
+                                        </div>
+                                    </a>
+                                </td>
+
+                                <td rowspan="@rowspan" style="vertical-align: top;">
+                                    <div class="small">
+                                        <div><b>timestamp</b>: @r.TimestampLocal</div>
+                                        <div><b>deviceId</b>: @r.Entity.DeviceId</div>
+                                        <div><b>modelName</b>: @r.Entity.ModelName</div>
+                                        <div><b>imageSize</b>: @r.Entity.ImageSize</div>
+                                        <div><b>measureMethod</b>: @r.Entity.MeasureMethod</div>
+                                        <div><b>detectedFilms</b>: @r.Entity.DetectedFilms</div>
+                                    </div>
+                                </td>
+                            }
+
+                            <td>
+                                @if (film.Film > 0)
+                                {
+                                    <span>@($"#{film.Film}")</span>
+                                }
+                            </td>
+
+                            @foreach (var col in _measureColumns)
+                            {
+                                if (film.Cells.TryGetValue(col.Index, out var cell) && (!string.IsNullOrWhiteSpace(cell.Value) || !string.IsNullOrWhiteSpace(cell.Err)))
+                                {
+                                    <td style="white-space: nowrap;">
+                                        @if (!string.IsNullOrWhiteSpace(cell.Value))
+                                        {
+                                            <span>@cell.Value</span>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(cell.Err))
+                                        {
+                                            <span class="@(cell.IsFail ? "text-danger" : "text-muted")" style="font-size: 0.85rem;">(@cell.Err)</span>
+                                        }
+                                    </td>
+                                }
+                                else
+                                {
+                                    <td></td>
+                                }
+                            }
+
+                            @if (i == 0)
+                            {
+                                <td rowspan="@rowspan" style="vertical-align: top;">
+                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmDeleteRecordAsync(r.Entity.Id)">
+                                        Delete
+                                    </button>
+                                </td>
+                            }
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [Parameter] public string? ModelName { get; set; }
+
+    private sealed class MeasureColumnVm
+    {
+        public string Index { get; init; } = string.Empty;
+        public string Gt { get; init; } = string.Empty;
+    }
+
+    private sealed class MeasureCellVm
+    {
+        public string Value { get; init; } = string.Empty;
+        public string Err { get; init; } = string.Empty;
+        public bool IsFail { get; init; }
+    }
+
+    private sealed class FilmRowVm
+    {
+        public int Film { get; init; }
+        public Dictionary<string, MeasureCellVm> Cells { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private sealed class RecordVm
+    {
+        public AirulerFilmMeasureResult Entity { get; init; } = default!;
+        public string ThumbnailUrl { get; init; } = string.Empty;
+        public string DetailPageUrl { get; init; } = string.Empty;
+        public string TimestampLocal => Entity.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+        public List<FilmRowVm> Films { get; init; } = new();
+    }
+
+    private List<RecordVm> _records = new();
+    private List<MeasureColumnVm> _measureColumns = new();
+    private string? _loadError;
+    private string? _statusMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await ReloadAsync();
+    }
+
+    private string ResultsRoot => Path.Combine(Env.WebRootPath, "results");
+
+    private static string ThumbUrl(string modelName, string fileName)
+        => $"/results/{Uri.EscapeDataString(modelName)}/thumbnail/{Uri.EscapeDataString(fileName)}";
+
+    private static string DetailUrl(string modelName, string fileName)
+        => $"/airuler-result/{Uri.EscapeDataString(modelName)}/{Uri.EscapeDataString(fileName)}";
+
+    private string JsonFilePath(string modelName, string fileName)
+        => Path.Combine(ResultsRoot, Path.GetFileName(modelName), "json", Path.GetFileNameWithoutExtension(fileName) + ".json");
+
+    private string ImageFilePath(string modelName, string fileName)
+        => Path.Combine(ResultsRoot, Path.GetFileName(modelName), "image", Path.GetFileName(fileName));
+
+    private string ThumbnailFilePath(string modelName, string fileName)
+        => Path.Combine(ResultsRoot, Path.GetFileName(modelName), "thumbnail", Path.GetFileName(fileName));
+
+    private async Task ReloadAsync()
+    {
+        _loadError = null;
+        _statusMessage = null;
+        _records = new();
+        _measureColumns = new();
+
+        if (string.IsNullOrWhiteSpace(ModelName))
+            return;
+
+        try
+        {
+            var rows = await Db.AirulerFilmMeasureResults
+                .AsNoTracking()
+                .Where(x => x.ModelName == ModelName)
+                .OrderByDescending(x => x.TimestampUtc)
+                .ThenByDescending(x => x.Id)
+                .ToListAsync();
+
+            var cols = new List<MeasureColumnVm>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var vms = new List<RecordVm>(rows.Count);
+            foreach (var e in rows)
+            {
+                var films = ParseFilms(e.ResultsJson, cols, seen);
+                vms.Add(new RecordVm
+                {
+                    Entity = e,
+                    ThumbnailUrl = ThumbUrl(e.ModelName, e.FileName),
+                    DetailPageUrl = DetailUrl(e.ModelName, e.FileName),
+                    Films = films
+                });
+            }
+
+            _measureColumns = cols;
+            _records = vms;
+        }
+        catch (Exception ex)
+        {
+            _loadError = ex.Message;
+        }
+    }
+
+    private static List<FilmRowVm> ParseFilms(string resultsJson, List<MeasureColumnVm> cols, HashSet<string> seen)
+    {
+        var films = new List<FilmRowVm>();
+
+        if (string.IsNullOrWhiteSpace(resultsJson))
+            return films;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(resultsJson);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array)
+                return films;
+
+            foreach (var filmEl in doc.RootElement.EnumerateArray())
+            {
+                var filmNo = 0;
+                if (filmEl.TryGetProperty("film", out var fno) && fno.ValueKind == JsonValueKind.Number)
+                    fno.TryGetInt32(out filmNo);
+
+                var row = new FilmRowVm { Film = filmNo };
+
+                if (filmEl.TryGetProperty("measures", out var meas) && meas.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var m in meas.EnumerateArray())
+                    {
+                        var idx = GetString(m, "index");
+                        if (string.IsNullOrWhiteSpace(idx)) continue;
+
+                        var gtStr = GetNumberAsString(m, "gt");
+                        if (!seen.Contains(idx))
+                        {
+                            cols.Add(new MeasureColumnVm { Index = idx, Gt = gtStr });
+                            seen.Add(idx);
+                        }
+
+                        var valueStr = GetNumberAsString(m, "value");
+                        var errStr = GetNumberAsString(m, "err");
+                        var result = GetString(m, "result");
+                        var isFail = string.Equals(result, "FAIL", StringComparison.OrdinalIgnoreCase);
+
+                        row.Cells[idx] = new MeasureCellVm
+                        {
+                            Value = valueStr,
+                            Err = errStr,
+                            IsFail = isFail
+                        };
+                    }
+                }
+
+                films.Add(row);
+            }
+        }
+        catch
+        {
+            // ignore parse error
+        }
+
+        return films;
+    }
+
+    private static string GetString(JsonElement e, string name)
+    {
+        if (e.TryGetProperty(name, out var p) && p.ValueKind == JsonValueKind.String)
+            return p.GetString() ?? string.Empty;
+        return string.Empty;
+    }
+
+    private static string GetNumberAsString(JsonElement e, string name)
+    {
+        if (!e.TryGetProperty(name, out var p)) return string.Empty;
+
+        if (p.ValueKind == JsonValueKind.Number)
+        {
+            if (p.TryGetDouble(out var d))
+                return d.ToString("0.###");
+        }
+        else if (p.ValueKind == JsonValueKind.String)
+        {
+            return p.GetString() ?? string.Empty;
+        }
+
+        return string.Empty;
+    }
+
+    private async Task ConfirmDeleteRecordAsync(long id)
+    {
+        var target = _records.FirstOrDefault(r => r.Entity.Id == id);
+        if (target == null)
+            return;
+
+        var ok = await JS.InvokeAsync<bool>("confirm", $"Delete '{target.Entity.FileName}'?\nThis will remove DB row and image/thumbnail/json files.");
+        if (!ok)
+            return;
+
+        await DeleteRecordAsync(id);
+    }
+
+    private async Task DeleteRecordAsync(long id)
+    {
+        try
+        {
+            var ent = await Db.AirulerFilmMeasureResults.FirstOrDefaultAsync(x => x.Id == id);
+            if (ent == null) return;
+
+            // 파일 삭제
+            SafeDeleteFile(ImageFilePath(ent.ModelName, ent.FileName));
+            SafeDeleteFile(ThumbnailFilePath(ent.ModelName, ent.FileName));
+            SafeDeleteFile(JsonFilePath(ent.ModelName, ent.FileName));
+
+            Db.AirulerFilmMeasureResults.Remove(ent);
+            await Db.SaveChangesAsync();
+
+            _statusMessage = $"Deleted: {ent.FileName}";
+            await ReloadAsync();
+        }
+        catch (Exception ex)
+        {
+            _statusMessage = $"Delete failed: {ex.Message}";
+        }
+    }
+
+    private void SafeDeleteFile(string path)
+    {
+        try
+        {
+            var full = Path.GetFullPath(path);
+            var root = Path.GetFullPath(ResultsRoot);
+            if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return;
+
+            if (System.IO.File.Exists(full))
+                System.IO.File.Delete(full);
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+}

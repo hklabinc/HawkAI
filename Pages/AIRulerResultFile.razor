@@ -1,0 +1,114 @@
+@page "/airuler-result/{ModelName}/{FileName}"
+
+@using HawkAI.Data
+@using HawkAI.Data.AirulerResultService
+@using Microsoft.EntityFrameworkCore
+
+@inject DataDbContext Db
+@inject IWebHostEnvironment Env
+
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <h4 class="mb-0">
+        <strong>@ModelName</strong>
+        <span class="text-muted" style="font-size: 0.95rem;">@("/" + FileName)</span>
+    </h4>
+
+    <div class="d-flex gap-2">
+        <a class="btn btn-sm btn-outline-secondary" href="/airuler-result">List</a>
+        @if (!string.IsNullOrWhiteSpace(ModelName))
+        {
+            <a class="btn btn-sm btn-outline-secondary" href="@($"/airuler-result/{Uri.EscapeDataString(ModelName)}")">Back</a>
+        }
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(_loadError))
+{
+    <div class="alert alert-warning mt-3">@_loadError</div>
+}
+else if (_record == null)
+{
+    <div class="text-muted mt-3">Record not found.</div>
+}
+else
+{
+    <div class="mt-3">
+        <img src="@_imageUrl" style="max-width: 100%; height: auto; border: 1px solid #eee;" />
+        <div class="mt-2 small text-muted">
+            <b>timestamp</b>: @_record.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
+            <span class="text-muted"> · </span>
+            <b>deviceId</b>: @_record.DeviceId
+            <span class="text-muted"> · </span>
+            <b>imageSize</b>: @_record.ImageSize
+            <span class="text-muted"> · </span>
+            <b>measureMethod</b>: @_record.MeasureMethod
+            <span class="text-muted"> · </span>
+            <b>detectedFilms</b>: @_record.DetectedFilms
+        </div>
+    </div>
+
+    <hr class="my-4" />
+
+    <h6><strong>Raw JSON (EXIF UserComment)</strong></h6>
+    <pre style="max-height: 70vh; overflow: auto; background: #fafafa; border: 1px solid #eee; padding: 8px;">@_jsonText</pre>
+}
+
+@code {
+    [Parameter] public string? ModelName { get; set; }
+    [Parameter] public string? FileName { get; set; }
+
+    private AirulerFilmMeasureResult? _record;
+    private string? _loadError;
+    private string _jsonText = string.Empty;
+    private string _imageUrl = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _record = null;
+        _loadError = null;
+        _jsonText = string.Empty;
+        _imageUrl = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(ModelName) || string.IsNullOrWhiteSpace(FileName))
+        {
+            _loadError = "Invalid route.";
+            return;
+        }
+
+        try
+        {
+            // DB 기준으로 record 확인
+            _record = await Db.AirulerFilmMeasureResults
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.ModelName == ModelName && x.FileName == FileName);
+
+            if (_record == null)
+                return;
+
+            _imageUrl = ImageUrl(_record.ModelName, _record.FileName);
+
+            // Raw JSON 파일 읽기
+            var jsonPath = JsonFilePath(_record.ModelName, _record.FileName);
+            if (System.IO.File.Exists(jsonPath))
+            {
+                _jsonText = await System.IO.File.ReadAllTextAsync(jsonPath);
+            }
+            else
+            {
+                _jsonText = "(JSON file not found on server.)";
+            }
+        }
+        catch (Exception ex)
+        {
+            _loadError = ex.Message;
+        }
+    }
+
+    private string ResultsRoot => Path.Combine(Env.WebRootPath, "results");
+
+    private static string ImageUrl(string modelName, string fileName)
+        => $"/results/{Uri.EscapeDataString(modelName)}/image/{Uri.EscapeDataString(fileName)}";
+
+    private string JsonFilePath(string modelName, string fileName)
+        => Path.Combine(ResultsRoot, Path.GetFileName(modelName), "json", Path.GetFileNameWithoutExtension(fileName) + ".json");
+}
