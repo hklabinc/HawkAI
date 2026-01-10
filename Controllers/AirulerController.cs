@@ -1,6 +1,14 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using HawkAI.Data;
+using HawkAI.Data.AirulerResultService;
+using HawkAI.Helper;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Jpeg;
+using SixLabors.ImageSharp.Processing;
 using System.Text;
 using System.Text.Json;
+using System.Text.Encodings.Web;
 using System.Text.RegularExpressions;
 
 namespace HawkAI.Controllers
@@ -10,19 +18,28 @@ namespace HawkAI.Controllers
     public class AirulerController : ControllerBase
     {
         private readonly IWebHostEnvironment _env;
+        private readonly DataDbContext _db;
 
         // 모델명 안전 처리(경로탈출 방지)
         private static readonly Regex UnsafeChars = new(@"[^0-9a-zA-Z_\-\.]+", RegexOptions.Compiled);
 
-        public AirulerController(IWebHostEnvironment env)
+        public AirulerController(IWebHostEnvironment env, DataDbContext db)
         {
             _env = env;
+            _db = db;
         }
 
         private string AirulerRoot => Path.Combine(_env.WebRootPath, "airuler");
         private string ModelsDir => Path.Combine(AirulerRoot, "models");
         private string ImagesDir => Path.Combine(AirulerRoot, "images");
-        private string ResultsDir => Path.Combine(AirulerRoot, "results");
+        // NOTE: 기존 wwwroot/airuler/results 는 더 이상 사용하지 않는다.
+        // AIRuler 결과(Exif UserComment JSON 포함 JPG)는 요구사항에 따라 wwwroot/results/{model}/... 에 저장한다.
+        private string ResultsRoot => Path.Combine(_env.WebRootPath, "results");
+
+        private string ModelResultsRoot(string modelName) => Path.Combine(ResultsRoot, modelName);
+        private string ModelResultsImageDir(string modelName) => Path.Combine(ModelResultsRoot(modelName), "image");
+        private string ModelResultsThumbnailDir(string modelName) => Path.Combine(ModelResultsRoot(modelName), "thumbnail");
+        private string ModelResultsJsonDir(string modelName) => Path.Combine(ModelResultsRoot(modelName), "json");
 
         private string SanitizeModelName(string raw)
         {
@@ -46,13 +63,19 @@ namespace HawkAI.Controllers
             Directory.CreateDirectory(AirulerRoot);
             Directory.CreateDirectory(ModelsDir);
             Directory.CreateDirectory(ImagesDir);
-            Directory.CreateDirectory(ResultsDir);
+            Directory.CreateDirectory(ResultsRoot);
         }
 
         private string ModelImagesDir(string modelName) => Path.Combine(ImagesDir, modelName);
 
-        private static string ResultsUrl(string fileName)
-            => $"/airuler/results/{Uri.EscapeDataString(fileName)}";
+        private static string ResultImageUrl(string modelName, string fileName)
+            => $"/results/{Uri.EscapeDataString(modelName)}/image/{Uri.EscapeDataString(fileName)}";
+
+        private static string ResultThumbnailUrl(string modelName, string fileName)
+            => $"/results/{Uri.EscapeDataString(modelName)}/thumbnail/{Uri.EscapeDataString(fileName)}";
+
+        private static string ResultJsonUrl(string modelName, string fileName)
+            => $"/results/{Uri.EscapeDataString(modelName)}/json/{Uri.EscapeDataString(Path.GetFileNameWithoutExtension(fileName) + ".json")}";
 
         private static bool IsImageExt(string path)
         {
@@ -62,40 +85,49 @@ namespace HawkAI.Controllers
 
         // =========================
         // AIRuler Results (DCIM/AIRulerResult 업로드 대상)
+        // - 업로드된 JPG의 EXIF(UserComment) JSON을 추출하여 DB에 저장하고
+        //   wwwroot/results/{modelName}/(image|thumbnail|json) 에 파일로 저장한다.
         // =========================
 
         /// <summary>
-        /// ✅ 서버에 저장된 결과 이미지 목록
-        /// - 정적 파일 경로: /airuler/results/{file}
+        /// ✅ 서버에 저장된 결과 목록(DB)
+        /// - 정적 파일 경로:
+        ///   /results/{model}/image/{file}
+        ///   /results/{model}/thumbnail/{file}
+        ///   /results/{model}/json/{base}.json
         /// </summary>
         [HttpGet("results")]
-        public IActionResult ListResults()
+        public async Task<IActionResult> ListResults()
         {
             EnsureBaseDirs();
 
-            if (!Directory.Exists(ResultsDir))
-                return Ok(Array.Empty<object>());
-
-            var files = Directory.GetFiles(ResultsDir)
-                .Where(IsImageExt)
-                .Select(p => new FileInfo(p))
-                .OrderByDescending(fi => fi.LastWriteTimeUtc)
-                .Select(fi => new
+            var list = await _db.AirulerFilmMeasureResults
+                .AsNoTracking()
+                .OrderByDescending(x => x.TimestampUtc)
+                .Select(x => new
                 {
-                    fileName = fi.Name,
-                    url = ResultsUrl(fi.Name),
-                    sizeBytes = fi.Length,
-                    lastWriteUtc = fi.LastWriteTimeUtc
+                    id = x.Id,
+                    modelName = x.ModelName,
+                    fileName = x.FileName,
+                    imageUrl = ResultImageUrl(x.ModelName, x.FileName),
+                    thumbnailUrl = ResultThumbnailUrl(x.ModelName, x.FileName),
+                    jsonUrl = ResultJsonUrl(x.ModelName, x.FileName),
+                    timestampUtc = x.TimestampUtc,
+                    deviceId = x.DeviceId,
+                    imageSize = x.ImageSize,
+                    measureMethod = x.MeasureMethod,
+                    detectedFilms = x.DetectedFilms
                 })
-                .ToList();
+                .ToListAsync();
 
-            return Ok(files);
+            return Ok(list);
         }
 
         /// <summary>
         /// ✅ 결과 이미지 업로드
-        /// - 저장 위치: wwwroot/airuler/results/
-        /// - 주의: EXIF(UserComment) JSON이 포함된 JPEG를 그대로 저장해야 하므로 재인코딩 금지.
+        /// - 저장 위치: wwwroot/results/{modelName}/(image|thumbnail|json)
+        /// - DB 저장: DataDbContext.AirulerFilmMeasureResults
+        /// - 주의: EXIF(UserComment) JSON이 포함된 JPEG를 그대로 저장해야 하므로 원본은 재인코딩 금지.
         /// </summary>
         [HttpPost("upload-results")]
         [RequestSizeLimit(500 * 1024 * 1024)]
@@ -106,10 +138,9 @@ namespace HawkAI.Controllers
             if (files == null || files.Count == 0)
                 return BadRequest("No files.");
 
-            Directory.CreateDirectory(ResultsDir);
-
             int saved = 0;
-            var savedFiles = new List<string>();
+            var savedItems = new List<object>();
+            var errors = new List<object>();
 
             foreach (var f in files)
             {
@@ -117,37 +148,221 @@ namespace HawkAI.Controllers
 
                 var originalName = Path.GetFileName(f.FileName);
                 var ext = Path.GetExtension(originalName).ToLowerInvariant();
-                if (!(ext is ".png" or ".jpg" or ".jpeg" or ".bmp" or ".webp"))
-                    continue;
 
-                var baseName = Path.GetFileNameWithoutExtension(originalName);
-                var safeBase = UnsafeChars.Replace(baseName.Replace(' ', '_'), "");
-                if (string.IsNullOrWhiteSpace(safeBase)) safeBase = "result";
-
-                var targetName = safeBase + ext;
-                var targetPath = Path.Combine(ResultsDir, targetName);
-
-                int idx = 1;
-                while (System.IO.File.Exists(targetPath))
+                // 결과 이미지는 EXIF(UserComment) 기반이므로 JPEG만 허용
+                if (!(ext is ".jpg" or ".jpeg"))
                 {
-                    targetName = $"{safeBase}_{idx}{ext}";
-                    targetPath = Path.Combine(ResultsDir, targetName);
-                    idx++;
+                    errors.Add(new { fileName = originalName, error = "Only .jpg/.jpeg is supported." });
+                    continue;
                 }
 
-                await using var stream = new FileStream(targetPath, FileMode.Create);
-                await f.CopyToAsync(stream);
+                // 1) EXIF(UserComment) JSON 추출
+                string? userCommentJson;
+                string? extractErr;
+                await using (var rs = f.OpenReadStream())
+                {
+                    userCommentJson = ExifUserCommentHelper.TryReadUserCommentJson(rs, out extractErr);
+                }
 
-                saved++;
-                savedFiles.Add(targetName);
+                if (userCommentJson == null)
+                {
+                    errors.Add(new { fileName = originalName, error = extractErr ?? "EXIF(UserComment) not found." });
+                    continue;
+                }
+
+                // 2) JSON 파싱
+                JsonDocument doc;
+                try
+                {
+                    doc = JsonDocument.Parse(userCommentJson);
+                }
+                catch (Exception ex)
+                {
+                    errors.Add(new { fileName = originalName, error = $"Invalid JSON: {ex.Message}" });
+                    continue;
+                }
+
+                using (doc)
+                {
+                    var root = doc.RootElement;
+
+                    // 필수 필드
+                    var modelNameRaw = GetString(root, "modelName");
+                    var modelName = SanitizeModelName(modelNameRaw);
+                    if (string.IsNullOrWhiteSpace(modelName)) modelName = "Unknown";
+
+                    var deviceId = GetString(root, "deviceId");
+
+                    var method = GetString(root, "measureMethod");
+                    if (string.IsNullOrWhiteSpace(method))
+                        method = GetString(root, "measurementMethod");
+
+                    var detectedFilms = GetInt(root, "detectedFilms");
+
+                    var (imgW, imgH) = GetImageSize(root);
+                    var imageSize = (imgW > 0 && imgH > 0) ? $"{imgW}*{imgH}" : string.Empty;
+
+                    var timestampUtc = GetTimestampUtc(root);
+
+                    var resultsJson = "[]";
+                    if (root.TryGetProperty("results", out var resElem))
+                        resultsJson = resElem.GetRawText();
+
+                    // 3) 폴더 구성: wwwroot/results/{model}/image|thumbnail|json
+                    Directory.CreateDirectory(ResultsRoot);
+                    Directory.CreateDirectory(ModelResultsRoot(modelName));
+                    var imgDir = ModelResultsImageDir(modelName);
+                    var thumbDir = ModelResultsThumbnailDir(modelName);
+                    var jsonDir = ModelResultsJsonDir(modelName);
+                    Directory.CreateDirectory(imgDir);
+                    Directory.CreateDirectory(thumbDir);
+                    Directory.CreateDirectory(jsonDir);
+
+                    // 4) 저장 파일명 결정(중복 처리)
+                    var baseName = Path.GetFileNameWithoutExtension(originalName);
+                    var safeBase = UnsafeChars.Replace(baseName.Replace(' ', '_'), "");
+                    if (string.IsNullOrWhiteSpace(safeBase)) safeBase = "result";
+
+                    var targetName = safeBase + ext;
+                    var imagePath = Path.Combine(imgDir, targetName);
+                    int idx = 1;
+                    while (System.IO.File.Exists(imagePath))
+                    {
+                        targetName = $"{safeBase}_{idx}{ext}";
+                        imagePath = Path.Combine(imgDir, targetName);
+                        idx++;
+                    }
+
+                    // 5) 원본 이미지 저장(Exif 유지 위해 재인코딩 금지)
+                    await using (var fs = new FileStream(imagePath, FileMode.Create))
+                    {
+                        await f.CopyToAsync(fs);
+                    }
+
+                    // 6) JSON 저장 (UserComment 전체를 별도 파일로)
+                    var jsonFileName = Path.GetFileNameWithoutExtension(targetName) + ".json";
+                    var jsonPath = Path.Combine(jsonDir, jsonFileName);
+                    var prettyJson = JsonSerializer.Serialize(
+                        root,
+                        new JsonSerializerOptions
+                        {
+                            WriteIndented = true,
+                            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                        });
+                    await System.IO.File.WriteAllTextAsync(jsonPath, prettyJson, new UTF8Encoding(false));
+
+                    // 7) Thumbnail 생성
+                    var thumbPath = Path.Combine(thumbDir, targetName);
+                    await CreateThumbnailAsync(imagePath, thumbPath);
+
+                    // 8) DB 저장
+                    var entity = new AirulerFilmMeasureResult
+                    {
+                        FileName = targetName,
+                        TimestampUtc = timestampUtc,
+                        DeviceId = deviceId,
+                        ModelName = modelName,
+                        ImageSize = imageSize,
+                        MeasureMethod = method,
+                        DetectedFilms = detectedFilms,
+                        ResultsJson = resultsJson
+                    };
+
+                    _db.AirulerFilmMeasureResults.Add(entity);
+                    await _db.SaveChangesAsync();
+
+                    saved++;
+                    savedItems.Add(new
+                    {
+                        id = entity.Id,
+                        modelName,
+                        fileName = targetName,
+                        imageUrl = ResultImageUrl(modelName, targetName),
+                        thumbnailUrl = ResultThumbnailUrl(modelName, targetName),
+                        jsonUrl = ResultJsonUrl(modelName, targetName)
+                    });
+                }
             }
 
             return Ok(new
             {
                 success = true,
                 saved,
-                files = savedFiles
+                items = savedItems,
+                errors
             });
+        }
+
+        private static async Task CreateThumbnailAsync(string imagePath, string thumbPath)
+        {
+            // 썸네일은 원본 해상도가 매우 크므로 1/10 ~ 1/20 수준으로 축소
+            using var img = await Image.LoadAsync(imagePath);
+            var maxDim = Math.Max(img.Width, img.Height);
+            var scale = maxDim >= 12000 ? 0.05 : 0.1; // 큰 이미지는 더 축소
+
+            var newW = Math.Max(1, (int)Math.Round(img.Width * scale));
+            var newH = Math.Max(1, (int)Math.Round(img.Height * scale));
+
+            img.Mutate(x => x.Resize(newW, newH));
+            await img.SaveAsJpegAsync(thumbPath, new JpegEncoder { Quality = 80 });
+        }
+
+        private static string GetString(JsonElement root, string name)
+        {
+            if (root.TryGetProperty(name, out var p) && p.ValueKind == JsonValueKind.String)
+                return p.GetString() ?? string.Empty;
+            return string.Empty;
+        }
+
+        private static int GetInt(JsonElement root, string name)
+        {
+            if (root.TryGetProperty(name, out var p) && p.ValueKind == JsonValueKind.Number && p.TryGetInt32(out var v))
+                return v;
+            return 0;
+        }
+
+        private static (int width, int height) GetImageSize(JsonElement root)
+        {
+            if (root.TryGetProperty("image", out var img) && img.ValueKind == JsonValueKind.Object)
+            {
+                int w = 0, h = 0;
+                if (img.TryGetProperty("width", out var pw) && pw.ValueKind == JsonValueKind.Number)
+                    pw.TryGetInt32(out w);
+                if (img.TryGetProperty("height", out var ph) && ph.ValueKind == JsonValueKind.Number)
+                    ph.TryGetInt32(out h);
+                return (w, h);
+            }
+            return (0, 0);
+        }
+
+        private static DateTime GetTimestampUtc(JsonElement root)
+        {
+            // 1) timestampMs 우선
+            if (root.TryGetProperty("timestampMs", out var t) && t.ValueKind == JsonValueKind.Number && t.TryGetInt64(out var ms))
+            {
+                try
+                {
+                    return DateTimeOffset.FromUnixTimeMilliseconds(ms).UtcDateTime;
+                }
+                catch
+                {
+                    // ignore
+                }
+            }
+
+            // 2) timestamp 문자열 파싱 시도 (yyyy-MM-dd HH:mm:ss)
+            if (root.TryGetProperty("timestamp", out var ts) && ts.ValueKind == JsonValueKind.String)
+            {
+                var s = ts.GetString();
+                if (!string.IsNullOrWhiteSpace(s) && DateTime.TryParse(s, out var dt))
+                {
+                    // 입력이 로컬로 들어왔다면 UTC로 변환할 근거가 없어 Local로 가정 후 Utc 변환
+                    return DateTime.SpecifyKind(dt, DateTimeKind.Local).ToUniversalTime();
+                }
+            }
+
+            // 3) fallback: 현재시각 UTC
+            return DateTime.UtcNow;
         }
 
         // ✅ 모델(프로젝트) 목록

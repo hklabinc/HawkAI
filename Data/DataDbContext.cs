@@ -4,6 +4,7 @@ using HawkAI.Data.GameService;
 using HawkAI.Data.CameraService;
 using HawkAI.Data.EventService;
 using HawkAI.Data.ProjectService;
+using HawkAI.Data.AirulerResultService;
 
 namespace HawkAI.Data
 {
@@ -121,6 +122,8 @@ namespace HawkAI.Data
 
         public DbSet<Project> Projects => Set<Project>();
         public DbSet<ImageEntry> Images => Set<ImageEntry>();
+
+        public DbSet<AirulerFilmMeasureResult> AirulerFilmMeasureResults => Set<AirulerFilmMeasureResult>();
 
     }
 }

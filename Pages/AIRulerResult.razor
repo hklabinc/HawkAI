@@ -1,508 +1,656 @@
 @page "/airuler-result"
 
-@using System.Text
 @using System.Text.Json
-@using SixLabors.ImageSharp
-@using SixLabors.ImageSharp.Metadata.Profiles.Exif
+@using HawkAI.Data
+@using HawkAI.Data.AirulerResultService
+@using Microsoft.EntityFrameworkCore
 
+@inject DataDbContext Db
 @inject IWebHostEnvironment Env
+@inject IJSRuntime JS
 
-<h3>AIRuler Results</h3>
+<h4><strong>AIRuler Results</strong> (@_modelCards.Count)</h4>
 
-<div class="mb-2 d-flex align-items-center gap-2 flex-wrap">
-    <button class="btn btn-sm btn-outline-primary" @onclick="Reload">Refresh</button>
-    <span class="text-muted small">@_items.Count file(s) in <code>wwwroot/airuler/results</code></span>
+<div class="d-flex gap-2 mb-3 flex-wrap">
+    <button class="btn btn-outline-secondary" @onclick="ReloadAsync">
+        <span class="oi oi-reload"></span>
+        Refresh
+    </button>
+
+    <button class="btn btn-danger" @onclick="ConfirmDeleteSelectedModelsAsync" disabled="@(!_modelCards.Any(x => x.IsSelectedForDelete))">
+        <span class="oi oi-trash"></span>
+        Delete Selected
+    </button>
+
     @if (!string.IsNullOrWhiteSpace(_loadError))
     {
         <span class="text-danger small">@_loadError</span>
     }
+    @if (!string.IsNullOrWhiteSpace(_statusMessage))
+    {
+        <span class="text-muted small">@_statusMessage</span>
+    }
 </div>
 
-<div class="row g-2">
+@if (_modelCards.Count == 0)
+{
+    <div class="text-muted">No results found. Upload results via <code>/api/airuler/upload-results</code>.</div>
+}
+else
+{
+    <div class="d-flex flex-wrap gap-3">
+        @foreach (var m in _modelCards)
+        {
+            var isActive = string.Equals(m.ModelName, _selectedModelName, StringComparison.OrdinalIgnoreCase);
 
-    <!-- Left: list -->
-    <div class="col-12 col-xl-4">
-        <div class="card">
-            <div class="card-header d-flex align-items-center justify-content-between">
-                <span>Result Images</span>
-                <span class="small text-muted">(click to view JSON)</span>
+            <div class="card" style="width: 320px; position: relative; @(isActive ? "border:2px solid #0d6efd;" : "")">
+                <img src="@m.RepresentativeThumbnailUrl"
+                     class="card-img-top"
+                     style="height: 180px; object-fit: cover; cursor: pointer;"
+                     @onclick="() => SelectModelAsync(m.ModelName)" />
+
+                <div class="card-body">
+                    <h5 class="card-title mb-1">
+                        <strong>@m.ModelName</strong>
+                        <span class="text-muted" style="font-size: 0.95rem;">(@m.FileCount)</span>
+                    </h5>
+                    <p class="card-text text-muted" style="font-size: 0.85rem;">
+                        Updated @m.LatestTimestampLocal
+                    </p>
+                </div>
+
+                <!-- 카드 우측 상단 Delete Selected 체크박스 -->
+                <div class="position-absolute top-0 end-0 m-2">
+                    <input type="checkbox" class="form-check-input" @bind="m.IsSelectedForDelete" />
+                </div>
             </div>
-            <div class="card-body p-2" style="max-height: 75vh; overflow: auto;">
-                @if (_items.Count == 0)
-                {
-                    <div class="text-muted">No result files found.</div>
-                }
-                else
-                {
-                    @foreach (var it in _items)
-                    {
-                        var selected = (_selected?.FileName == it.FileName);
-                        <div class="d-flex align-items-center border rounded p-1 mb-2 @(selected ? "bg-light" : "")"
-                             style="cursor:pointer;"
-                             @onclick="(() => Select(it))">
+        }
+    </div>
+}
 
-                            <img src="@it.Url" style="width:72px; height:72px; object-fit:cover;" />
+@if (!string.IsNullOrWhiteSpace(_selectedModelName))
+{
+    <hr class="my-4" />
 
-                            <div class="ms-2" style="min-width: 0;">
-                                <div style="font-size: 0.92rem; word-break: break-all;"><b>@it.FileName</b></div>
-                                <div class="small text-muted">
-                                    @FormatBytes(it.SizeBytes) · @it.LastWriteLocal
-                                </div>
-                            </div>
-                        </div>
-                    }
-                }
-            </div>
-        </div>
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <h4 class="mb-0"><strong>@_selectedModelName</strong> <span class="text-muted" style="font-size: 0.95rem;">(@_records.Count)</span></h4>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="ClearSelectedModel">Close</button>
     </div>
 
-    <!-- Right: details -->
-    <div class="col-12 col-xl-8">
-        <div class="card">
-            <div class="card-header">Details</div>
-            <div class="card-body">
-                @if (_selected == null)
-                {
-                    <div class="text-muted">Select an image on the left to view its embedded JSON (EXIF UserComment).</div>
-                }
-                else
-                {
-                    <div class="mb-2">
-                        <img src="@_selected.Url" style="max-width: 100%; height: auto; border: 1px solid #eee;" />
-                    </div>
-
-                    <div class="mb-3">
-                        <div><b>File</b>: @_selected.FileName</div>
-                        <div><b>URL</b>: <a href="@_selected.Url" target="_blank">Open image</a></div>
-                    </div>
-
-                    @if (!string.IsNullOrWhiteSpace(_selectedJsonError))
+    @if (!string.IsNullOrWhiteSpace(_modelLoadError))
+    {
+        <div class="alert alert-warning mt-2">@_modelLoadError</div>
+    }
+    else if (_records.Count == 0)
+    {
+        <div class="text-muted mt-2">No records for this model.</div>
+    }
+    else
+    {
+        <div class="table-responsive mt-3" style="max-height: 70vh; overflow:auto;">
+            <table class="table table-sm table-hover align-middle">
+                <thead class="table-light" style="position: sticky; top: 0; z-index: 1;">
+                    <tr>
+                        <th style="min-width: 220px;"><strong>Image</strong></th>
+                        <th style="min-width: 260px;"><strong>Info</strong></th>
+                        <th style="width: 70px;"><strong>Film</strong></th>
+                        @foreach (var col in _measureColumns)
+                        {
+                            <th style="min-width: 110px;"><strong>@col.Header</strong></th>
+                        }
+                        <th style="width: 120px;"><strong>Actions</strong></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in _records)
                     {
-                        <div class="alert alert-warning">
-                            <b>JSON extract failed</b><br />
-                            @_selectedJsonError
-                        </div>
-                    }
-                    else if (_selectedJsonDoc == null)
-                    {
-                        <div class="text-muted">No JSON loaded.</div>
-                    }
-                    else
-                    {
-                        <div class="row g-2">
-                            <div class="col-12 col-lg-6">
-                                <h5>Parsed Summary</h5>
-                                <table class="table table-sm">
-                                    <tbody>
-                                        <tr><th style="width: 190px;">schema</th><td>@_summary.Schema</td></tr>
-                                        <tr><th>modelName</th><td>@_summary.ModelName</td></tr>
-                                        <tr><th>measurementMethod</th><td>@_summary.MeasurementMethod</td></tr>
-                                        <tr><th>detectedFilms</th><td>@_summary.DetectedFilms</td></tr>
-                                        @if (_summary.MeasurementMethod == "RULER")
-                                        {
-                                            <tr><th>pixelsPerMm(H)</th><td>@_summary.PixelsPerMmH</td></tr>
-                                            <tr><th>pixelsPerMm(V)</th><td>@_summary.PixelsPerMmV</td></tr>
-                                        }
-                                        else if (_summary.MeasurementMethod == "GRID")
-                                        {
-                                            <tr><th>gridPitch(mm)</th><td>@_summary.GridPitchMm</td></tr>
-                                            <tr><th>gridJsonPath</th><td style="word-break: break-all;">@_summary.GridJsonPath</td></tr>
-                                        }
-                                        <tr><th>timestamp</th><td>@_summary.TimestampLocal</td></tr>
-                                    </tbody>
-                                </table>
+                        var filmRows = r.Films.Count > 0 ? r.Films : new List<FilmRowVm> { new FilmRowVm { Film = 0 } };
+                        var rowspan = filmRows.Count;
 
-                                @if (_summary.LogsPreview?.Count > 0)
+                        for (var i = 0; i < filmRows.Count; i++)
+                        {
+                            var film = filmRows[i];
+                            <tr>
+                                @if (i == 0)
                                 {
-                                    <h6 class="mt-3">Logs (preview)</h6>
-                                    <pre style="max-height: 260px; overflow: auto; background: #fafafa; border: 1px solid #eee; padding: 8px;">@string.Join('\n', _summary.LogsPreview)</pre>
+                                    <td rowspan="@rowspan" style="vertical-align: top;">
+                                        <button type="button" class="btn btn-link p-0 text-start" @onclick="() => OpenPreviewAsync(r)">
+                                            <div class="d-flex align-items-center" style="gap: 8px;">
+                                                <img src="@r.ThumbnailUrl" style="width: 96px; height: 72px; object-fit: cover; border: 1px solid #eee;" />
+                                                <div style="min-width:0;">
+                                                    <div style="word-break: break-all;"><b>@r.Entity.FileName</b></div>
+                                                    <div class="small text-muted">click to open</div>
+                                                </div>
+                                            </div>
+                                        </button>
+                                    </td>
+                                    <td rowspan="@rowspan" style="vertical-align: top;">
+                                        <div class="small">
+                                            <div><b>timestamp</b>: @r.TimestampLocal</div>
+                                            <div><b>deviceId</b>: @r.Entity.DeviceId</div>
+                                            <div><b>modelName</b>: @r.Entity.ModelName</div>
+                                            <div><b>imageSize</b>: @r.Entity.ImageSize</div>
+                                            <div><b>measureMethod</b>: @r.Entity.MeasureMethod</div>
+                                            <div><b>detectedFilms</b>: @r.Entity.DetectedFilms</div>
+                                        </div>
+                                    </td>
                                 }
-                            </div>
 
-                            <div class="col-12 col-lg-6">
-                                <h5>Raw JSON (EXIF UserComment)</h5>
-                                <pre style="max-height: 520px; overflow: auto; background: #fafafa; border: 1px solid #eee; padding: 8px;">@_selectedJsonPretty</pre>
-                            </div>
-                        </div>
+                                <td>
+                                    @if (film.Film > 0)
+                                    {
+                                        <span>#{@film.Film}</span>
+                                    }
+                                </td>
+
+                                @foreach (var col in _measureColumns)
+                                {
+                                    if (film.Cells.TryGetValue(col.Index, out var cell) && !string.IsNullOrWhiteSpace(cell.Text))
+                                    {
+                                        <td class="@(cell.IsFail ? "text-danger" : "")" style="white-space: nowrap;">
+                                            @cell.Text
+                                        </td>
+                                    }
+                                    else
+                                    {
+                                        <td></td>
+                                    }
+                                }
+
+                                @if (i == 0)
+                                {
+                                    <td rowspan="@rowspan" style="vertical-align: top;">
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmDeleteRecordAsync(r.Entity.Id)">
+                                            Delete
+                                        </button>
+                                    </td>
+                                }
+                            </tr>
+                        }
                     }
-                }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@if (_showPreviewModal && _previewRecord != null)
+{
+    <div class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><strong>@_previewRecord.Entity.FileName</strong></h5>
+                    <button type="button" class="btn-close" @onclick="ClosePreview"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12 col-lg-7">
+                            <img src="@_previewRecord.ImageUrl" style="max-width: 100%; height: auto; border: 1px solid #eee;" />
+                        </div>
+                        <div class="col-12 col-lg-5">
+                            <div class="mb-2">
+                                <a href="@_previewRecord.ImageUrl" target="_blank">Open original image</a>
+                                <span class="text-muted"> · </span>
+                                <a href="@_previewRecord.JsonUrl" target="_blank">Open JSON file</a>
+                            </div>
+                            <h6><strong>Raw JSON (EXIF UserComment)</strong></h6>
+                            <pre style="max-height: 70vh; overflow: auto; background: #fafafa; border: 1px solid #eee; padding: 8px;">@_previewJson</pre>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @onclick="ClosePreview">Close</button>
+                </div>
             </div>
         </div>
     </div>
-</div>
+}
 
 @code {
 
-    private sealed record ResultItem(
-        string FileName,
-        string Url,
-        long SizeBytes,
-        DateTime LastWriteUtc
-    )
+    private sealed class ModelCardVm
     {
-        public string LastWriteLocal => LastWriteUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+        public string ModelName { get; init; } = string.Empty;
+        public int FileCount { get; init; }
+        public DateTime LatestTimestampUtc { get; init; }
+        public string RepresentativeThumbnailUrl { get; init; } = string.Empty;
+        public bool IsSelectedForDelete { get; set; }
+
+        public string LatestTimestampLocal => LatestTimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
     }
 
-    private sealed record ResultSummary(
-        string Schema,
-        string ModelName,
-        string MeasurementMethod,
-        int DetectedFilms,
-        string? PixelsPerMmH,
-        string? PixelsPerMmV,
-        string? GridPitchMm,
-        string? GridJsonPath,
-        string TimestampLocal,
-        List<string>? LogsPreview
-    );
+    private sealed class MeasureColumnVm
+    {
+        public string Index { get; init; } = string.Empty;
+        public string Gt { get; init; } = string.Empty;
+        public string Header => string.IsNullOrWhiteSpace(Gt) ? Index : $"{Index} ({Gt})";
+    }
 
-    private List<ResultItem> _items = new();
-    private ResultItem? _selected;
+    private sealed class MeasureCellVm
+    {
+        public string Text { get; init; } = string.Empty;
+        public bool IsFail { get; init; }
+    }
+
+    private sealed class FilmRowVm
+    {
+        public int Film { get; init; }
+        public Dictionary<string, MeasureCellVm> Cells { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private sealed class RecordVm
+    {
+        public AirulerFilmMeasureResult Entity { get; init; } = default!;
+        public string ThumbnailUrl { get; init; } = string.Empty;
+        public string ImageUrl { get; init; } = string.Empty;
+        public string JsonUrl { get; init; } = string.Empty;
+
+        public string TimestampLocal => Entity.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+
+        public List<FilmRowVm> Films { get; init; } = new();
+    }
+
+    private List<ModelCardVm> _modelCards = new();
+    private string? _selectedModelName;
+    private List<RecordVm> _records = new();
+    private List<MeasureColumnVm> _measureColumns = new();
 
     private string? _loadError;
+    private string? _modelLoadError;
+    private string? _statusMessage;
 
-    private string? _selectedJsonError;
-    private JsonDocument? _selectedJsonDoc;
-    private string _selectedJsonPretty = "";
+    private bool _showPreviewModal;
+    private RecordVm? _previewRecord;
+    private string _previewJson = string.Empty;
 
-    private ResultSummary _summary = new(
-        Schema: "",
-        ModelName: "",
-        MeasurementMethod: "",
-        DetectedFilms: 0,
-        PixelsPerMmH: null,
-        PixelsPerMmV: null,
-        GridPitchMm: null,
-        GridJsonPath: null,
-        TimestampLocal: "",
-        LogsPreview: null
-    );
-
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        Reload();
+        await ReloadAsync();
     }
 
-    private void Reload()
+    private string ResultsRoot => Path.Combine(Env.WebRootPath, "results");
+
+    private static string ThumbUrl(string modelName, string fileName)
+        => $"/results/{Uri.EscapeDataString(modelName)}/thumbnail/{Uri.EscapeDataString(fileName)}";
+
+    private static string ImageUrl(string modelName, string fileName)
+        => $"/results/{Uri.EscapeDataString(modelName)}/image/{Uri.EscapeDataString(fileName)}";
+
+    private static string JsonUrl(string modelName, string fileName)
+        => $"/results/{Uri.EscapeDataString(modelName)}/json/{Uri.EscapeDataString(Path.GetFileNameWithoutExtension(fileName) + ".json")}";
+
+    private string JsonFilePath(string modelName, string fileName)
+        => Path.Combine(ResultsRoot, modelName, "json", Path.GetFileNameWithoutExtension(fileName) + ".json");
+
+    private string ModelDirPath(string modelName)
+        => Path.Combine(ResultsRoot, modelName);
+
+    private string ImageFilePath(string modelName, string fileName)
+        => Path.Combine(ResultsRoot, modelName, "image", fileName);
+
+    private string ThumbnailFilePath(string modelName, string fileName)
+        => Path.Combine(ResultsRoot, modelName, "thumbnail", fileName);
+
+    private async Task ReloadAsync()
     {
         _loadError = null;
-        _selected = null;
-        _selectedJsonError = null;
-        _selectedJsonDoc?.Dispose();
-        _selectedJsonDoc = null;
-        _selectedJsonPretty = "";
-
-        var dir = ResultsDir();
-        try
-        {
-            Directory.CreateDirectory(dir);
-
-            _items = Directory
-                .GetFiles(dir)
-                .Where(IsImage)
-                .Select(p => new FileInfo(p))
-                .OrderByDescending(fi => fi.LastWriteTimeUtc)
-                .Select(fi => new ResultItem(
-                    FileName: fi.Name,
-                    Url: $"/airuler/results/{Uri.EscapeDataString(fi.Name)}",
-                    SizeBytes: fi.Length,
-                    LastWriteUtc: fi.LastWriteTimeUtc
-                ))
-                .ToList();
-        }
-        catch (Exception ex)
-        {
-            _items = new();
-            _loadError = ex.Message;
-        }
-    }
-
-    private void Select(ResultItem it)
-    {
-        _selected = it;
-        _selectedJsonError = null;
-        _selectedJsonDoc?.Dispose();
-        _selectedJsonDoc = null;
-        _selectedJsonPretty = "";
+        _statusMessage = null;
 
         try
         {
-            var path = Path.Combine(ResultsDir(), it.FileName);
-            if (!System.IO.File.Exists(path))
-            {
-                _selectedJsonError = "File not found on server.";
-                return;
-            }
+            var all = await Db.AirulerFilmMeasureResults
+                .AsNoTracking()
+                .ToListAsync();
 
-            var json = TryReadExifUserCommentJson(path, out var err);
-            if (json == null)
-            {
-                _selectedJsonError = err ?? "EXIF(UserComment) not found.";
-                return;
-            }
-
-            // JSON parse
-            _selectedJsonDoc = JsonDocument.Parse(json);
-
-            // pretty
-            _selectedJsonPretty = JsonSerializer.Serialize(
-                _selectedJsonDoc.RootElement,
-                new JsonSerializerOptions
+            _modelCards = all
+                .GroupBy(x => x.ModelName, StringComparer.OrdinalIgnoreCase)
+                .Select(g =>
                 {
-                    WriteIndented = true,
-                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-                }
-            );
-
-            _summary = BuildSummary(_selectedJsonDoc.RootElement);
-        }
-        catch (Exception ex)
-        {
-            _selectedJsonError = ex.Message;
-        }
-    }
-
-    private string ResultsDir() => Path.Combine(Env.WebRootPath, "airuler", "results");
-
-    private static bool IsImage(string path)
-    {
-        var ext = Path.GetExtension(path).ToLowerInvariant();
-        return ext is ".jpg" or ".jpeg" or ".png" or ".bmp" or ".webp";
-    }
-
-    private static string FormatBytes(long bytes)
-    {
-        if (bytes < 1024) return $"{bytes} B";
-        var kb = bytes / 1024.0;
-        if (kb < 1024) return $"{kb:0.0} KB";
-        var mb = kb / 1024.0;
-        if (mb < 1024) return $"{mb:0.0} MB";
-        var gb = mb / 1024.0;
-        return $"{gb:0.0} GB";
-    }
-
-    private static string? TryReadExifUserCommentJson(string filePath, out string? error)
-    {
-        error = null;
-
-        try
-        {
-            using var image = Image.Load(filePath);
-            var exif = image.Metadata.ExifProfile;
-            if (exif == null)
-            {
-                error = "EXIF profile not found.";
-                return null;
-            }
-
-            // NOTE:
-            // 일부 프로젝트에서는 `GetValue(...)` 호출이 Microsoft.Extensions.Configuration의
-            // `ConfigurationBinder.GetValue<T>()` 확장메서드로 잘못 바인딩되면서
-            // "형식 인수를 유추할 수 없습니다" 컴파일 오류가 발생할 수 있습니다.
-            // (Razor/GlobalUsings 조합에 따라 발생)
-            // 그래서 ImageSharp ExifProfile의 저장된 Values 컬렉션을 순회하여
-            // UserComment 태그를 찾는 방식으로 구현합니다(버전 호환성↑).
-
-            object? exifValueObj = null;
-            try
-            {
-                var valuesProp = exif.GetType().GetProperty("Values");
-                var valuesEnum = valuesProp?.GetValue(exif) as System.Collections.IEnumerable;
-                if (valuesEnum != null)
-                {
-                    foreach (var item in valuesEnum)
+                    var latest = g.OrderByDescending(x => x.TimestampUtc).First();
+                    return new ModelCardVm
                     {
-                        if (item == null) continue;
-                        var tagProp = item.GetType().GetProperty("Tag");
-                        var tag = tagProp?.GetValue(item);
-                        if (tag == null) continue;
+                        ModelName = latest.ModelName,
+                        FileCount = g.Count(),
+                        LatestTimestampUtc = latest.TimestampUtc,
+                        RepresentativeThumbnailUrl = ThumbUrl(latest.ModelName, latest.FileName),
+                        IsSelectedForDelete = _modelCards.FirstOrDefault(m => string.Equals(m.ModelName, latest.ModelName, StringComparison.OrdinalIgnoreCase))?.IsSelectedForDelete ?? false
+                    };
+                })
+                .OrderByDescending(x => x.LatestTimestampUtc)
+                .ThenBy(x => x.ModelName)
+                .ToList();
 
-                        // Tag.ToString() == "UserComment" 형태를 기대
-                        if (string.Equals(tag.ToString(), "UserComment", StringComparison.OrdinalIgnoreCase))
-                        {
-                            exifValueObj = item;
-                            break;
-                        }
-                    }
-                }
-            }
-            catch
+            // 선택된 모델이 그대로 존재하면 상세도 갱신
+            if (!string.IsNullOrWhiteSpace(_selectedModelName)
+                && _modelCards.Any(m => string.Equals(m.ModelName, _selectedModelName, StringComparison.OrdinalIgnoreCase)))
             {
-                // ignore (fallback below)
-            }
-
-            if (exifValueObj == null)
-            {
-                error = "EXIF(UserComment) tag not found.";
-                return null;
-            }
-
-            object? vValueObj = null;
-            try
-            {
-                // ImageSharp ExifValue<T>는 보통 `Value` 프로퍼티에 실제 값을 가집니다.
-                vValueObj = exifValueObj.GetType().GetProperty("Value")?.GetValue(exifValueObj);
-            }
-            catch
-            {
-                // ignore
-            }
-
-            string raw;
-            if (vValueObj is string s)
-            {
-                raw = s;
-            }
-            else if (vValueObj is byte[] bytes)
-            {
-                raw = DecodeExifUserComment(bytes);
+                await LoadModelAsync(_selectedModelName!);
             }
             else
             {
-                raw = vValueObj?.ToString() ?? "";
+                _selectedModelName = null;
+                _records = new();
+                _measureColumns = new();
             }
-
-            // 정리: null 문자/앞뒤 공백 제거
-            raw = raw.Trim('\0', ' ', '\t', '\r', '\n');
-
-            // 일부 구현체에서 prefix가 섞여 들어오는 경우가 있어 JSON 시작 위치를 찾는다.
-            var idx = raw.IndexOf('{');
-            if (idx > 0) raw = raw.Substring(idx);
-
-            if (string.IsNullOrWhiteSpace(raw))
-            {
-                error = "EXIF(UserComment) value is empty.";
-                return null;
-            }
-
-            return raw;
         }
         catch (Exception ex)
         {
-            error = ex.Message;
-            return null;
+            _loadError = ex.Message;
+            _modelCards = new();
         }
     }
 
-    // Exif UserComment (Undefined bytes) decode
-    // - Exif spec uses 8-byte prefix: "ASCII\0\0\0", "UNICODE\0", "JIS\0..."
-    private static string DecodeExifUserComment(byte[] bytes)
+    private async Task SelectModelAsync(string modelName)
     {
-        if (bytes.Length == 0) return "";
-
-        if (bytes.Length >= 8)
-        {
-            var prefix = Encoding.ASCII.GetString(bytes, 0, 8).TrimEnd('\0').ToUpperInvariant();
-            var payload = bytes.Skip(8).ToArray();
-
-            if (prefix.StartsWith("ASCII"))
-            {
-                return Encoding.UTF8.GetString(payload).TrimEnd('\0');
-            }
-
-            if (prefix.StartsWith("UNICODE"))
-            {
-                // 대부분 Android는 UTF-16LE로 들어오지만, 혹시 몰라 양쪽을 시도.
-                var s1 = Encoding.Unicode.GetString(payload).TrimEnd('\0');
-                if (s1.Contains('{')) return s1;
-
-                var s2 = Encoding.BigEndianUnicode.GetString(payload).TrimEnd('\0');
-                return s2;
-            }
-
-            // unknown prefix: try UTF-8 from payload
-            var s = Encoding.UTF8.GetString(payload).TrimEnd('\0');
-            if (s.Contains('{')) return s;
-        }
-
-        // fallback: decode whole bytes as UTF-8
-        return Encoding.UTF8.GetString(bytes).TrimEnd('\0');
+        _selectedModelName = modelName;
+        await LoadModelAsync(modelName);
     }
 
-    private static ResultSummary BuildSummary(JsonElement root)
+    private void ClearSelectedModel()
     {
-        static string GetString(JsonElement e, string name)
+        _selectedModelName = null;
+        _records = new();
+        _measureColumns = new();
+        _modelLoadError = null;
+    }
+
+    private async Task LoadModelAsync(string modelName)
+    {
+        _modelLoadError = null;
+        _records = new();
+        _measureColumns = new();
+
+        try
         {
-            if (e.TryGetProperty(name, out var p) && p.ValueKind == JsonValueKind.String)
-                return p.GetString() ?? "";
-            return "";
-        }
+            var rows = await Db.AirulerFilmMeasureResults
+                .AsNoTracking()
+                .Where(x => x.ModelName == modelName)
+                .OrderByDescending(x => x.TimestampUtc)
+                .ThenByDescending(x => x.Id)
+                .ToListAsync();
 
-        static int GetInt(JsonElement e, string name)
-        {
-            if (e.TryGetProperty(name, out var p) && p.ValueKind == JsonValueKind.Number && p.TryGetInt32(out var v))
-                return v;
-            return 0;
-        }
+            var cols = new List<MeasureColumnVm>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        static string? GetNumberAsString(JsonElement e, string name)
-        {
-            if (e.TryGetProperty(name, out var p) && p.ValueKind == JsonValueKind.Number)
-                return p.GetDouble().ToString("0.###");
-            return null;
-        }
-
-        var schema = GetString(root, "schema");
-        var modelName = GetString(root, "modelName");
-        var detectedFilms = GetInt(root, "detectedFilms");
-
-        var measurementMethod = GetString(root, "measurementMethod");
-        if (string.IsNullOrWhiteSpace(measurementMethod))
-        {
-            // schema로 추정
-            measurementMethod = schema.Contains("Grid", StringComparison.OrdinalIgnoreCase) ? "GRID" : "RULER";
-        }
-
-        string? pxH = null;
-        string? pxV = null;
-
-        if (measurementMethod == "RULER" && root.TryGetProperty("pixelsPerMm", out var ppm) && ppm.ValueKind == JsonValueKind.Object)
-        {
-            pxH = GetNumberAsString(ppm, "h");
-            pxV = GetNumberAsString(ppm, "v");
-        }
-
-        string? pitchMm = null;
-        string? gridJsonPath = null;
-        if (measurementMethod == "GRID" && root.TryGetProperty("grid", out var grid) && grid.ValueKind == JsonValueKind.Object)
-        {
-            pitchMm = GetNumberAsString(grid, "pitchMm");
-            if (grid.TryGetProperty("gridJsonPath", out var gp) && gp.ValueKind == JsonValueKind.String)
-                gridJsonPath = gp.GetString();
-        }
-
-        var tsLocal = "";
-        if (root.TryGetProperty("timestampMs", out var t) && t.ValueKind == JsonValueKind.Number && t.TryGetInt64(out var ms))
-        {
-            try
+            var vms = new List<RecordVm>(rows.Count);
+            foreach (var e in rows)
             {
-                tsLocal = DateTimeOffset.FromUnixTimeMilliseconds(ms).ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+                var films = ParseFilms(e.ResultsJson, cols, seen);
+                vms.Add(new RecordVm
+                {
+                    Entity = e,
+                    ThumbnailUrl = ThumbUrl(e.ModelName, e.FileName),
+                    ImageUrl = ImageUrl(e.ModelName, e.FileName),
+                    JsonUrl = JsonUrl(e.ModelName, e.FileName),
+                    Films = films
+                });
             }
-            catch { /* ignore */ }
-        }
 
-        List<string>? logsPreview = null;
-        if (root.TryGetProperty("logs", out var logs) && logs.ValueKind == JsonValueKind.Array)
+            _measureColumns = cols;
+            _records = vms;
+        }
+        catch (Exception ex)
         {
-            logsPreview = new List<string>();
-            foreach (var x in logs.EnumerateArray().Take(50))
+            _modelLoadError = ex.Message;
+        }
+    }
+
+    private static List<FilmRowVm> ParseFilms(string resultsJson, List<MeasureColumnVm> cols, HashSet<string> seen)
+    {
+        var films = new List<FilmRowVm>();
+
+        if (string.IsNullOrWhiteSpace(resultsJson))
+            return films;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(resultsJson);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array)
+                return films;
+
+            foreach (var filmEl in doc.RootElement.EnumerateArray())
             {
-                if (x.ValueKind == JsonValueKind.String)
-                    logsPreview.Add(x.GetString() ?? "");
+                var filmNo = 0;
+                if (filmEl.TryGetProperty("film", out var fno) && fno.ValueKind == JsonValueKind.Number)
+                    fno.TryGetInt32(out filmNo);
+
+                var row = new FilmRowVm { Film = filmNo };
+
+                if (filmEl.TryGetProperty("measures", out var meas) && meas.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var m in meas.EnumerateArray())
+                    {
+                        var idx = GetString(m, "index");
+                        if (string.IsNullOrWhiteSpace(idx)) continue;
+
+                        var gtStr = GetNumberAsString(m, "gt");
+                        if (!seen.Contains(idx))
+                        {
+                            cols.Add(new MeasureColumnVm { Index = idx, Gt = gtStr });
+                            seen.Add(idx);
+                        }
+
+                        var valueStr = GetNumberAsString(m, "value");
+                        var errStr = GetNumberAsString(m, "err");
+                        var result = GetString(m, "result");
+                        var isFail = string.Equals(result, "FAIL", StringComparison.OrdinalIgnoreCase);
+
+                        var text = valueStr;
+                        if (!string.IsNullOrWhiteSpace(errStr))
+                            text = string.IsNullOrWhiteSpace(valueStr) ? $"({errStr})" : $"{valueStr} ({errStr})";
+
+                        row.Cells[idx] = new MeasureCellVm { Text = text, IsFail = isFail };
+                    }
+                }
+
+                films.Add(row);
             }
         }
+        catch
+        {
+            // ignore parse error
+        }
 
-        return new ResultSummary(
-            Schema: schema,
-            ModelName: modelName,
-            MeasurementMethod: measurementMethod,
-            DetectedFilms: detectedFilms,
-            PixelsPerMmH: pxH,
-            PixelsPerMmV: pxV,
-            GridPitchMm: pitchMm,
-            GridJsonPath: gridJsonPath,
-            TimestampLocal: tsLocal,
-            LogsPreview: logsPreview
-        );
+        return films;
+    }
+
+    private static string GetString(JsonElement e, string name)
+    {
+        if (e.TryGetProperty(name, out var p) && p.ValueKind == JsonValueKind.String)
+            return p.GetString() ?? string.Empty;
+        return string.Empty;
+    }
+
+    private static string GetNumberAsString(JsonElement e, string name)
+    {
+        if (!e.TryGetProperty(name, out var p)) return string.Empty;
+
+        if (p.ValueKind == JsonValueKind.Number)
+        {
+            if (p.TryGetDouble(out var d))
+                return d.ToString("0.###");
+        }
+        else if (p.ValueKind == JsonValueKind.String)
+        {
+            return p.GetString() ?? string.Empty;
+        }
+
+        return string.Empty;
+    }
+
+    private async Task OpenPreviewAsync(RecordVm record)
+    {
+        _previewRecord = record;
+        _previewJson = string.Empty;
+        _showPreviewModal = true;
+
+        try
+        {
+            var path = JsonFilePath(record.Entity.ModelName, record.Entity.FileName);
+            if (System.IO.File.Exists(path))
+            {
+                _previewJson = await System.IO.File.ReadAllTextAsync(path);
+            }
+            else
+            {
+                _previewJson = "(JSON file not found on server.)";
+            }
+        }
+        catch (Exception ex)
+        {
+            _previewJson = ex.Message;
+        }
+    }
+
+    private void ClosePreview()
+    {
+        _showPreviewModal = false;
+        _previewRecord = null;
+        _previewJson = string.Empty;
+    }
+
+    private async Task ConfirmDeleteRecordAsync(long id)
+    {
+        var target = _records.FirstOrDefault(r => r.Entity.Id == id);
+        if (target == null)
+            return;
+
+        var ok = await JS.InvokeAsync<bool>("confirm", $"Delete '{target.Entity.FileName}'?\nThis will remove DB row and image/thumbnail/json files.");
+        if (!ok)
+            return;
+
+        await DeleteRecordAsync(id);
+    }
+
+    private async Task DeleteRecordAsync(long id)
+    {
+        try
+        {
+            var ent = await Db.AirulerFilmMeasureResults.FirstOrDefaultAsync(x => x.Id == id);
+            if (ent == null) return;
+
+            // 파일 삭제
+            SafeDeleteFile(ImageFilePath(ent.ModelName, ent.FileName));
+            SafeDeleteFile(ThumbnailFilePath(ent.ModelName, ent.FileName));
+            SafeDeleteFile(JsonFilePath(ent.ModelName, ent.FileName));
+
+            Db.AirulerFilmMeasureResults.Remove(ent);
+            await Db.SaveChangesAsync();
+
+            _statusMessage = $"Deleted: {ent.FileName}";
+
+            // 모델 폴더가 비어있으면 정리
+            TryCleanupEmptyModelFolder(ent.ModelName);
+
+            // UI 갱신
+            await ReloadAsync();
+
+            if (!string.IsNullOrWhiteSpace(_selectedModelName))
+                await LoadModelAsync(_selectedModelName!);
+        }
+        catch (Exception ex)
+        {
+            _statusMessage = $"Delete failed: {ex.Message}";
+        }
+    }
+
+    private async Task ConfirmDeleteSelectedModelsAsync()
+    {
+        var selected = _modelCards.Where(x => x.IsSelectedForDelete).Select(x => x.ModelName).ToList();
+        if (selected.Count == 0) return;
+
+        var ok = await JS.InvokeAsync<bool>("confirm", $"Delete selected model(s): {selected.Count}?\nThis will remove all DB rows and files under /results/{{model}}.");
+        if (!ok) return;
+
+        await DeleteModelsAsync(selected);
+    }
+
+    private async Task DeleteModelsAsync(List<string> modelNames)
+    {
+        try
+        {
+            var rows = await Db.AirulerFilmMeasureResults
+                .Where(x => modelNames.Contains(x.ModelName))
+                .ToListAsync();
+
+            Db.AirulerFilmMeasureResults.RemoveRange(rows);
+            await Db.SaveChangesAsync();
+
+            // 폴더 삭제
+            foreach (var m in modelNames)
+            {
+                var dir = ModelDirPath(m);
+                SafeDeleteDirectory(dir);
+            }
+
+            _statusMessage = $"Deleted models: {string.Join(", ", modelNames)}";
+
+            // 선택된 모델이 삭제된 경우 UI close
+            if (!string.IsNullOrWhiteSpace(_selectedModelName) && modelNames.Any(x => string.Equals(x, _selectedModelName, StringComparison.OrdinalIgnoreCase)))
+            {
+                ClearSelectedModel();
+            }
+
+            await ReloadAsync();
+        }
+        catch (Exception ex)
+        {
+            _statusMessage = $"Delete models failed: {ex.Message}";
+        }
+    }
+
+    private void SafeDeleteFile(string path)
+    {
+        try
+        {
+            var full = Path.GetFullPath(path);
+            var root = Path.GetFullPath(ResultsRoot);
+            if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return;
+
+            if (System.IO.File.Exists(full))
+                System.IO.File.Delete(full);
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    private void SafeDeleteDirectory(string path)
+    {
+        try
+        {
+            var full = Path.GetFullPath(path);
+            var root = Path.GetFullPath(ResultsRoot);
+            if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return;
+
+            if (Directory.Exists(full))
+                Directory.Delete(full, recursive: true);
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    private void TryCleanupEmptyModelFolder(string modelName)
+    {
+        try
+        {
+            var modelDir = ModelDirPath(modelName);
+            if (!Directory.Exists(modelDir)) return;
+
+            // image/thumbnail/json 모두 비면 삭제
+            bool hasFiles = Directory.EnumerateFiles(modelDir, "*", SearchOption.AllDirectories).Any();
+            if (!hasFiles)
+            {
+                SafeDeleteDirectory(modelDir);
+            }
+        }
+        catch
+        {
+            // ignore
+        }
     }
 }
