@@ -1,4 +1,4 @@
-﻿@page "/airuler"
+﻿@page "/airuler-modeler"
 @using System.Text
 @using System.Text.Json
 @using System.Text.Encodings.Web
@@ -14,23 +14,10 @@
             <div class="airuler-toolbar">
                 <div class="me-2"><b>AIRuler Viewer</b></div>
 
-                <button class="btn btn-sm btn-outline-secondary" @onclick="ResetViewAsync">Reset View</button>
-                <button class="btn btn-sm btn-outline-danger" @onclick="ClearSelectionAsync">Clear Selection</button>
-
-                <span class="ms-2 small text-muted">
-                    zoom=@_zoomFactor.ToString("0.00"), pan=(@_panX,@_panY)
+                <span class="ms-auto airuler-hint">
+                    (ROI: Arrow 이동 / Shift+Arrow 크기 / Delete 삭제 / Ctrl+C,X,V,E View: Ctrl+'+' 확대 / Ctrl+'-' 축소 / Ctrl+Arrow 팬 (Viewer만))
                 </span>
-
-                <span class="ms-auto airuler-hover">
-                    <span id="airulerHover"></span>
-                </span>
-            </div>
-
-            <div class="airuler-hint mt-2">
-                ROI: Arrow 이동 / Shift+Arrow 크기 / Delete 삭제 / Ctrl+C,X,V,E<br />
-                View: Ctrl+'+' 확대 / Ctrl+'-' 축소 / Ctrl+Arrow 팬 (Viewer만)
-            </div>
-        </div>
+            </div></div>
 
         <div class="card-body p-0">
             <div id="airulerViewerHost" class="airuler-viewer-host">
@@ -45,11 +32,11 @@
         </div>
     </div>
 
-    <!-- =================== Bottom Panels =================== -->
+        <!-- =================== Bottom Panels =================== -->
     <div class="row g-2 mt-2">
 
-        <!-- LEFT: Model / Images / Upload -->
-        <div class="col-12 col-xl-4">
+        <!-- 1) Model / Images / Upload -->
+        <div class="col-12 col-xl-3">
             <div class="card">
                 <div class="card-header">Model / Images</div>
                 <div class="card-body">
@@ -67,20 +54,20 @@
 
                     <div class="mb-2">
                         <label class="form-label">New Model Name</label>
-                        <input class="form-control" @bind="_newModelName" placeholder="e.g. Kodak_Portra_400" />
+                        <input class="form-control" @bind="_newModelName" placeholder="e.g. M2379-00" />
                     </div>
 
                     <div class="d-flex gap-2 flex-wrap">
                         <button class="btn btn-sm btn-primary" @onclick="CreateOrSelectModelAsync">Create/Select</button>
                         <button class="btn btn-sm btn-outline-secondary" @onclick="RefreshModelsAsync">Refresh</button>
-                        <button class="btn btn-sm btn-outline-primary" @onclick="RefreshImagesAsync" disabled="@string.IsNullOrWhiteSpace(_selectedModel)">Reload images</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="DeleteSelectedModelAsync" disabled="@string.IsNullOrWhiteSpace(_selectedModel)">Delete</button>
                     </div>
 
                     <hr />
 
                     <div class="mb-2">
                         <label class="form-label">Image list</label>
-                        <div style="max-height:220px; overflow:auto; border:1px solid #eee; padding:6px;">
+                        <div style="max-height:260px; overflow:auto; border:1px solid #eee; padding:6px;">
                             @if (string.IsNullOrWhiteSpace(_selectedModel))
                             {
                                 <div class="text-muted">Select a model first.</div>
@@ -123,8 +110,8 @@
             </div>
         </div>
 
-        <!-- MIDDLE: ROI / Measure -->
-        <div class="col-12 col-xl-4">
+        <!-- 2) ROI -->
+        <div class="col-12 col-xl-3">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span>ROI</span>
@@ -135,7 +122,7 @@
                 </div>
 
                 <div class="card-body">
-                    <div style="max-height:180px; overflow:auto; border:1px solid #eee; padding:6px;">
+                    <div style="max-height:360px; overflow:auto; border:1px solid #eee; padding:6px;">
                         @foreach (var r in _rois.OrderBy(r => r.Id))
                         {
                             <button class="btn btn-sm @(r.Id == _selectedRoiId ? "btn-danger" : "btn-light")"
@@ -145,27 +132,18 @@
                             </button>
                         }
                     </div>
-
-                    @if (_selectedRoiId is not null)
-                    {
-                        var rr = _rois.FirstOrDefault(x => x.Id == _selectedRoiId.Value);
-                        if (rr is not null)
-                        {
-                            <div class="mt-2 small text-muted">
-                                Selected ROI: roi_@rr.Id<br />
-                                x=@((int)rr.X), y=@((int)rr.Y), w=@((int)rr.W), h=@((int)rr.H)
-                            </div>
-                        }
-                    }
                 </div>
             </div>
+        </div>
 
-            <div class="card mt-2">
+        <!-- 3) Measure -->
+        <div class="col-12 col-xl-3">
+            <div class="card">
                 <div class="card-header">Measure</div>
                 <div class="card-body">
                     <div class="mb-2">
                         <label class="form-label">Measure Index</label>
-                        <input class="form-control" @bind="_measureForm.IndexText" placeholder="e.g. 1" />
+                        <input class="form-control" @bind="_measureForm.IndexText" placeholder="e.g. CP1, CP2, No.3-1" />
                     </div>
 
                     <div class="mb-2">
@@ -196,6 +174,11 @@
                         <input class="form-control" @bind="_measureForm.MarginText" placeholder="e.g. 0.1" />
                     </div>
 
+                    <div class="mb-2">
+                        <label class="form-label">Adjust</label>
+                        <input class="form-control" @bind="_measureForm.AdjustText" placeholder="e.g. +0.1, -0.2, *0.12, /1.1" />
+                    </div>
+
                     <div class="d-flex gap-2 flex-wrap">
                         <button class="btn btn-sm btn-primary" @onclick="AddOrUpdateMeasureAsync">Add/Update</button>
                         <button class="btn btn-sm btn-outline-danger" @onclick="DeleteMeasureAsync">Delete</button>
@@ -203,8 +186,8 @@
 
                     <hr />
 
-                    <div style="max-height:140px; overflow:auto; border:1px solid #eee; padding:6px;">
-                        @foreach (var mid in _measures.Keys.OrderBy(x => x))
+                    <div style="max-height:320px; overflow:auto; border:1px solid #eee; padding:6px;">
+                        @foreach (var mid in GetOrderedMeasureIds())
                         {
                             var m = _measures[mid];
                             <button class="btn btn-sm @(mid == _selectedMeasureId ? "btn-danger" : "btn-light")"
@@ -218,8 +201,8 @@
             </div>
         </div>
 
-        <!-- RIGHT: JSON / Log -->
-        <div class="col-12 col-xl-4">
+        <!-- 4) JSON -->
+        <div class="col-12 col-xl-3">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <span>JSON</span>
@@ -241,13 +224,6 @@
                 </div>
                 <div class="card-body">
                     <textarea class="airuler-json form-control" @bind="_jsonEditorText"></textarea>
-                </div>
-            </div>
-
-            <div class="card mt-2">
-                <div class="card-header">Log</div>
-                <div class="card-body">
-                    <textarea class="airuler-log form-control" readonly>@_logText</textarea>
                 </div>
             </div>
         </div>
@@ -364,11 +340,10 @@
 
     // ROI / Measure
     private readonly List<Roi> _rois = new();
-    private readonly Dictionary<int, Measure> _measures = new();
-    private int? _selectedRoiId = null;
-    private int? _selectedMeasureId = null;
-
-    // JSON + Log
+    private readonly Dictionary<string, Measure> _measures = new(StringComparer.Ordinal);
+private int? _selectedRoiId = null;
+    private string? _selectedMeasureId = null;
+// JSON + Log
     private string _jsonEditorText = "";
     private readonly List<string> _logs = new();
     private string _logText => string.Join("\n", _logs.TakeLast(250));
@@ -384,7 +359,7 @@
     private Rect _pendingRect;
 
     // JS interop
-    private DotNetObjectReference<AIRuler>? _dotNetRef;
+    private DotNetObjectReference<AIRulerModeler>? _dotNetRef;
     private bool _jsInited = false;
 
     protected override async Task OnInitializedAsync()
@@ -405,7 +380,7 @@
                 _dotNetRef,
                 "airulerCanvas",
                 "airulerImage",
-                "airulerHover",
+                null,
                 "airulerViewerHost",
                 "airulerTransformHost",
                 "airulerViewerSplitter"
@@ -503,7 +478,51 @@
         await RefreshImagesAsync();
     }
 
-    private async Task OnModelChanged(ChangeEventArgs e)
+        private async Task DeleteSelectedModelAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_selectedModel)) return;
+
+        var model = _selectedModel.Trim();
+
+        var ok = await JS.InvokeAsync<bool>(
+            "confirm",
+            $"선택한 모델 '{model}' 을(를) 삭제할까요?\n\n삭제 대상:\n- /airuler/images/{model}/\n- /airuler/models/{model}.json\n\n이 작업은 되돌릴 수 없습니다."
+        );
+
+        if (!ok) return;
+
+        try
+        {
+            var imgDir = Path.Combine(ImagesRoot, model);
+            if (Directory.Exists(imgDir))
+                Directory.Delete(imgDir, recursive: true);
+
+            var modelJson = Path.Combine(ModelsRoot, $"{model}.json");
+            if (File.Exists(modelJson))
+                File.Delete(modelJson);
+
+            Log($"Model deleted: {model}");
+        }
+        catch (Exception ex)
+        {
+            Log($"ERROR: Failed to delete model '{model}': {ex.Message}");
+        }
+
+        // Clear selection/state
+        _selectedModel = null;
+        _selectedImage = null;
+        _currentImageUrl = null;
+        _images.Clear();
+        _imgW = 0;
+        _imgH = 0;
+
+        ClearAllData();
+
+        await RefreshModelsAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+private async Task OnModelChanged(ChangeEventArgs e)
     {
         _selectedModel = e.Value?.ToString();
         _selectedImage = null;
@@ -552,13 +571,18 @@
         }
     }
 
-    private async Task SelectImageAsync(string file)
+        private async Task SelectImageAsync(string file)
     {
         if (string.IsNullOrWhiteSpace(_selectedModel)) return;
 
+        var newUrl = $"/airuler/images/{Uri.EscapeDataString(_selectedModel)}/{Uri.EscapeDataString(file)}";
+        var isSameImage = string.Equals(_currentImageUrl, newUrl, StringComparison.Ordinal);
+
         _selectedImage = file;
-        _currentImageUrl = $"/airuler/images/{Uri.EscapeDataString(_selectedModel)}/{Uri.EscapeDataString(file)}";
-        _fitOnNextImageLoad = true;     // 로드 끝나면 fit
+        _currentImageUrl = newUrl;
+
+        // 앞으로는 "항상 viewer 창 크기에 맞게" 보이도록: 이미지 선택 시 기본 View를 Fit로 초기화
+        _fitOnNextImageLoad = true;
 
         // 이미지 바꾸면 view 초기화(줌/팬은 Viewer만 적용)
         _zoomFactor = 1.0;
@@ -571,6 +595,14 @@
 
         Log($"Image selected: {_selectedImage}");
         await InvokeAsync(StateHasChanged);
+
+        // 같은 이미지를 다시 클릭하면 <img> load 이벤트가 발생하지 않을 수 있으므로, 즉시 Fit을 한 번 더 적용
+        if (isSameImage && _imgW > 0 && _imgH > 0)
+        {
+            _fitOnNextImageLoad = false;
+            await FitViewToViewerAsync();
+            await InvokeAsync(StateHasChanged);
+        }
         // 실제 자연해상도는 JS의 OnImageLoaded에서 들어옴
     }
 
@@ -582,7 +614,7 @@
         Log($"Selected {_pendingFiles.Count} file(s) for upload.");
     }
 
-    private async Task UploadSelectedFilesAsync()
+private async Task UploadSelectedFilesAsync()
     {
         if (string.IsNullOrWhiteSpace(_selectedModel)) return;
         if (_pendingFiles.Count == 0) return;
@@ -671,18 +703,18 @@
         }
 
         // Measure hit
-        var hitMeasure = FindMeasureNearPoint(x, y, thresholdPx: 8.0);
-        if (hitMeasure is not null)
+        var hitMeasureId = FindMeasureNearPoint(x, y, thresholdPx: 8.0);
+        if (hitMeasureId is not null)
         {
-            _selectedMeasureId = hitMeasure.Value;
+            _selectedMeasureId = hitMeasureId;
             _selectedRoiId = null;
-            Log($"Selected measure_{hitMeasure.Value}");
+            Log($"Selected measure_{hitMeasureId}");
             await PushCanvasStateAsync();
             await InvokeAsync(StateHasChanged);
             return;
         }
 
-        // background
+// background
         await ClearSelectionAsync();
     }
 
@@ -787,7 +819,7 @@
         await InvokeAsync(StateHasChanged);
     }
 
-    private async Task SelectMeasureAsync(int id)
+    private async Task SelectMeasureAsync(string id)
     {
         _selectedMeasureId = id;
         _selectedRoiId = null;
@@ -1009,14 +1041,16 @@
         await InvokeAsync(StateHasChanged);
     }
 
-    // =================== Measure ===================
+        // =================== Measure ===================
     private async Task AddOrUpdateMeasureAsync()
     {
-        if (!int.TryParse((_measureForm.IndexText ?? "").Trim(), out var idx))
+        var idx = NormalizeMeasureId(_measureForm.IndexText);
+        if (string.IsNullOrWhiteSpace(idx))
         {
-            Log("ERROR: Measure index must be integer.");
+            Log("ERROR: Measure index is required.");
             return;
         }
+        _measureForm.IndexText = idx; // normalize (strip "measure_" etc)
 
         var sId = ParseRoiNameToId(_measureForm.StartText ?? "");
         var eId = ParseRoiNameToId(_measureForm.EndText ?? "");
@@ -1035,13 +1069,16 @@
         if (!double.TryParse(_measureForm.GtText, out var gt)) gt = 0;
         if (!double.TryParse(_measureForm.MarginText, out var margin)) margin = 0;
 
+        var adjust = (_measureForm.AdjustText ?? "").Trim();
+
         _measures[idx] = new Measure
         {
             Start = $"roi_{sId.Value}",
             End = $"roi_{eId.Value}",
             Direction = string.IsNullOrWhiteSpace(_measureForm.Direction) ? "x" : _measureForm.Direction,
             Gt = gt,
-            Margin = margin
+            Margin = margin,
+            Adjust = adjust
         };
 
         _selectedMeasureId = idx;
@@ -1054,10 +1091,21 @@
 
     private async Task DeleteMeasureAsync()
     {
-        if (!int.TryParse((_measureForm.IndexText ?? "").Trim(), out var idx))
+        var idx = NormalizeMeasureId(_measureForm.IndexText);
+
+        // If the input box is empty, delete the currently selected measure (if any)
+        if (string.IsNullOrWhiteSpace(idx))
         {
-            Log("ERROR: Measure index must be integer.");
-            return;
+            if (!string.IsNullOrWhiteSpace(_selectedMeasureId))
+            {
+                idx = _selectedMeasureId!;
+                _measureForm.IndexText = idx;
+            }
+            else
+            {
+                Log("ERROR: Measure index is required.");
+                return;
+            }
         }
 
         if (_measures.Remove(idx))
@@ -1073,13 +1121,13 @@
         }
     }
 
-    private int? FindMeasureNearPoint(double x, double y, double thresholdPx)
+private string? FindMeasureNearPoint(double x, double y, double thresholdPx)
     {
         if (_measures.Count == 0) return null;
 
         var roiMap = _rois.ToDictionary(r => r.Id, r => r);
         double best = double.MaxValue;
-        int? bestId = null;
+        string? bestId = null;
 
         foreach (var kv in _measures)
         {
@@ -1218,7 +1266,7 @@
         }
 
         data["n_measure"] = _measures.Count;
-        foreach (var mid in _measures.Keys.OrderBy(x => x))
+        foreach (var mid in GetOrderedMeasureIds())
         {
             var m = _measures[mid];
             data[$"measure_{mid}"] = new Dictionary<string, object?>
@@ -1227,7 +1275,8 @@
                 ["end"] = m.End,
                 ["direction"] = m.Direction,
                 ["gt"] = m.Gt,
-                ["margin"] = m.Margin
+                ["margin"] = m.Margin,
+                ["adjust"] = m.Adjust
             };
         }
 
@@ -1240,7 +1289,7 @@
         if (!_jsInited) return;
 
         var selectedMeasureRoiIds = new List<int>();
-        if (_selectedMeasureId is not null && _measures.TryGetValue(_selectedMeasureId.Value, out var sm))
+        if (_selectedMeasureId is not null && _measures.TryGetValue(_selectedMeasureId, out var sm))
         {
             var s = ParseRoiNameToId(sm.Start);
             var e = ParseRoiNameToId(sm.End);
@@ -1372,8 +1421,8 @@
             if (!prop.Name.StartsWith("measure_", StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            var idxStr = prop.Name.Substring("measure_".Length);
-            if (!int.TryParse(idxStr, out var mid)) continue;
+            var mid = NormalizeMeasureId(prop.Name.Substring("measure_".Length));
+            if (string.IsNullOrWhiteSpace(mid)) continue;
 
             var obj = prop.Value;
             if (obj.ValueKind != JsonValueKind.Object) continue;
@@ -1387,6 +1436,7 @@
             // gt/margin은 json에 null일 수도 있으니 안전하게
             var gt = ReadNullableDouble(obj, "gt") ?? 0;
             var margin = ReadNullableDouble(obj, "margin") ?? 0;
+            var adjust = ReadString(obj, "adjust", "");
 
             _measures[mid] = new Measure
             {
@@ -1394,7 +1444,8 @@
                 End = end,
                 Direction = dir,
                 Gt = gt,
-                Margin = margin
+                Margin = margin,
+                Adjust = adjust
             };
         }
     }
@@ -1413,7 +1464,29 @@
         return s;
     }
 
-    private static string ReadString(JsonElement obj, string propName, string defaultValue)
+    
+    private static string NormalizeMeasureId(string? s)
+    {
+        s = (s ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(s)) return "";
+
+        if (s.StartsWith("measure_", StringComparison.OrdinalIgnoreCase))
+            s = s.Substring("measure_".Length);
+
+        return s.Trim();
+    }
+
+    private IEnumerable<string> GetOrderedMeasureIds()
+    {
+        // 숫자로만 된 id("1","2",...)는 숫자 기준으로 정렬, 그 외는 문자열 기준 정렬
+        return _measures.Keys
+            .OrderBy(id => int.TryParse(id, out _) ? 0 : 1)
+            .ThenBy(id => int.TryParse(id, out var n) ? n : int.MaxValue)
+            .ThenBy(id => id, StringComparer.Ordinal)
+            .ToList();
+    }
+
+private static string ReadString(JsonElement obj, string propName, string defaultValue)
     {
         if (!obj.TryGetProperty(propName, out var el)) return defaultValue;
         if (el.ValueKind == JsonValueKind.String) return el.GetString() ?? defaultValue;
@@ -1512,6 +1585,7 @@
         public string Direction { get; set; } = "x";
         public double Gt { get; set; }
         public double Margin { get; set; }
+        public string Adjust { get; set; } = "";
     }
 
     private readonly record struct Rect(double X, double Y, double W, double H);
@@ -1531,6 +1605,7 @@
         public string Direction { get; set; } = "x";
         public string GtText { get; set; } = "0";
         public string MarginText { get; set; } = "0.15";
+        public string AdjustText { get; set; } = "";
     }
 
     private MeasureFormModel _measureForm = new();
