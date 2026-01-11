@@ -44,7 +44,7 @@ else
             <div class="card" style="width: 320px; position: relative;">
                 <img src="@m.RepresentativeThumbnailUrl"
                      class="card-img-top"
-                     style="height: 180px; object-fit: cover; cursor: pointer;"
+                     style="height: 180px; object-fit: contain; object-position: center; background: #f8f9fa; cursor: pointer;"
                      @onclick="() => GoToModel(m.ModelName)" />
 
                 <div class="card-body" style="cursor:pointer;" @onclick="() => GoToModel(m.ModelName)">

@@ -293,6 +293,233 @@ namespace HawkAI.Controllers
             });
         }
 
+        /// <summary>
+        /// ✅ 특정 모델의 결과를 CSV로 내보내기
+        /// - UI(/airuler-result/{model}) 테이블과 동일한 형태로 (파일 1개당 Film 개수만큼 서브 행)
+        /// - showError=false이면 (err) 값은 제외
+        /// </summary>
+        [HttpGet("export/{modelName}")]
+        public async Task<IActionResult> ExportModelResultsCsv(string modelName, [FromQuery] bool showError = true)
+        {
+            EnsureBaseDirs();
+
+            var model = SanitizeModelName(modelName);
+            if (string.IsNullOrWhiteSpace(model))
+                return BadRequest("Invalid modelName.");
+
+            var rows = await _db.AirulerFilmMeasureResults
+                .AsNoTracking()
+                .Where(x => x.ModelName == model)
+                .OrderByDescending(x => x.TimestampUtc)
+                .ThenByDescending(x => x.Id)
+                .ToListAsync();
+
+            // 측정 Index 컬럼을 UI와 동일하게 '처음 등장한 순서'로 수집
+            var cols = new List<ExportMeasureColumn>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var parsed = new List<(AirulerFilmMeasureResult Row, List<ExportFilmRow> Films)>(rows.Count);
+            foreach (var r in rows)
+            {
+                var films = ParseExportFilms(r.ResultsJson, cols, seen);
+                parsed.Add((r, films));
+            }
+
+            var sb = new StringBuilder();
+
+            // Header
+            sb.Append("No,FileName,Timestamp,DeviceId,ImageSize,MeasureMethod,DetectedFilms,Film");
+            foreach (var c in cols)
+            {
+                sb.Append(',');
+                sb.Append(CsvEscape(c.Header));
+            }
+            sb.AppendLine();
+
+            // Rows (파일 1개당 Film 개수만큼 행 생성)
+            for (var recIdx = 0; recIdx < parsed.Count; recIdx++)
+            {
+                var (row, films) = parsed[recIdx];
+                var no = recIdx + 1;
+
+                if (films.Count == 0)
+                    films = new List<ExportFilmRow> { new ExportFilmRow { Film = 0 } };
+
+                for (var fi = 0; fi < films.Count; fi++)
+                {
+                    var film = films[fi];
+
+                    // No/Info 등은 UI처럼 첫 Film 행에만 채우고, 나머지는 공란 처리
+                    if (fi == 0)
+                    {
+                        sb.Append(no);
+                        sb.Append(',');
+                        sb.Append(CsvEscape(row.FileName));
+                        sb.Append(',');
+                        sb.Append(CsvEscape(row.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")));
+                        sb.Append(',');
+                        sb.Append(CsvEscape(row.DeviceId));
+                        sb.Append(',');
+                        sb.Append(CsvEscape(row.ImageSize));
+                        sb.Append(',');
+                        sb.Append(CsvEscape(row.MeasureMethod));
+                        sb.Append(',');
+                        sb.Append(row.DetectedFilms);
+                    }
+                    else
+                    {
+                        // 7개 컬럼(No ~ DetectedFilms) 공란
+                        sb.Append(",,,,,,");
+                    }
+
+                    // Film
+                    sb.Append(',');
+                    sb.Append(film.Film > 0 ? CsvEscape($"#{film.Film}") : "");
+
+                    // Measures
+                    foreach (var c in cols)
+                    {
+                        sb.Append(',');
+
+                        if (film.Cells.TryGetValue(c.Index, out var cell))
+                        {
+                            var text = cell.Value ?? string.Empty;
+                            var err = cell.Err ?? string.Empty;
+
+                            if (showError && !string.IsNullOrWhiteSpace(err))
+                            {
+                                text = string.IsNullOrWhiteSpace(text)
+                                    ? $"({err})"
+                                    : $"{text} ({err})";
+                            }
+
+                            sb.Append(CsvEscape(text));
+                        }
+                        else
+                        {
+                            sb.Append(string.Empty);
+                        }
+                    }
+
+                    sb.AppendLine();
+                }
+            }
+
+            // Excel 호환을 위해 UTF-8 BOM 추가
+            var csv = "\uFEFF" + sb.ToString();
+            var bytes = Encoding.UTF8.GetBytes(csv);
+
+            var safeName = string.IsNullOrWhiteSpace(model) ? "AIRuler" : model;
+            var fileName = $"{safeName}_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+
+            return File(bytes, "text/csv; charset=utf-8", fileName);
+        }
+
+        private sealed class ExportMeasureColumn
+        {
+            public string Index { get; init; } = string.Empty;
+            public string Gt { get; init; } = string.Empty;
+            public string Header => string.IsNullOrWhiteSpace(Gt) ? Index : $"{Index} ({Gt})";
+        }
+
+        private sealed class ExportCell
+        {
+            public string? Value { get; init; }
+            public string? Err { get; init; }
+        }
+
+        private sealed class ExportFilmRow
+        {
+            public int Film { get; init; }
+            public Dictionary<string, ExportCell> Cells { get; } = new(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static List<ExportFilmRow> ParseExportFilms(string resultsJson, List<ExportMeasureColumn> cols, HashSet<string> seen)
+        {
+            var films = new List<ExportFilmRow>();
+            if (string.IsNullOrWhiteSpace(resultsJson))
+                return films;
+
+            try
+            {
+                using var doc = JsonDocument.Parse(resultsJson);
+                if (doc.RootElement.ValueKind != JsonValueKind.Array)
+                    return films;
+
+                foreach (var filmEl in doc.RootElement.EnumerateArray())
+                {
+                    var filmNo = 0;
+                    if (filmEl.TryGetProperty("film", out var fno) && fno.ValueKind == JsonValueKind.Number)
+                        fno.TryGetInt32(out filmNo);
+
+                    var row = new ExportFilmRow { Film = filmNo };
+
+                    if (filmEl.TryGetProperty("measures", out var meas) && meas.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var m in meas.EnumerateArray())
+                        {
+                            var idx = GetString(m, "index");
+                            if (string.IsNullOrWhiteSpace(idx)) continue;
+
+                            var gtStr = GetNumberAsString(m, "gt");
+                            if (!seen.Contains(idx))
+                            {
+                                cols.Add(new ExportMeasureColumn { Index = idx, Gt = gtStr });
+                                seen.Add(idx);
+                            }
+
+                            var valueStr = GetNumberAsString(m, "value");
+                            var errStr = GetNumberAsString(m, "err");
+
+                            row.Cells[idx] = new ExportCell
+                            {
+                                Value = valueStr,
+                                Err = errStr
+                            };
+                        }
+                    }
+
+                    films.Add(row);
+                }
+            }
+            catch
+            {
+                // ignore parse errors
+            }
+
+            return films;
+        }
+
+        private static string GetNumberAsString(JsonElement e, string name)
+        {
+            if (!e.TryGetProperty(name, out var p)) return string.Empty;
+
+            if (p.ValueKind == JsonValueKind.Number)
+            {
+                if (p.TryGetDouble(out var d))
+                    return d.ToString("0.###");
+            }
+            else if (p.ValueKind == JsonValueKind.String)
+            {
+                return p.GetString() ?? string.Empty;
+            }
+
+            return string.Empty;
+        }
+
+        private static string CsvEscape(string? s)
+        {
+            s ??= string.Empty;
+
+            var mustQuote = s.Contains(',') || s.Contains('\n') || s.Contains('\r') || s.Contains('"');
+            if (!mustQuote)
+                return s;
+
+            // CSV 표준: " 는 "" 로 이스케이프
+            var escaped = s.Replace("\"", "\"\"");
+            return $"\"{escaped}\"";
+        }
+
         private static async Task CreateThumbnailAsync(string imagePath, string thumbPath)
         {
             // 썸네일은 원본 해상도가 매우 크므로 1/10 ~ 1/20 수준으로 축소

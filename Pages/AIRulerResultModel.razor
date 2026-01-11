@@ -15,9 +15,22 @@
         <span class="text-muted" style="font-size: 0.95rem;">(@_records.Count)</span>
     </h4>
 
-    <div class="d-flex gap-2">
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+        <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" id="showErrSwitch" @bind="_showError" />
+            <label class="form-check-label small" for="showErrSwitch">Show error</label>
+        </div>
+
         <a class="btn btn-sm btn-outline-secondary" href="/airuler-result">Back</a>
         <button class="btn btn-sm btn-outline-secondary" @onclick="ReloadAsync">Refresh</button>
+
+        <a class="btn btn-sm btn-success @(!CanExport ? "disabled" : "")"
+           href="@ExportUrl"
+           target="_blank"
+           aria-disabled="@(!CanExport)"
+           tabindex="@(!CanExport ? "-1" : null)">
+            Save
+        </a>
     </div>
 </div>
 
@@ -48,16 +61,20 @@ else if (_records.Count > 0)
                     <th style="min-width: 220px;"><strong>Image</strong></th>
                     <th style="min-width: 260px;"><strong>Info</strong></th>
                     <th style="width: 70px;"><strong>Film</strong></th>
+
                     @foreach (var col in _measureColumns)
                     {
                         <th style="min-width: 110px; white-space: nowrap;">
-                            <strong>@col.Index</strong>
-                            @if (!string.IsNullOrWhiteSpace(col.Gt))
-                            {
-                                <span class="text-muted" style="font-size: 0.85rem;">(@col.Gt)</span>
-                            }
+                            <div style="line-height: 1.05;">
+                                <div><strong>@col.Index</strong></div>
+                                @if (!string.IsNullOrWhiteSpace(col.Gt))
+                                {
+                                    <div class="text-muted" style="font-size: 0.85rem;">(@col.Gt)</div>
+                                }
+                            </div>
                         </th>
                     }
+
                     <th style="width: 120px;"><strong>Actions</strong></th>
                 </tr>
             </thead>
@@ -81,11 +98,11 @@ else if (_records.Count > 0)
 
                                 <td rowspan="@rowspan" style="vertical-align: top;">
                                     <a class="btn btn-link p-0 text-start" href="@r.DetailPageUrl" style="text-decoration:none;">
-                                        <div class="d-flex align-items-center" style="gap: 8px;">
-                                            <img src="@r.ThumbnailUrl" style="width: 96px; height: 72px; object-fit: cover; border: 1px solid #eee;" />
-                                            <div style="min-width:0;">
-                                                <div style="word-break: break-all;"><b>@r.Entity.FileName</b></div>
-                                                <div class="small text-muted">click to open</div>
+                                        <div style="width: 170px;">
+                                            <img src="@r.ThumbnailUrl"
+                                                 style="width: 170px; height: 96px; object-fit: contain; object-position: center; background: #f8f9fa; border: 1px solid #eee;" />
+                                            <div style="font-size: 0.82rem; word-break: break-all; margin-top: 4px;">
+                                                <b class="text-body">@r.Entity.FileName</b>
                                             </div>
                                         </div>
                                     </a>
@@ -95,10 +112,8 @@ else if (_records.Count > 0)
                                     <div class="small">
                                         <div><b>timestamp</b>: @r.TimestampLocal</div>
                                         <div><b>deviceId</b>: @r.Entity.DeviceId</div>
-                                        <div><b>modelName</b>: @r.Entity.ModelName</div>
                                         <div><b>imageSize</b>: @r.Entity.ImageSize</div>
                                         <div><b>measureMethod</b>: @r.Entity.MeasureMethod</div>
-                                        <div><b>detectedFilms</b>: @r.Entity.DetectedFilms</div>
                                     </div>
                                 </td>
                             }
@@ -112,17 +127,20 @@ else if (_records.Count > 0)
 
                             @foreach (var col in _measureColumns)
                             {
-                                if (film.Cells.TryGetValue(col.Index, out var cell) && (!string.IsNullOrWhiteSpace(cell.Value) || !string.IsNullOrWhiteSpace(cell.Err)))
+                                if (film.Cells.TryGetValue(col.Index, out var cell)
+                                    && (!string.IsNullOrWhiteSpace(cell.Value) || (_showError && !string.IsNullOrWhiteSpace(cell.Err))))
                                 {
-                                    <td style="white-space: nowrap;">
-                                        @if (!string.IsNullOrWhiteSpace(cell.Value))
-                                        {
-                                            <span>@cell.Value</span>
-                                        }
-                                        @if (!string.IsNullOrWhiteSpace(cell.Err))
-                                        {
-                                            <span class="@(cell.IsFail ? "text-danger" : "text-muted")" style="font-size: 0.85rem;">(@cell.Err)</span>
-                                        }
+                                    <td>
+                                        <div style="line-height: 1.05;">
+                                            @if (!string.IsNullOrWhiteSpace(cell.Value))
+                                            {
+                                                <div class="@(cell.IsFail ? "text-danger" : "")">@cell.Value</div>
+                                            }
+                                            @if (_showError && !string.IsNullOrWhiteSpace(cell.Err))
+                                            {
+                                                <div class="@(cell.IsFail ? "text-danger" : "text-muted")" style="font-size: 0.85rem;">(@cell.Err)</div>
+                                            }
+                                        </div>
                                     </td>
                                 }
                                 else
@@ -149,6 +167,8 @@ else if (_records.Count > 0)
 
 @code {
     [Parameter] public string? ModelName { get; set; }
+
+    private bool _showError = true;
 
     private sealed class MeasureColumnVm
     {
@@ -182,6 +202,13 @@ else if (_records.Count > 0)
     private List<MeasureColumnVm> _measureColumns = new();
     private string? _loadError;
     private string? _statusMessage;
+
+    private bool CanExport => !string.IsNullOrWhiteSpace(ModelName) && _records.Count > 0;
+
+    private string ExportUrl
+        => CanExport
+            ? $"/api/airuler/export/{Uri.EscapeDataString(ModelName!) }?showError={_showError.ToString().ToLowerInvariant()}"
+            : "#";
 
     protected override async Task OnParametersSetAsync()
     {
