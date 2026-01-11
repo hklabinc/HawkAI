@@ -1,0 +1,1780 @@
+@page "/airuler/modeler"
+@using System.Text
+@using System.Text.Json
+@using System.Text.Encodings.Web
+@inject IWebHostEnvironment Env
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div class="airuler-page container-fluid">
+
+    <!-- =================== Viewer (TOP FULL WIDTH) =================== -->
+    <div class="card">
+        <div class="card-header">
+            <div class="airuler-toolbar">
+                <div class="me-2"><b>AIRuler Viewer</b></div>
+
+                <span class="ms-auto airuler-hint">
+                    (ROI: Arrow 이동 / Shift+Arrow 크기 / Delete 삭제 / Ctrl+C,X,V View: Ctrl+'+' 확대 / Ctrl+'-' 축소 / Ctrl+Arrow 팬 (Viewer만))
+                </span>
+            </div></div>
+
+        <div class="card-body p-0">
+            <div id="airulerViewerHost" class="airuler-viewer-host">
+                <div id="airulerTransformHost" class="airuler-transform-host">
+                    <div class="airuler-image-wrap">
+                        <img id="airulerImage" src="@(_currentImageUrl ?? "")" />
+                        <canvas id="airulerCanvas" tabindex="0"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div id="airulerViewerSplitter" class="airuler-splitter" title="Drag to resize viewer height"></div>
+        </div>
+    </div>
+
+        <!-- =================== Bottom Panels =================== -->
+    <div class="row g-2 mt-2">
+
+        <!-- 1) Model / Images / Upload -->
+        <div class="col-12 col-xl-3">
+            <div class="card">
+                <div class="card-header"><b>Model / Images</b></div>
+                <div class="card-body">
+
+                    <div class="mb-2">
+                        <label class="form-label">Model</label>
+                        <select class="form-select" @onchange="OnModelChanged">
+                            <option value="">(select)</option>
+                            @foreach (var m in _models)
+                            {
+                                <option value="@m" selected="@(m == _selectedModel)">@m</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label">New Model Name</label>
+                        <input class="form-control" @bind="_newModelName" placeholder="e.g. M2379-00" />
+                    </div>
+
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button class="btn btn-sm btn-primary" @onclick="CreateOrSelectModelAsync">Add</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="DeleteSelectedModelAsync" disabled="@string.IsNullOrWhiteSpace(_selectedModel)">Delete</button>
+                    </div>
+
+                    <hr />
+
+                    <div class="mb-2">
+                        <label class="form-label">Image list</label>
+                        <div style="max-height:260px; overflow:auto; border:1px solid #eee; padding:6px;">
+                            @if (string.IsNullOrWhiteSpace(_selectedModel))
+                            {
+                                <div class="text-muted">Select a model first.</div>
+                            }
+                            else if (_images.Count == 0)
+                            {
+                                <div class="text-muted">No images.</div>
+                            }
+                            else
+                            {
+                                @foreach (var f in _images)
+                                {
+                                    <button class="btn btn-sm @(f == _selectedImage ? "btn-primary" : "btn-light")"
+                                            style="width:100%; text-align:left; margin-bottom:4px;"
+                                            @onclick="(() => SelectImageAsync(f))">
+                                        @f
+                                    </button>
+                                }
+                            }
+                        </div>
+                    </div>
+
+                    <div class="mb-2 small text-muted">
+                        Natural size: @_imgW x @_imgH
+                    </div>
+
+                    <hr />
+
+                    <div class="mb-2">
+                        <label class="form-label">Upload (Browser)</label>
+                        <InputFile OnChange="OnLocalFilesSelected" multiple accept="image/*" />
+                    </div>
+                    <button class="btn btn-sm btn-success"
+                            @onclick="UploadSelectedFilesAsync"
+                            disabled="@(!_pendingFiles.Any() || string.IsNullOrWhiteSpace(_selectedModel))">
+                        Upload to /airuler/images/@_selectedModel
+                    </button>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- 2) ROI -->
+        <div class="col-12 col-xl-3">
+            <div class="card">
+                <div class="card-header"><b>ROI</b></div>
+
+                <div class="card-body">
+                    <div class="mb-2">
+                        <label class="form-label">ROI ID</label>
+                        <input class="form-control" type="number" step="1" @bind="_roiEditor.IdText" placeholder="e.g. 1" />
+                    </div>
+
+                    <div class="row g-1 mb-2">
+                        <div class="col-3">
+                            <label class="form-label">X</label>
+                            <input class="form-control" type="number" step="1" @bind="_roiEditor.XText" />
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label">Y</label>
+                            <input class="form-control" type="number" step="1" @bind="_roiEditor.YText" />
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label">W</label>
+                            <input class="form-control" type="number" step="1" @bind="_roiEditor.WText" />
+                        </div>
+                        <div class="col-3">
+                            <label class="form-label">H</label>
+                            <input class="form-control" type="number" step="1" @bind="_roiEditor.HText" />
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label">Method</label>
+                        <select class="form-select" @bind="_roiEditor.Method">
+                            @foreach (var m in RoiMethodOptions)
+                            {
+                                <option value="@m">@m</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label">Parameter</label>
+                        <input class="form-control" type="number" step="0.01" min="0" max="1" @bind="_roiEditor.ParameterText" />
+                        <div class="form-text">default=0.5, 0~1 (작을수록 어두운쪽 bias)</div>
+                    </div>
+
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button class="btn btn-sm btn-primary" @onclick="AddOrUpdateRoiAsync">Add/Update</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="DeleteRoiAsync" disabled="@(_selectedRoiId is null && string.IsNullOrWhiteSpace(_roiEditor.IdText))">Delete</button>
+                    </div>
+
+                    <hr />
+
+                    <div style="height:320px; min-height:120px; resize:vertical; overflow:auto; border:1px solid #eee; padding:6px;">
+                        @foreach (var r in _rois.OrderBy(r => r.Id))
+                        {
+                            <button class="btn btn-sm @(r.Id == _selectedRoiId ? "btn-danger" : "btn-light")"
+                                    style="width:100%; text-align:left; margin-bottom:4px;"
+                                    @onclick="(() => SelectRoiAsync(r.Id))">
+                                roi_@r.Id  (method=@(string.IsNullOrWhiteSpace(r.Method) ? "-" : r.Method))
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3) Measure -->
+        <div class="col-12 col-xl-3">
+            <div class="card">
+                <div class="card-header"><b>Measure</b></div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <label class="form-label">Measure Index</label>
+                        <input class="form-control" @bind="_measureForm.IndexText" placeholder="e.g. CP1, CP2, No.3-1" />
+                    </div>
+
+                    <div class="row g-1 mb-2">
+                        <div class="col-4">
+                            <label class="form-label">Start ROI</label>
+                            <input class="form-control" @bind="_measureForm.StartText" placeholder="e.g. 1 or roi_1" />
+                        </div>
+
+                        <div class="col-4">
+                            <label class="form-label">End ROI</label>
+                            <input class="form-control" @bind="_measureForm.EndText" placeholder="e.g. 2 or roi_2" />
+                        </div>
+
+                        <div class="col-4">
+                            <label class="form-label">Dir</label>
+                            <select class="form-select" @bind="_measureForm.Direction">
+                                <option value="x">x</option>
+                                <option value="y">y</option>
+                                <option value="xy">xy</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row g-1 mb-2">
+                        <div class="col-4">
+                            <label class="form-label">GT</label>
+                            <input class="form-control" @bind="_measureForm.GtText" placeholder="e.g. 0.85" />
+                        </div>
+
+                        <div class="col-4">
+                            <label class="form-label">Margin</label>
+                            <input class="form-control" @bind="_measureForm.MarginText" placeholder="e.g. 0.1" />
+                        </div>
+
+                        <div class="col-4">
+                            <label class="form-label">Adjust</label>
+                            <input class="form-control" @bind="_measureForm.AdjustText" placeholder="+-*/숫자" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button class="btn btn-sm btn-primary" @onclick="AddOrUpdateMeasureAsync">Add/Update</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="DeleteMeasureAsync">Delete</button>
+                    </div>
+
+                    <hr />
+
+                    <div style="height:320px; min-height:120px; resize:vertical; overflow:auto; border:1px solid #eee; padding:6px;">
+                        @foreach (var mid in GetOrderedMeasureIds())
+                        {
+                            var m = _measures[mid];
+                            <button class="btn btn-sm @(mid == _selectedMeasureId ? "btn-danger" : "btn-light")"
+                                    style="width:100%; text-align:left; margin-bottom:4px;"
+                                    @onclick="(() => SelectMeasureAsync(mid))">
+                                measure_@mid : @m.Start -> @m.End (@m.Direction)
+                            </button>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4) JSON -->
+        <div class="col-12 col-xl-3">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <span><b>JSON</b></span>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button class="btn btn-sm btn-primary" @onclick="GenerateJsonToEditor">Generate JSON</button>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="ApplyJsonEditorAsync">Apply to Viewer</button>
+                        <button class="btn btn-sm btn-warning" @onclick="LoadJsonAsync" disabled="@string.IsNullOrWhiteSpace(_selectedModel)">Load</button>
+                        <button class="btn btn-sm btn-danger" @onclick="SaveJsonAsync" disabled="@string.IsNullOrWhiteSpace(_selectedModel)">Save</button>                        
+
+                        @if (!string.IsNullOrWhiteSpace(_selectedModel))
+                        {
+                            <a class="btn btn-sm btn-success"
+                               href="@($"/airuler/models/{_selectedModel}.json")"
+                               download>
+                                Download
+                            </a>
+                        }
+                    </div>
+                </div>
+                <div class="card-body">
+                    <textarea class="airuler-json form-control" style="height:520px; resize:vertical;" @bind="_jsonEditorText"></textarea>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+@code
+{
+    // ---------- Paths ----------
+    private string AirulerRoot => Path.Combine(Env.WebRootPath, "airuler");
+    private string ImagesRoot => Path.Combine(AirulerRoot, "images");
+    private string ModelsRoot => Path.Combine(AirulerRoot, "models");
+
+    // ---------- State ----------
+    private List<string> _models = new();
+    private string? _selectedModel;
+    private string _newModelName = "";
+
+    private List<string> _images = new();
+    private string? _selectedImage;
+    private string? _currentImageUrl;
+
+    private int _imgW = 0;
+    private int _imgH = 0;
+
+    // 이미지 로드 전 JSON Load를 누르면 여기 저장해두었다가 OnImageLoaded에서 적용
+    private string? _pendingJsonToApply;
+
+    // View state (Viewer 내부만 적용)
+    private double _zoomFactor = 1.0;
+    private int _panX = 0;
+    private int _panY = 0;
+
+    // ROI / Measure
+    private readonly List<Roi> _rois = new();
+    private readonly Dictionary<string, Measure> _measures = new(StringComparer.Ordinal);
+private int? _selectedRoiId = null;
+    private string? _selectedMeasureId = null;
+// JSON + Log
+    private string _jsonEditorText = "";
+    private readonly List<string> _logs = new();
+    private string _logText => string.Join("\n", _logs.TakeLast(250));
+
+    // Upload
+    private readonly List<IBrowserFile> _pendingFiles = new();
+
+    // ROI Methods
+    private static readonly string[] RoiMethodOptions = new[]
+    {
+        "line_x_by_prob",
+        "line_y_by_prob",
+        "curve_x",
+        "curve_y",
+        "corner",
+        "cross",
+        "round",
+        "line_x_by_level",
+        "line_y_by_level"
+    };
+
+    private const string DefaultRoiMethod = "line_x_by_prob";
+
+    // ROI editor (inline)
+    private RoiEditorModel _roiEditor = new();
+
+    // JS interop
+    private DotNetObjectReference<Modeler>? _dotNetRef;
+    private bool _jsInited = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Directory.CreateDirectory(ImagesRoot);
+        Directory.CreateDirectory(ModelsRoot);
+
+        ResetRoiEditor();
+
+        await RefreshModelsAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_jsInited)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+
+            await JS.InvokeVoidAsync(
+                "airulerCanvas.init",
+                _dotNetRef,
+                "airulerCanvas",
+                "airulerImage",
+                null,
+                "airulerViewerHost",
+                "airulerTransformHost",
+                "airulerViewerSplitter"
+            );
+
+            _jsInited = true;
+
+            await ApplyTransformAsync();
+            await PushCanvasStateAsync();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("airulerCanvas.dispose"); } catch { /* ignore */ }
+        _dotNetRef?.Dispose();
+    }
+
+    // =================== Viewer Transform ===================
+    private bool _fitOnNextImageLoad = false;
+
+    private sealed class FitTransform
+    {
+        public double Zoom { get; set; }
+        public int PanX { get; set; }
+        public int PanY { get; set; }
+    }
+
+    private async Task FitViewToViewerAsync()
+    {
+        if (!_jsInited) return;
+
+        FitTransform? fit;
+        try
+        {
+            fit = await JS.InvokeAsync<FitTransform>("airulerCanvas.getFitTransform");
+        }
+        catch
+        {
+            return;
+        }
+
+        var z = fit?.Zoom ?? 1.0;
+        if (double.IsNaN(z) || double.IsInfinity(z) || z <= 0) z = 1.0;
+
+        _zoomFactor = z;
+        _panX = fit?.PanX ?? 0;
+        _panY = fit?.PanY ?? 0;
+
+        await ApplyTransformAsync();
+    }
+
+    private async Task ApplyTransformAsync()
+    {
+        if (!_jsInited) return;
+        await JS.InvokeVoidAsync("airulerCanvas.setTransform", _panX, _panY, _zoomFactor);
+    }
+
+    private async Task ResetViewAsync()
+    {
+        _zoomFactor = 1.0;
+        _panX = 0;
+        _panY = 0;
+        Log("View reset");
+        await ApplyTransformAsync();
+    }
+
+    // =================== Model / Images ===================
+    private async Task RefreshModelsAsync()
+    {
+        Directory.CreateDirectory(ImagesRoot);
+        _models = Directory.GetDirectories(ImagesRoot)
+            .Select(Path.GetFileName)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x!)
+            .OrderBy(x => x)
+            .ToList();
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task CreateOrSelectModelAsync()
+    {
+        var name = (string.IsNullOrWhiteSpace(_newModelName) ? _selectedModel : _newModelName)?.Trim();
+        if (string.IsNullOrWhiteSpace(name)) return;
+
+        name = SanitizeModelName(name);
+        Directory.CreateDirectory(Path.Combine(ImagesRoot, name));
+
+        _selectedModel = name;
+        _newModelName = "";
+        Log($"Model selected: {_selectedModel}");
+
+        await RefreshModelsAsync();
+        await RefreshImagesAsync();
+    }
+
+        private async Task DeleteSelectedModelAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_selectedModel)) return;
+
+        var model = _selectedModel.Trim();
+
+        var ok = await JS.InvokeAsync<bool>(
+            "confirm",
+            $"선택한 모델 '{model}' 을(를) 삭제할까요?\n\n삭제 대상:\n- /airuler/images/{model}/\n- /airuler/models/{model}.json\n\n이 작업은 되돌릴 수 없습니다."
+        );
+
+        if (!ok) return;
+
+        try
+        {
+            var imgDir = Path.Combine(ImagesRoot, model);
+            if (Directory.Exists(imgDir))
+                Directory.Delete(imgDir, recursive: true);
+
+            var modelJson = Path.Combine(ModelsRoot, $"{model}.json");
+            if (File.Exists(modelJson))
+                File.Delete(modelJson);
+
+            Log($"Model deleted: {model}");
+        }
+        catch (Exception ex)
+        {
+            Log($"ERROR: Failed to delete model '{model}': {ex.Message}");
+        }
+
+        // Clear selection/state
+        _selectedModel = null;
+        _selectedImage = null;
+        _currentImageUrl = null;
+        _images.Clear();
+        _imgW = 0;
+        _imgH = 0;
+
+        ClearAllData();
+
+        await RefreshModelsAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+private async Task OnModelChanged(ChangeEventArgs e)
+    {
+        _selectedModel = e.Value?.ToString();
+        _selectedImage = null;
+        _currentImageUrl = null;
+
+        ClearAllData();
+        Log($"Model changed: {_selectedModel}");
+
+        await RefreshImagesAsync();
+    }
+
+    private async Task RefreshImagesAsync()
+    {
+        _images.Clear();
+        if (string.IsNullOrWhiteSpace(_selectedModel))
+        {
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        var dir = Path.Combine(ImagesRoot, _selectedModel);
+        Directory.CreateDirectory(dir);
+
+        _images = Directory.GetFiles(dir)
+            .Select(Path.GetFileName)
+            .Where(f => !string.IsNullOrWhiteSpace(f) && IsImageFile(f))
+            .Select(f => f!)
+            .OrderBy(f => f)
+            .ToList();
+
+        bool selectedNew = false;
+
+        if (_images.Count > 0 && string.IsNullOrWhiteSpace(_selectedImage))
+        {
+            selectedNew = true;
+            await SelectImageAsync(_images[0]); // 여기서 _fitOnNextImageLoad=true → OnImageLoaded에서 fit
+        }
+
+        await InvokeAsync(StateHasChanged);
+
+        // ✅ Reload images처럼 "선택은 그대로"면 지금 바로 fit
+        if (!selectedNew && !string.IsNullOrWhiteSpace(_selectedImage) && _currentImageUrl is not null)
+        {
+            await FitViewToViewerAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+        private async Task SelectImageAsync(string file)
+    {
+        if (string.IsNullOrWhiteSpace(_selectedModel)) return;
+
+        var newUrl = $"/airuler/images/{Uri.EscapeDataString(_selectedModel)}/{Uri.EscapeDataString(file)}";
+        var isSameImage = string.Equals(_currentImageUrl, newUrl, StringComparison.Ordinal);
+
+        _selectedImage = file;
+        _currentImageUrl = newUrl;
+
+        // 앞으로는 "항상 viewer 창 크기에 맞게" 보이도록: 이미지 선택 시 기본 View를 Fit로 초기화
+        _fitOnNextImageLoad = true;
+
+        // 이미지 바꾸면 view 초기화(줌/팬은 Viewer만 적용)
+        _zoomFactor = 1.0;
+        _panX = 0;
+        _panY = 0;
+        await ApplyTransformAsync();
+
+        // ROI/Measure는 python처럼 “이미지 바뀌면 새 작업” 느낌이면 초기화가 자연스러움
+        ClearAllData(keepModel: true);
+
+        Log($"Image selected: {_selectedImage}");
+        await InvokeAsync(StateHasChanged);
+
+        // 같은 이미지를 다시 클릭하면 <img> load 이벤트가 발생하지 않을 수 있으므로, 즉시 Fit을 한 번 더 적용
+        if (isSameImage && _imgW > 0 && _imgH > 0)
+        {
+            _fitOnNextImageLoad = false;
+            await FitViewToViewerAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+        // 실제 자연해상도는 JS의 OnImageLoaded에서 들어옴
+    }
+
+    // =================== Upload (Browser) ===================
+    private void OnLocalFilesSelected(InputFileChangeEventArgs e)
+    {
+        _pendingFiles.Clear();
+        _pendingFiles.AddRange(e.GetMultipleFiles());
+        Log($"Selected {_pendingFiles.Count} file(s) for upload.");
+    }
+
+private async Task UploadSelectedFilesAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_selectedModel)) return;
+        if (_pendingFiles.Count == 0) return;
+
+        var dir = Path.Combine(ImagesRoot, _selectedModel);
+        Directory.CreateDirectory(dir);
+
+        foreach (var f in _pendingFiles)
+        {
+            var safeName = Path.GetFileName(f.Name);
+            var path = Path.Combine(dir, safeName);
+
+            await using var fs = File.Create(path);
+            await f.OpenReadStream(maxAllowedSize: 1024L * 1024L * 1024L).CopyToAsync(fs);
+
+            Log($"Uploaded: {safeName}");
+        }
+
+        _pendingFiles.Clear();
+        await RefreshImagesAsync();
+    }
+
+    // =================== JS -> C# callbacks ===================
+    [JSInvokable]
+    public async Task OnImageLoaded(int w, int h)
+    {
+        _imgW = w;
+        _imgH = h;
+        Log($"Image loaded: {_imgW}x{_imgH}");
+
+        // ✅ 이미지 로드 전에 JSON이 로드되어 대기중이면 지금 적용
+        if (!string.IsNullOrWhiteSpace(_pendingJsonToApply))
+        {
+            var txt = _pendingJsonToApply;
+            _pendingJsonToApply = null;
+
+            if (TryRestoreFromJsonText(txt!, out var err))
+                Log("Pending JSON applied after image load.");
+            else
+                Log($"ERROR: pending JSON apply failed: {err}");
+        }
+
+        // ✅ 새 이미지가 로드된 경우에만 자동 fit
+        if (_fitOnNextImageLoad)
+        {
+            _fitOnNextImageLoad = false;
+            await FitViewToViewerAsync();
+        }
+
+        await PushCanvasStateAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public async Task OnNewRoiRect(double x, double y, double w, double h)
+    {
+        if (_imgW <= 0 || _imgH <= 0) return;
+
+        var rect = ClampRectToImage(new Rect(x, y, w, h));
+        var rid = SuggestNextRoiId();
+
+        EnsureRoiEditorDefaults();
+
+        // Create ROI immediately (no modal). Values are px in editor; JSON is normalized at Generate JSON.
+        var method = string.IsNullOrWhiteSpace(_roiEditor.Method) ? DefaultRoiMethod : _roiEditor.Method.Trim();
+        if (Array.IndexOf(RoiMethodOptions, method) < 0)
+            method = DefaultRoiMethod;
+
+        var param = 0.5;
+        if (!string.IsNullOrWhiteSpace(_roiEditor.ParameterText) && double.TryParse(_roiEditor.ParameterText.Trim(), out var p))
+            param = p;
+
+        // clamp 0~1
+        if (param < 0) param = 0;
+        if (param > 1) param = 1;
+
+        var roi = new Roi
+        {
+            Id = rid,
+            X = rect.X,
+            Y = rect.Y,
+            W = rect.W,
+            H = rect.H,
+            Method = method,
+            Parameter = param
+        };
+
+        ClampRoiToImageInPlace(roi);
+
+        _rois.Add(roi);
+        _selectedRoiId = rid;
+        _selectedMeasureId = null;
+
+        LoadRoiIntoEditor(roi);
+
+        Log($"roi_{rid} created");
+        await PushCanvasStateAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public async Task OnCanvasClicked(double x, double y)
+    {
+        // ROI hit
+        var hitRoi = _rois.LastOrDefault(r => r.Contains(x, y));
+        if (hitRoi is not null)
+        {
+            _selectedRoiId = hitRoi.Id;
+            _selectedMeasureId = null;
+
+            LoadRoiIntoEditor(hitRoi);
+
+            Log($"Selected roi_{hitRoi.Id}");
+            await PushCanvasStateAsync();
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        // Measure hit
+        var hitMeasureId = FindMeasureNearPoint(x, y, thresholdPx: 8.0);
+        if (hitMeasureId is not null)
+        {
+            await SelectMeasureAsync(hitMeasureId);
+            return;
+        }
+
+        // background
+        await ClearSelectionAsync();
+    }
+
+    // ✅ 핵심: JS가 이 결과(true/false)로 preventDefault 할지 결정
+    [JSInvokable]
+    public async Task<bool> OnKeyDown(string key, bool ctrl, bool shift, bool alt)
+    {
+        // View: Ctrl + +/- zoom (Viewer만)
+        if (ctrl && (key == "+" || key == "="))
+        {
+            _zoomFactor = Math.Min(10.0, _zoomFactor * 1.1);
+            await ApplyTransformAsync();
+            Log($"Zoom in -> {_zoomFactor:0.00}");
+            await InvokeAsync(StateHasChanged);
+            return true;
+        }
+        if (ctrl && key == "-")
+        {
+            _zoomFactor = Math.Max(0.1, _zoomFactor / 1.1);
+            await ApplyTransformAsync();
+            Log($"Zoom out -> {_zoomFactor:0.00}");
+            await InvokeAsync(StateHasChanged);
+            return true;
+        }
+
+        // View: Ctrl + Arrow pan (Viewer만)
+        if (ctrl && key.StartsWith("Arrow", StringComparison.Ordinal))
+        {
+            const int step = 20;
+            if (key == "ArrowLeft") _panX += step;
+            if (key == "ArrowRight") _panX -= step;
+            if (key == "ArrowUp") _panY += step;
+            if (key == "ArrowDown") _panY -= step;
+
+            await ApplyTransformAsync();
+            Log($"Pan -> ({_panX},{_panY})");
+            await InvokeAsync(StateHasChanged);
+            return true;
+        }
+
+        // ROI shortcuts (선택된 ROI가 있을 때)
+        if (_selectedRoiId is not null)
+        {
+            if (key == "Delete")
+            {
+                await DeleteRoiAsync();
+                return true;
+            }
+
+            if (ctrl && key.Equals("c", StringComparison.OrdinalIgnoreCase))
+            {
+                CopySelectedRoi();
+                return true;
+            }
+            if (ctrl && key.Equals("x", StringComparison.OrdinalIgnoreCase))
+            {
+                await CutSelectedRoiAsync();
+                return true;
+            }
+            if (ctrl && key.Equals("v", StringComparison.OrdinalIgnoreCase))
+            {
+                await PasteRoiOffsetAsync();
+                return true;
+            }
+            // ROI move/resize: Arrow / Shift+Arrow
+            if (key.StartsWith("Arrow", StringComparison.Ordinal))
+            {
+                MoveOrResizeSelectedRoiByKey(key, resize: shift);
+                await PushCanvasStateAsync(); // 캔버스만 즉시 업데이트
+                // 좌표 표시를 업데이트하려면 아래 줄도 켜세요(키 반복 시 렌더 부하 증가 가능)
+                await InvokeAsync(StateHasChanged);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // =================== Selection / ROI ops ===================
+    private async Task ClearSelectionAsync()
+    {
+        _selectedRoiId = null;
+        _selectedMeasureId = null;
+        Log("Selection cleared");
+        await PushCanvasStateAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SelectRoiAsync(int id)
+    {
+        _selectedRoiId = id;
+        _selectedMeasureId = null;
+
+        var roi = _rois.FirstOrDefault(r => r.Id == id);
+        if (roi is not null)
+            LoadRoiIntoEditor(roi);
+
+        Log($"Selected roi_{id}");
+        await PushCanvasStateAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task SelectMeasureAsync(string id)
+    {
+        _selectedMeasureId = id;
+        _selectedRoiId = null;
+
+        // ✅ 선택된 measure 값을 Measure 입력폼에 채워넣기(복원)
+        if (_measures.TryGetValue(id, out var m))
+        {
+            _measureForm.IndexText = id;
+            _measureForm.StartText = m.Start;   // "roi_1" 형태
+            _measureForm.EndText = m.End;       // "roi_2" 형태
+            _measureForm.Direction = string.IsNullOrWhiteSpace(m.Direction) ? "x" : m.Direction;
+            _measureForm.GtText = m.Gt.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+            _measureForm.MarginText = m.Margin.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+            _measureForm.AdjustText = m.Adjust ?? "";
+        }
+
+        Log($"Selected measure_{id}");
+        await PushCanvasStateAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private Roi? _clipboardRoi = null;
+
+    private void CopySelectedRoi()
+    {
+        if (_selectedRoiId is null) return;
+        var roi = _rois.FirstOrDefault(r => r.Id == _selectedRoiId.Value);
+        if (roi is null) return;
+        _clipboardRoi = roi.Clone();
+        Log($"Copied roi_{roi.Id}");
+    }
+
+    private async Task CutSelectedRoiAsync()
+    {
+        CopySelectedRoi();
+        await DeleteRoiAsync();
+        Log("Cut ROI");
+    }
+
+    private async Task PasteRoiOffsetAsync()
+    {
+        if (_clipboardRoi is null) return;
+
+        var newId = SuggestNextRoiId();
+        var pasted = _clipboardRoi.Clone();
+        pasted.Id = newId;
+        pasted.X += 10;
+        pasted.Y += 10;
+        ClampRoiToImageInPlace(pasted);
+
+        _rois.Add(pasted);
+        _selectedRoiId = newId;
+        _selectedMeasureId = null;
+
+        LoadRoiIntoEditor(pasted);
+
+        Log($"Pasted roi_{newId}");
+        await PushCanvasStateAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void MoveOrResizeSelectedRoiByKey(string key, bool resize)
+    {
+        if (_selectedRoiId is null) return;
+        var roi = _rois.FirstOrDefault(r => r.Id == _selectedRoiId.Value);
+        if (roi is null) return;
+
+        if (resize)
+        {
+            if (key == "ArrowRight") roi.W += 1;
+            if (key == "ArrowLeft") roi.W = Math.Max(1, roi.W - 1);
+            if (key == "ArrowDown") roi.H += 1;
+            if (key == "ArrowUp") roi.H = Math.Max(1, roi.H - 1);
+        }
+        else
+        {
+            if (key == "ArrowLeft") roi.X -= 1;
+            if (key == "ArrowRight") roi.X += 1;
+            if (key == "ArrowUp") roi.Y -= 1;
+            if (key == "ArrowDown") roi.Y += 1;
+        }
+
+        ClampRoiToImageInPlace(roi);
+        LoadRoiIntoEditor(roi);
+    }
+
+    // =================== ROI (Inline Editor) ===================
+    private void ResetRoiEditor()
+    {
+        _roiEditor = new RoiEditorModel
+        {
+            IdText = "",
+            XText = "",
+            YText = "",
+            WText = "",
+            HText = "",
+            Method = DefaultRoiMethod,
+            ParameterText = "0.5"
+        };
+    }
+
+    private void EnsureRoiEditorDefaults()
+    {
+        if (string.IsNullOrWhiteSpace(_roiEditor.Method))
+            _roiEditor.Method = DefaultRoiMethod;
+
+        if (string.IsNullOrWhiteSpace(_roiEditor.ParameterText))
+            _roiEditor.ParameterText = "0.5";
+    }
+
+    private void LoadRoiIntoEditor(Roi roi)
+    {
+        _roiEditor.IdText = roi.Id.ToString();
+        _roiEditor.XText = ((int)Math.Round(roi.X)).ToString();
+        _roiEditor.YText = ((int)Math.Round(roi.Y)).ToString();
+        _roiEditor.WText = ((int)Math.Round(roi.W)).ToString();
+        _roiEditor.HText = ((int)Math.Round(roi.H)).ToString();
+        _roiEditor.Method = string.IsNullOrWhiteSpace(roi.Method) ? DefaultRoiMethod : roi.Method!;
+        _roiEditor.ParameterText = (roi.Parameter ?? 0.5).ToString("0.###");
+    }
+
+    private async Task AddOrUpdateRoiAsync()
+    {
+        if (_imgW <= 0 || _imgH <= 0)
+        {
+            Log("ERROR: image not loaded.");
+            return;
+        }
+
+        EnsureRoiEditorDefaults();
+
+        // ID
+        if (!int.TryParse((_roiEditor.IdText ?? "").Trim(), out var newId))
+        {
+            Log("ERROR: ROI ID must be an integer.");
+            return;
+        }
+
+        // x,y,w,h (px)
+        if (!double.TryParse((_roiEditor.XText ?? "").Trim(), out var x)) { Log("ERROR: X must be a number."); return; }
+        if (!double.TryParse((_roiEditor.YText ?? "").Trim(), out var y)) { Log("ERROR: Y must be a number."); return; }
+        if (!double.TryParse((_roiEditor.WText ?? "").Trim(), out var w)) { Log("ERROR: W must be a number."); return; }
+        if (!double.TryParse((_roiEditor.HText ?? "").Trim(), out var h)) { Log("ERROR: H must be a number."); return; }
+
+        if (w <= 0 || h <= 0)
+        {
+            Log("ERROR: W/H must be > 0.");
+            return;
+        }
+
+        // method
+        var method = (_roiEditor.Method ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(method))
+            method = DefaultRoiMethod;
+
+        if (Array.IndexOf(RoiMethodOptions, method) < 0)
+        {
+            Log($"ERROR: Invalid method: {method}");
+            return;
+        }
+
+        // parameter (0~1)
+        double param;
+        var pText = (_roiEditor.ParameterText ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(pText))
+        {
+            param = 0.5;
+        }
+        else if (!double.TryParse(pText, out param))
+        {
+            Log("ERROR: Parameter must be a number.");
+            return;
+        }
+        else if (param < 0 || param > 1)
+        {
+            Log("ERROR: Parameter must be between 0 and 1.");
+            return;
+        }
+
+        Roi? target = null;
+
+        // if selected ROI exists -> update that ROI (rename allowed)
+        if (_selectedRoiId is not null)
+        {
+            var oldId = _selectedRoiId.Value;
+            target = _rois.FirstOrDefault(r => r.Id == oldId);
+
+            if (target is not null && newId != oldId)
+            {
+                if (_rois.Any(r => r.Id == newId))
+                {
+                    Log($"ERROR: roi_{newId} already exists.");
+                    return;
+                }
+
+                // update measures referencing old roi id
+                foreach (var m in _measures.Values)
+                {
+                    if (ParseRoiNameToId(m.Start) == oldId) m.Start = $"roi_{newId}";
+                    if (ParseRoiNameToId(m.End) == oldId) m.End = $"roi_{newId}";
+                }
+
+                target.Id = newId;
+                _selectedRoiId = newId;
+            }
+        }
+
+        // no selection or selected not found -> update/create by id
+        if (target is null)
+        {
+            target = _rois.FirstOrDefault(r => r.Id == newId);
+            if (target is null)
+            {
+                target = new Roi { Id = newId };
+                _rois.Add(target);
+            }
+            _selectedRoiId = newId;
+        }
+
+        target.X = x;
+        target.Y = y;
+        target.W = w;
+        target.H = h;
+        target.Method = method;
+        target.Parameter = param;
+
+        ClampRoiToImageInPlace(target);
+
+        _selectedMeasureId = null;
+
+        LoadRoiIntoEditor(target);
+
+        Log($"roi_{target.Id} added/updated");
+
+        await PushCanvasStateAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task DeleteRoiAsync()
+    {
+        int? rid = null;
+
+        if (_selectedRoiId is not null)
+        {
+            rid = _selectedRoiId.Value;
+        }
+        else if (int.TryParse((_roiEditor.IdText ?? "").Trim(), out var parsed))
+        {
+            rid = parsed;
+        }
+
+        if (rid is null)
+        {
+            Log("ERROR: Select ROI or enter ROI ID first.");
+            return;
+        }
+
+        await DeleteRoiByIdAsync(rid.Value);
+    }
+
+    private async Task DeleteRoiByIdAsync(int rid)
+    {
+        var roi = _rois.FirstOrDefault(r => r.Id == rid);
+        if (roi is null)
+        {
+            Log($"WARN: roi_{rid} not found.");
+            return;
+        }
+
+        _rois.Remove(roi);
+        if (_selectedRoiId == rid) _selectedRoiId = null;
+
+        // ROI 참조 measure 제거
+        var toDelete = _measures
+            .Where(kv => ParseRoiNameToId(kv.Value.Start) == rid || ParseRoiNameToId(kv.Value.End) == rid)
+            .Select(kv => kv.Key)
+            .ToList();
+        foreach (var mid in toDelete) _measures.Remove(mid);
+
+        Log($"roi_{rid} deleted");
+
+        await PushCanvasStateAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // =================== Measure ===================
+    private async Task AddOrUpdateMeasureAsync()
+    {
+        var idx = NormalizeMeasureId(_measureForm.IndexText);
+        if (string.IsNullOrWhiteSpace(idx))
+        {
+            Log("ERROR: Measure index is required.");
+            return;
+        }
+        _measureForm.IndexText = idx; // normalize (strip "measure_" etc)
+
+        var sId = ParseRoiNameToId(_measureForm.StartText ?? "");
+        var eId = ParseRoiNameToId(_measureForm.EndText ?? "");
+        if (sId is null || eId is null)
+        {
+            Log("ERROR: Start/End ROI must be like '1' or 'roi_1'.");
+            return;
+        }
+
+        if (_rois.All(r => r.Id != sId.Value) || _rois.All(r => r.Id != eId.Value))
+        {
+            Log("ERROR: Start/End ROI id not found.");
+            return;
+        }
+
+        if (!double.TryParse(_measureForm.GtText, out var gt)) gt = 0;
+        if (!double.TryParse(_measureForm.MarginText, out var margin)) margin = 0;
+
+        var adjust = (_measureForm.AdjustText ?? "").Trim();
+
+        _measures[idx] = new Measure
+        {
+            Start = $"roi_{sId.Value}",
+            End = $"roi_{eId.Value}",
+            Direction = string.IsNullOrWhiteSpace(_measureForm.Direction) ? "x" : _measureForm.Direction,
+            Gt = gt,
+            Margin = margin,
+            Adjust = adjust
+        };
+
+        _selectedMeasureId = idx;
+        _selectedRoiId = null;
+
+        Log($"measure_{idx} added/updated");
+        await PushCanvasStateAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task DeleteMeasureAsync()
+    {
+        var idx = NormalizeMeasureId(_measureForm.IndexText);
+
+        // If the input box is empty, delete the currently selected measure (if any)
+        if (string.IsNullOrWhiteSpace(idx))
+        {
+            if (!string.IsNullOrWhiteSpace(_selectedMeasureId))
+            {
+                idx = _selectedMeasureId!;
+                _measureForm.IndexText = idx;
+            }
+            else
+            {
+                Log("ERROR: Measure index is required.");
+                return;
+            }
+        }
+
+        if (_measures.Remove(idx))
+        {
+            if (_selectedMeasureId == idx) _selectedMeasureId = null;
+            Log($"measure_{idx} deleted");
+            await PushCanvasStateAsync();
+            await InvokeAsync(StateHasChanged);
+        }
+        else
+        {
+            Log($"WARN: measure_{idx} not found.");
+        }
+    }
+
+private string? FindMeasureNearPoint(double x, double y, double thresholdPx)
+    {
+        if (_measures.Count == 0) return null;
+
+        var roiMap = _rois.ToDictionary(r => r.Id, r => r);
+        double best = double.MaxValue;
+        string? bestId = null;
+
+        foreach (var kv in _measures)
+        {
+            var mid = kv.Key;
+            var m = kv.Value;
+            var sid = ParseRoiNameToId(m.Start);
+            var eid = ParseRoiNameToId(m.End);
+            if (sid is null || eid is null) continue;
+            if (!roiMap.TryGetValue(sid.Value, out var sr) || !roiMap.TryGetValue(eid.Value, out var er)) continue;
+
+            var ax = sr.X + sr.W / 2;
+            var ay = sr.Y + sr.H / 2;
+            var bx = er.X + er.W / 2;
+            var by = er.Y + er.H / 2;
+
+            var d = DistancePointToSegment(x, y, ax, ay, bx, by);
+            if (d < thresholdPx && d < best)
+            {
+                best = d;
+                bestId = mid;
+            }
+        }
+
+        return bestId;
+    }
+
+    private static double DistancePointToSegment(double px, double py, double ax, double ay, double bx, double by)
+    {
+        var vx = bx - ax;
+        var vy = by - ay;
+        var wx = px - ax;
+        var wy = py - ay;
+
+        var c1 = vx * wx + vy * wy;
+        if (c1 <= 0) return Math.Sqrt((px - ax) * (px - ax) + (py - ay) * (py - ay));
+
+        var c2 = vx * vx + vy * vy;
+        if (c2 <= c1) return Math.Sqrt((px - bx) * (px - bx) + (py - by) * (py - by));
+
+        var t = c1 / c2;
+        var projx = ax + t * vx;
+        var projy = ay + t * vy;
+        return Math.Sqrt((px - projx) * (px - projx) + (py - projy) * (py - projy));
+    }
+
+    // =================== JSON ===================
+    private void GenerateJsonToEditor()
+    {
+        if (_imgW <= 0 || _imgH <= 0)
+        {
+            Log("ERROR: image not loaded.");
+            return;
+        }
+
+        var json = BuildFullJson();
+        _jsonEditorText = JsonSerializer.Serialize(json, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        });
+
+        Log("JSON generated");
+    }
+
+    private async Task SaveJsonAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_selectedModel))
+        {
+            Log("ERROR: select model first.");
+            return;
+        }
+
+        Directory.CreateDirectory(ModelsRoot);
+
+        var model = SanitizeModelName(_selectedModel);
+        var fileName = $"{model}.json";
+
+        // 실제 서버 저장 경로(디스크)
+        var diskPath = Path.Combine(ModelsRoot, fileName);
+
+        // 브라우저에서 접근 가능한 URL 경로
+        var urlPath = $"/airuler/models/{fileName}";
+
+        // ✅ JS로 저장 위치 안내 + 확인(OK) 시에만 저장
+        var ok = await JS.InvokeAsync<bool>(
+            "confirm",
+            $"Save JSON?\n\n" +
+            $"URL: {urlPath}\n" +
+            $"Server folder: wwwroot/airuler/models/\n" +
+            $"File: {fileName}\n\n" +
+            $"Press OK to save."
+        );
+
+        if (!ok)
+        {
+            Log("Save canceled.");
+            return;
+        }
+
+        await File.WriteAllTextAsync(diskPath, _jsonEditorText ?? "", Encoding.UTF8);
+
+        Log($"Saved: {urlPath}");
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LoadJsonAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_selectedModel))
+            return;
+
+        var model = SanitizeModelName(_selectedModel);
+        var path = Path.Combine(ModelsRoot, $"{model}.json");
+
+        if (!File.Exists(path))
+        {
+            Log("WARN: JSON file not found.");
+            return;
+        }
+
+        var txt = await File.ReadAllTextAsync(path, Encoding.UTF8);
+        _jsonEditorText = txt;
+
+        // ✅ 이미지가 아직 로드되지 않았으면, 나중에 적용
+        if (_imgW <= 0 || _imgH <= 0)
+        {
+            _pendingJsonToApply = txt;
+            Log("JSON loaded into editor. Image not loaded yet -> will apply after image loads.");
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        // ✅ 즉시 파싱/복원 후 캔버스 반영
+        if (TryRestoreFromJsonText(txt, out var err))
+            Log("JSON loaded and applied to viewer.");
+        else
+            Log($"ERROR: JSON parse/apply failed: {err}");
+
+        await PushCanvasStateAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private Dictionary<string, object?> BuildFullJson()
+    {
+        var data = new Dictionary<string, object?>();
+
+        var validRois = _rois.OrderBy(r => r.Id).ToList();
+        data["n_roi"] = validRois.Count;
+
+        foreach (var roi in validRois)
+        {
+            data[$"roi_{roi.Id}"] = new Dictionary<string, object?>
+            {
+                ["x"] = roi.X / _imgW,
+                ["y"] = roi.Y / _imgH,
+                ["w"] = roi.W / _imgW,
+                ["h"] = roi.H / _imgH,
+                ["method"] = roi.Method ?? "",
+                ["parameter"] = roi.Parameter
+            };
+        }
+
+        data["n_measure"] = _measures.Count;
+        foreach (var mid in GetOrderedMeasureIds())
+        {
+            var m = _measures[mid];
+            data[$"measure_{mid}"] = new Dictionary<string, object?>
+            {
+                ["start"] = m.Start,
+                ["end"] = m.End,
+                ["direction"] = m.Direction,
+                ["gt"] = m.Gt,
+                ["margin"] = m.Margin,
+                ["adjust"] = m.Adjust
+            };
+        }
+
+        return data;
+    }
+
+    // =================== Canvas Push ===================
+    private async Task PushCanvasStateAsync()
+    {
+        if (!_jsInited) return;
+
+        var selectedMeasureRoiIds = new List<int>();
+        if (_selectedMeasureId is not null && _measures.TryGetValue(_selectedMeasureId, out var sm))
+        {
+            var s = ParseRoiNameToId(sm.Start);
+            var e = ParseRoiNameToId(sm.End);
+            if (s is not null) selectedMeasureRoiIds.Add(s.Value);
+            if (e is not null) selectedMeasureRoiIds.Add(e.Value);
+        }
+
+        var payload = new
+        {
+            rois = _rois.Select(r => new { id = r.Id, x = r.X, y = r.Y, w = r.W, h = r.H }).ToList(),
+            measures = _measures.Select(kv => new
+            {
+                id = kv.Key,
+                startId = ParseRoiNameToId(kv.Value.Start),
+                endId = ParseRoiNameToId(kv.Value.End)
+            }).ToList(),
+            selectedRoiId = _selectedRoiId,
+            selectedMeasureId = _selectedMeasureId,
+            selectedMeasureRoiIds
+        };
+
+        var json = JsonSerializer.Serialize(payload, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        await JS.InvokeVoidAsync("airulerCanvas.setState", json);
+    }
+
+    // =================== Helpers ===================
+    private void Log(string msg) => _logs.Add($"[{DateTime.Now:HH:mm:ss}] {msg}");
+
+    private void ClearAllData(bool keepModel = false)
+    {
+        _rois.Clear();
+        _measures.Clear();
+        _selectedRoiId = null;
+        _selectedMeasureId = null;
+        _jsonEditorText = "";
+
+        ResetRoiEditor();
+    }
+
+    private static bool IsImageFile(string name)
+    {
+        var ext = Path.GetExtension(name).ToLowerInvariant();
+        return ext is ".jpg" or ".jpeg" or ".png" or ".bmp" or ".webp";
+    }
+
+    private static int? ParseRoiNameToId(string s)
+    {
+        s = (s ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(s)) return null;
+        if (s.StartsWith("roi_", StringComparison.OrdinalIgnoreCase)) s = s.Substring(4);
+        return int.TryParse(s, out var id) ? id : null;
+    }
+
+    private static string SanitizeModelName(string s)
+    {
+        var sb = new StringBuilder();
+        foreach (var ch in s)
+            if (char.IsLetterOrDigit(ch) || ch == '_' || ch == '-') sb.Append(ch);
+        return sb.Length == 0 ? "Model" : sb.ToString();
+    }
+
+    private bool TryRestoreFromJsonText(string jsonText, out string error)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(jsonText);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                error = "Root JSON is not an object.";
+                return false;
+            }
+
+            RestoreFromJson(doc.RootElement);
+            error = "";
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    private void RestoreFromJson(JsonElement root)
+    {
+        // 현재 상태 초기화
+        _rois.Clear();
+        _measures.Clear();
+        _selectedRoiId = null;
+        _selectedMeasureId = null;
+
+        // ---------- ROI ----------
+        foreach (var prop in root.EnumerateObject())
+        {
+            if (!prop.Name.StartsWith("roi_", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var id = ParseRoiNameToId(prop.Name);
+            if (id is null) continue;
+
+            var obj = prop.Value;
+            if (obj.ValueKind != JsonValueKind.Object) continue;
+
+            // python json은 normalized (0~1) -> px로 환산
+            var xn = ReadDouble(obj, "x", 0);
+            var yn = ReadDouble(obj, "y", 0);
+            var wn = ReadDouble(obj, "w", 0.1);
+            var hn = ReadDouble(obj, "h", 0.1);
+
+            var roi = new Roi
+            {
+                Id = id.Value,
+                X = xn * _imgW,
+                Y = yn * _imgH,
+                W = wn * _imgW,
+                H = hn * _imgH,
+                Method = ReadString(obj, "method", ""),
+                Parameter = ReadNullableDouble(obj, "parameter")
+            };
+
+            ClampRoiToImageInPlace(roi);
+            _rois.Add(roi);
+        }
+
+        // ---------- Measure ----------
+        foreach (var prop in root.EnumerateObject())
+        {
+            if (!prop.Name.StartsWith("measure_", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var mid = NormalizeMeasureId(prop.Name.Substring("measure_".Length));
+            if (string.IsNullOrWhiteSpace(mid)) continue;
+
+            var obj = prop.Value;
+            if (obj.ValueKind != JsonValueKind.Object) continue;
+
+            var start = NormalizeRoiName(ReadString(obj, "start", ""));
+            var end = NormalizeRoiName(ReadString(obj, "end", ""));
+
+            var dir = ReadString(obj, "direction", "x");
+            if (dir != "x" && dir != "y") dir = "x";
+
+            // gt/margin은 json에 null일 수도 있으니 안전하게
+            var gt = ReadNullableDouble(obj, "gt") ?? 0;
+            var margin = ReadNullableDouble(obj, "margin") ?? 0;
+            var adjust = ReadString(obj, "adjust", "");
+
+            _measures[mid] = new Measure
+            {
+                Start = start,
+                End = end,
+                Direction = dir,
+                Gt = gt,
+                Margin = margin,
+                Adjust = adjust
+            };
+        }
+    }
+
+    private static string NormalizeRoiName(string s)
+    {
+        s = (s ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(s)) return "";
+
+        if (s.StartsWith("roi_", StringComparison.OrdinalIgnoreCase))
+            return s;
+
+        if (int.TryParse(s, out var id))
+            return $"roi_{id}";
+
+        return s;
+    }
+
+    
+    private static string NormalizeMeasureId(string? s)
+    {
+        s = (s ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(s)) return "";
+
+        if (s.StartsWith("measure_", StringComparison.OrdinalIgnoreCase))
+            s = s.Substring("measure_".Length);
+
+        return s.Trim();
+    }
+
+        // ---------- Measure ordering (Natural sort for No.3-1, No.10-1, CP2-2, ...) ----------
+    private static readonly System.Text.RegularExpressions.Regex CpMeasureIndexRegex =
+        new(@"^CP(\d+)(?:-(\d+))?$", System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    private static readonly System.Text.RegularExpressions.Regex NoMeasureIndexRegex =
+        new(@"^No\.(\d+)(?:-(\d+))?$", System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    private static (int group, int a, int b, string raw) GetMeasureSortKey(string? id)
+    {
+        var s = (id ?? "").Trim();
+        if (string.IsNullOrEmpty(s))
+            return (9, int.MaxValue, int.MaxValue, "");
+
+        // 숫자 id: "1", "2", ...
+        if (int.TryParse(s, out var n))
+            return (0, n, 0, s);
+
+        // CP 계열: "CP1", "CP2-2"
+        var m = CpMeasureIndexRegex.Match(s);
+        if (m.Success && int.TryParse(m.Groups[1].Value, out var cpA))
+        {
+            var cpB = 0;
+            if (m.Groups[2].Success) int.TryParse(m.Groups[2].Value, out cpB);
+            return (1, cpA, cpB, s);
+        }
+
+        // No. 계열: "No.3-1", "No.10-2"
+        m = NoMeasureIndexRegex.Match(s);
+        if (m.Success && int.TryParse(m.Groups[1].Value, out var noA))
+        {
+            var noB = 0;
+            if (m.Groups[2].Success) int.TryParse(m.Groups[2].Value, out noB);
+            return (2, noA, noB, s);
+        }
+
+        // 기타: 문자열 기준
+        return (9, int.MaxValue, int.MaxValue, s);
+    }
+
+    private static int CompareMeasureId(string? x, string? y)
+    {
+        var kx = GetMeasureSortKey(x);
+        var ky = GetMeasureSortKey(y);
+
+        var c = kx.group.CompareTo(ky.group);
+        if (c != 0) return c;
+
+        c = kx.a.CompareTo(ky.a);
+        if (c != 0) return c;
+
+        c = kx.b.CompareTo(ky.b);
+        if (c != 0) return c;
+
+        // 동일 key면 raw 문자열로 안정화(대소문자 구분 유지)
+        return string.Compare(kx.raw, ky.raw, StringComparison.Ordinal);
+    }
+
+    private IEnumerable<string> GetOrderedMeasureIds()
+    {
+        // ✅ "No.10-1"이 "No.3-1"보다 먼저 오는 문제를 방지하기 위해 자연정렬 적용
+        return _measures.Keys
+            .OrderBy(id => id, Comparer<string>.Create(CompareMeasureId))
+            .ToList();
+    }
+
+private static string ReadString(JsonElement obj, string propName, string defaultValue)
+    {
+        if (!obj.TryGetProperty(propName, out var el)) return defaultValue;
+        if (el.ValueKind == JsonValueKind.String) return el.GetString() ?? defaultValue;
+        return defaultValue;
+    }
+
+    private static double ReadDouble(JsonElement obj, string propName, double defaultValue)
+    {
+        if (!obj.TryGetProperty(propName, out var el)) return defaultValue;
+
+        if (el.ValueKind == JsonValueKind.Number) return el.GetDouble();
+        if (el.ValueKind == JsonValueKind.String && double.TryParse(el.GetString(), out var d)) return d;
+
+        return defaultValue;
+    }
+
+    private static double? ReadNullableDouble(JsonElement obj, string propName)
+    {
+        if (!obj.TryGetProperty(propName, out var el)) return null;
+
+        if (el.ValueKind == JsonValueKind.Null) return null;
+        if (el.ValueKind == JsonValueKind.Number) return el.GetDouble();
+        if (el.ValueKind == JsonValueKind.String)
+        {
+            var s = el.GetString();
+            if (string.IsNullOrWhiteSpace(s)) return null;
+            if (double.TryParse(s, out var d)) return d;
+        }
+
+        return null;
+    }
+
+    private int SuggestNextRoiId() => _rois.Count == 0 ? 1 : _rois.Max(r => r.Id) + 1;
+
+    private Rect ClampRectToImage(Rect r)
+    {
+        var x = r.X; var y = r.Y; var w = r.W; var h = r.H;
+        if (w < 0) { x += w; w = -w; }
+        if (h < 0) { y += h; h = -h; }
+
+        w = Math.Max(1, w);
+        h = Math.Max(1, h);
+
+        if (_imgW > 0 && _imgH > 0)
+        {
+            x = Math.Max(0, Math.Min(x, _imgW - 1));
+            y = Math.Max(0, Math.Min(y, _imgH - 1));
+            if (x + w > _imgW) w = Math.Max(1, _imgW - x);
+            if (y + h > _imgH) h = Math.Max(1, _imgH - y);
+        }
+
+        return new Rect(x, y, w, h);
+    }
+
+    private void ClampRoiToImageInPlace(Roi r)
+    {
+        if (_imgW <= 0 || _imgH <= 0) return;
+        r.X = Math.Max(0, Math.Min(r.X, _imgW - 1));
+        r.Y = Math.Max(0, Math.Min(r.Y, _imgH - 1));
+        r.W = Math.Max(1, r.W);
+        r.H = Math.Max(1, r.H);
+        if (r.X + r.W > _imgW) r.W = Math.Max(1, _imgW - r.X);
+        if (r.Y + r.H > _imgH) r.H = Math.Max(1, _imgH - r.Y);
+    }
+
+    // =================== Models ===================
+    private sealed class Roi
+    {
+        public int Id { get; set; }
+        public double X { get; set; }
+        public double Y { get; set; }
+        public double W { get; set; }
+        public double H { get; set; }
+        public string? Method { get; set; }
+        public double? Parameter { get; set; }
+
+        public bool Contains(double px, double py)
+            => px >= X && py >= Y && px <= (X + W) && py <= (Y + H);
+
+        public Roi Clone() => new Roi
+        {
+            Id = Id,
+            X = X,
+            Y = Y,
+            W = W,
+            H = H,
+            Method = Method,
+            Parameter = Parameter
+        };
+    }
+
+    private sealed class Measure
+    {
+        public string Start { get; set; } = "";
+        public string End { get; set; } = "";
+        public string Direction { get; set; } = "x";
+        public double Gt { get; set; }
+        public double Margin { get; set; }
+        public string Adjust { get; set; } = "";
+    }
+
+    private readonly record struct Rect(double X, double Y, double W, double H);
+
+    private sealed class RoiEditorModel
+    {
+        public string IdText { get; set; } = "";
+        public string XText { get; set; } = "";
+        public string YText { get; set; } = "";
+        public string WText { get; set; } = "";
+        public string HText { get; set; } = "";
+        public string Method { get; set; } = "";
+        public string ParameterText { get; set; } = "";
+    }
+
+    private sealed class MeasureFormModel
+    {
+        public string IndexText { get; set; } = "";
+        public string StartText { get; set; } = "";
+        public string EndText { get; set; } = "";
+        public string Direction { get; set; } = "x";
+        public string GtText { get; set; } = "0";
+        public string MarginText { get; set; } = "0.15";
+        public string AdjustText { get; set; } = "";
+    }
+
+    private MeasureFormModel _measureForm = new();
+
+    private async Task ApplyJsonEditorAsync()
+    {
+        if (_imgW <= 0 || _imgH <= 0)
+        {
+            Log("ERROR: Image not loaded. Cannot apply JSON yet.");
+            return;
+        }
+
+        if (TryRestoreFromJsonText(_jsonEditorText ?? "", out var err))
+            Log("JSON editor text applied to viewer.");
+        else
+            Log($"ERROR: JSON editor apply failed: {err}");
+
+        await PushCanvasStateAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+}
