@@ -24,12 +24,20 @@
         <a class="btn btn-sm btn-outline-secondary" href="/airuler-result">Back</a>
         <button class="btn btn-sm btn-outline-secondary" @onclick="ReloadAsync">Refresh</button>
 
+        <!-- ✅ Refresh 와 Save 사이에 Delete Selected 추가 -->
+        <button class="btn btn-sm btn-danger"
+                disabled="@(!CanDeleteSelected)"
+                @onclick="ConfirmDeleteSelectedAsync">
+            <span class="oi oi-trash"></span>
+            Delete Selected
+        </button>
+
         <a class="btn btn-sm btn-success @(!CanExport ? "disabled" : "")"
            href="@ExportUrl"
            target="_blank"
            aria-disabled="@(!CanExport)"
            tabindex="@(!CanExport ? "-1" : null)">
-            Save
+            Save to CSV
         </a>
     </div>
 </div>
@@ -54,17 +62,24 @@ else if (_records.Count == 0 && string.IsNullOrWhiteSpace(_loadError))
 else if (_records.Count > 0)
 {
     <div class="table-responsive mt-3" style="max-height: 75vh; overflow:auto;">
-        <table class="table table-sm table-hover align-middle">
+        <table class="table table-sm table-hover align-middle airuler-result-table">
             <thead class="table-light" style="position: sticky; top: 0; z-index: 1;">
                 <tr>
-                    <th style="width: 56px;"><strong>No</strong></th>
-                    <th style="min-width: 220px;"><strong>Image</strong></th>
-                    <th style="min-width: 260px;"><strong>Info</strong></th>
-                    <th style="width: 70px;"><strong>Film</strong></th>
+                    <!-- ✅ No 컬럼 헤더에 전체선택(Select All) 체크 -->
+                    <th style="min-width: 60px;">
+                        <div class="d-flex align-items-center" style="gap:8px;">
+                            <input class="form-check-input m-0" type="checkbox" @bind="SelectAll" title="Select all" />
+                            <strong>No</strong>
+                        </div>
+                    </th>
+
+                    <th style="min-width: 180px;"><strong>Image</strong></th>
+                    <th style="min-width: 210px;"><strong>Info</strong></th>
+                    <th style="min-width: 50px;"><strong>Film</strong></th>
 
                     @foreach (var col in _measureColumns)
                     {
-                        <th style="min-width: 110px; white-space: nowrap;">
+                        <th style="min-width: 80px;">
                             <div style="line-height: 1.05;">
                                 <div><strong>@col.Index</strong></div>
                                 @if (!string.IsNullOrWhiteSpace(col.Gt))
@@ -74,10 +89,9 @@ else if (_records.Count > 0)
                             </div>
                         </th>
                     }
-
-                    <th style="width: 120px;"><strong>Actions</strong></th>
                 </tr>
             </thead>
+
             <tbody>
                 @for (var recIdx = 0; recIdx < _records.Count; recIdx++)
                 {
@@ -94,13 +108,19 @@ else if (_records.Count > 0)
                         <tr>
                             @if (i == 0)
                             {
-                                <td rowspan="@rowspan" style="vertical-align: top;">@no</td>
+                                <!-- ✅ No 컬럼에 체크박스 + 번호 -->
+                                <td rowspan="@rowspan" style="vertical-align: top;">
+                                    <div class="d-flex align-items-start" style="gap:8px;">
+                                        <input class="form-check-input mt-1" type="checkbox" @bind="r.IsSelected" />
+                                        <span>@no</span>
+                                    </div>
+                                </td>
 
                                 <td rowspan="@rowspan" style="vertical-align: top;">
                                     <a class="btn btn-link p-0 text-start" href="@r.DetailPageUrl" style="text-decoration:none;">
                                         <div style="width: 170px;">
                                             <img src="@r.ThumbnailUrl"
-                                                 style="width: 170px; height: 96px; object-fit: contain; object-position: center; background: #f8f9fa; border: 1px solid #eee;" />                                            
+                                                 style="width: 170px; height: 96px; object-fit: contain; object-position: center; background: #f8f9fa; border: 1px solid #eee;" />
                                         </div>
                                     </a>
                                 </td>
@@ -126,7 +146,7 @@ else if (_records.Count > 0)
                             @foreach (var col in _measureColumns)
                             {
                                 if (film.Cells.TryGetValue(col.Index, out var cell)
-                                    && (!string.IsNullOrWhiteSpace(cell.Value) || (_showError && !string.IsNullOrWhiteSpace(cell.Err))))
+                                && (!string.IsNullOrWhiteSpace(cell.Value) || (_showError && !string.IsNullOrWhiteSpace(cell.Err))))
                                 {
                                     <td>
                                         <div style="line-height: 1.05;">
@@ -145,15 +165,6 @@ else if (_records.Count > 0)
                                 {
                                     <td></td>
                                 }
-                            }
-
-                            @if (i == 0)
-                            {
-                                <td rowspan="@rowspan" style="vertical-align: top;">
-                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => ConfirmDeleteRecordAsync(r.Entity.Id)">
-                                        Delete
-                                    </button>
-                                </td>
                             }
                         </tr>
                     }
@@ -194,6 +205,9 @@ else if (_records.Count > 0)
         public string DetailPageUrl { get; init; } = string.Empty;
         public string TimestampLocal => Entity.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
         public List<FilmRowVm> Films { get; init; } = new();
+
+        // ✅ 선택 상태
+        public bool IsSelected { get; set; }
     }
 
     private List<RecordVm> _records = new();
@@ -202,10 +216,22 @@ else if (_records.Count > 0)
     private string? _statusMessage;
 
     private bool CanExport => !string.IsNullOrWhiteSpace(ModelName) && _records.Count > 0;
+    private bool CanDeleteSelected => _records.Any(r => r.IsSelected);
+
+    // ✅ 헤더 "전체 선택" 체크박스 바인딩
+    private bool SelectAll
+    {
+        get => _records.Count > 0 && _records.All(r => r.IsSelected);
+        set
+        {
+            foreach (var r in _records)
+                r.IsSelected = value;
+        }
+    }
 
     private string ExportUrl
         => CanExport
-            ? $"/api/airuler/export/{Uri.EscapeDataString(ModelName!) }?showError={_showError.ToString().ToLowerInvariant()}"
+            ? $"/api/airuler/export/{Uri.EscapeDataString(ModelName!)}?showError={_showError.ToString().ToLowerInvariant()}"
             : "#";
 
     protected override async Task OnParametersSetAsync()
@@ -234,6 +260,10 @@ else if (_records.Count > 0)
     {
         _loadError = null;
         _statusMessage = null;
+
+        // ✅ Reload 시 기존 선택 유지(가능하면)
+        var selectedIds = _records.Where(r => r.IsSelected).Select(r => r.Entity.Id).ToHashSet();
+
         _records = new();
         _measureColumns = new();
 
@@ -261,7 +291,8 @@ else if (_records.Count > 0)
                     Entity = e,
                     ThumbnailUrl = ThumbUrl(e.ModelName, e.FileName),
                     DetailPageUrl = DetailUrl(e.ModelName, e.FileName),
-                    Films = films
+                    Films = films,
+                    IsSelected = selectedIds.Contains(e.Id)
                 });
             }
 
@@ -358,40 +389,55 @@ else if (_records.Count > 0)
         return string.Empty;
     }
 
-    private async Task ConfirmDeleteRecordAsync(long id)
+    private async Task ConfirmDeleteSelectedAsync()
     {
-        var target = _records.FirstOrDefault(r => r.Entity.Id == id);
-        if (target == null)
+        if (string.IsNullOrWhiteSpace(ModelName))
             return;
 
-        var ok = await JS.InvokeAsync<bool>("confirm", $"Delete '{target.Entity.FileName}'?\nThis will remove DB row and image/thumbnail/json files.");
+        var selected = _records.Where(r => r.IsSelected).ToList();
+        if (selected.Count == 0)
+            return;
+
+        var ok = await JS.InvokeAsync<bool>(
+            "confirm",
+            $"Delete selected {selected.Count} file(s)?\nThis will remove DB rows and image/thumbnail/json files."
+        );
+
         if (!ok)
             return;
 
-        await DeleteRecordAsync(id);
+        await DeleteSelectedAsync(selected.Select(r => r.Entity.Id).ToList());
     }
 
-    private async Task DeleteRecordAsync(long id)
+    private async Task DeleteSelectedAsync(List<long> ids)
     {
         try
         {
-            var ent = await Db.AirulerFilmMeasureResults.FirstOrDefaultAsync(x => x.Id == id);
-            if (ent == null) return;
+            if (ids.Count == 0 || string.IsNullOrWhiteSpace(ModelName))
+                return;
 
-            // 파일 삭제
-            SafeDeleteFile(ImageFilePath(ent.ModelName, ent.FileName));
-            SafeDeleteFile(ThumbnailFilePath(ent.ModelName, ent.FileName));
-            SafeDeleteFile(JsonFilePath(ent.ModelName, ent.FileName));
+            // tracking 필요(삭제)
+            var ents = await Db.AirulerFilmMeasureResults
+                .Where(x => x.ModelName == ModelName && ids.Contains(x.Id))
+                .ToListAsync();
 
-            Db.AirulerFilmMeasureResults.Remove(ent);
+            // 파일 삭제 먼저 시도 (실패해도 계속)
+            foreach (var ent in ents)
+            {
+                SafeDeleteFile(ImageFilePath(ent.ModelName, ent.FileName));
+                SafeDeleteFile(ThumbnailFilePath(ent.ModelName, ent.FileName));
+                SafeDeleteFile(JsonFilePath(ent.ModelName, ent.FileName));
+            }
+
+            Db.AirulerFilmMeasureResults.RemoveRange(ents);
             await Db.SaveChangesAsync();
 
-            _statusMessage = $"Deleted: {ent.FileName}";
+            _statusMessage = $"Deleted: {ents.Count} file(s)";
             await ReloadAsync();
         }
         catch (Exception ex)
         {
-            _statusMessage = $"Delete failed: {ex.Message}";
+            _statusMessage = $"Delete selected failed: {ex.Message}";
         }
     }
 

@@ -245,3 +245,16 @@ input:checked + .slider:before {
 .airuler-log {
     height: 180px;
 }
+
+/* Bootstrap 5 테이블 셀 패딩 변수 줄이기 */
+.airuler-result-table {
+    --bs-table-cell-padding-x: 0.25rem; /* 좌/우 */
+    --bs-table-cell-padding-y: 0.20rem; /* 상/하 */
+}
+
+    /* 혹시 변수가 안 먹는 환경 대비(강제) */
+    .airuler-result-table th,
+    .airuler-result-table td {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+    }

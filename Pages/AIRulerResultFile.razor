@@ -35,13 +35,13 @@ else
     <div class="mt-3">
         <img src="@_imageUrl" style="max-width: 100%; height: auto; border: 1px solid #eee;" />
         <div class="mt-2 small text-muted">
-            <b>timestamp</b>: @_record.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
+            <b>Time</b>: @_record.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
             <span class="text-muted"> · </span>
-            <b>deviceId</b>: @_record.DeviceId
+            <b>Device</b>: @_record.DeviceId
             <span class="text-muted"> · </span>
-            <b>imageSize</b>: @_record.ImageSize
+            <b>Size</b>: @_record.ImageSize
             <span class="text-muted"> · </span>
-            <b>measureMethod</b>: @_record.MeasureMethod
+            <b>Method</b>: @_record.MeasureMethod
         </div>
     </div>
 
