@@ -100,20 +100,18 @@ else if (_records.Count > 0)
                                     <a class="btn btn-link p-0 text-start" href="@r.DetailPageUrl" style="text-decoration:none;">
                                         <div style="width: 170px;">
                                             <img src="@r.ThumbnailUrl"
-                                                 style="width: 170px; height: 96px; object-fit: contain; object-position: center; background: #f8f9fa; border: 1px solid #eee;" />
-                                            <div style="font-size: 0.82rem; word-break: break-all; margin-top: 4px;">
-                                                <b class="text-body">@r.Entity.FileName</b>
-                                            </div>
+                                                 style="width: 170px; height: 96px; object-fit: contain; object-position: center; background: #f8f9fa; border: 1px solid #eee;" />                                            
                                         </div>
                                     </a>
                                 </td>
 
                                 <td rowspan="@rowspan" style="vertical-align: top;">
                                     <div class="small">
-                                        <div><b>timestamp</b>: @r.TimestampLocal</div>
-                                        <div><b>deviceId</b>: @r.Entity.DeviceId</div>
-                                        <div><b>imageSize</b>: @r.Entity.ImageSize</div>
-                                        <div><b>measureMethod</b>: @r.Entity.MeasureMethod</div>
+                                        <div><b>@r.Entity.FileName</b></div>
+                                        <div><b>Time</b>: @r.TimestampLocal</div>
+                                        <div><b>Device</b>: @r.Entity.DeviceId</div>
+                                        <div><b>Size</b>: @r.Entity.ImageSize</div>
+                                        <div><b>Method</b>: @r.Entity.MeasureMethod</div>
                                     </div>
                                 </td>
                             }

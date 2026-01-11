@@ -12,7 +12,7 @@
     <div class="card">
         <div class="card-header">
             <div class="airuler-toolbar">
-                <div class="me-2"><b>Viewer</b></div>
+                <div class="me-2"><b>AIRuler Viewer</b></div>
 
                 <span class="ms-auto airuler-hint">
                     (ROI: Arrow 이동 / Shift+Arrow 크기 / Delete 삭제 / Ctrl+C,X,V View: Ctrl+'+' 확대 / Ctrl+'-' 축소 / Ctrl+Arrow 팬 (Viewer만))
@@ -38,7 +38,7 @@
         <!-- 1) Model / Images / Upload -->
         <div class="col-12 col-xl-3">
             <div class="card">
-                <div class="card-header"><b>Model / Images</b></div>
+                <div class="card-header">Model / Images</div>
                 <div class="card-body">
 
                     <div class="mb-2">
@@ -58,7 +58,8 @@
                     </div>
 
                     <div class="d-flex gap-2 flex-wrap">
-                        <button class="btn btn-sm btn-primary" @onclick="CreateOrSelectModelAsync">Add</button>
+                        <button class="btn btn-sm btn-primary" @onclick="CreateOrSelectModelAsync">Create/Select</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="RefreshModelsAsync">Refresh</button>
                         <button class="btn btn-sm btn-outline-danger" @onclick="DeleteSelectedModelAsync" disabled="@string.IsNullOrWhiteSpace(_selectedModel)">Delete</button>
                     </div>
 
@@ -112,7 +113,7 @@
         <!-- 2) ROI -->
         <div class="col-12 col-xl-3">
             <div class="card">
-                <div class="card-header"><b>ROI</b></div>
+                <div class="card-header">ROI</div>
 
                 <div class="card-body">
                     <div class="mb-2">
@@ -157,8 +158,7 @@
 
                     <div class="d-flex gap-2 flex-wrap">
                         <button class="btn btn-sm btn-primary" @onclick="AddOrUpdateRoiAsync">Add/Update</button>
-                        <button class="btn btn-sm btn-outline-danger" @onclick="ConfirmDeleteRoiAsync" disabled="@(_selectedRoiId is null && string.IsNullOrWhiteSpace(_roiEditor.IdText))">Delete</button>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="ClearRoiEditorAsync">Clear</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="DeleteRoiAsync" disabled="@(_selectedRoiId is null && string.IsNullOrWhiteSpace(_roiEditor.IdText))">Delete</button>
                     </div>
 
                     <hr />
@@ -180,7 +180,7 @@
         <!-- 3) Measure -->
         <div class="col-12 col-xl-3">
             <div class="card">
-                <div class="card-header"><b>Measure</b></div>
+                <div class="card-header">Measure</div>
                 <div class="card-body">
                     <div class="mb-2">
                         <label class="form-label">Measure Index</label>
@@ -227,8 +227,7 @@
 
                     <div class="d-flex gap-2 flex-wrap">
                         <button class="btn btn-sm btn-primary" @onclick="AddOrUpdateMeasureAsync">Add/Update</button>
-                        <button class="btn btn-sm btn-outline-danger" @onclick="ConfirmDeleteMeasureAsync" disabled="@(_selectedMeasureId is null)">Delete</button>
-                        <button class="btn btn-sm btn-outline-secondary" @onclick="ClearMeasureEditorAsync">Clear</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="DeleteMeasureAsync">Delete</button>
                     </div>
 
                     <hr />
@@ -252,12 +251,21 @@
         <div class="col-12 col-xl-3">
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <span><b>JSON</b></span>
+                    <span>JSON</span>
                     <div class="d-flex gap-2 flex-wrap">
                         <button class="btn btn-sm btn-primary" @onclick="GenerateJsonToEditor">Generate JSON</button>
                         <button class="btn btn-sm btn-outline-primary" @onclick="ApplyJsonEditorAsync">Apply to Viewer</button>
-                        <button class="btn btn-sm btn-success" @onclick="LoadJsonAsync" disabled="@string.IsNullOrWhiteSpace(_selectedModel)">Load</button>
-                        <button class="btn btn-sm btn-danger" @onclick="ConfirmSaveJsonAsync" disabled="@string.IsNullOrWhiteSpace(_selectedModel)">Save</button>
+                        <button class="btn btn-sm btn-success" @onclick="SaveJsonAsync" disabled="@string.IsNullOrWhiteSpace(_selectedModel)">Save</button>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="LoadJsonAsync" disabled="@string.IsNullOrWhiteSpace(_selectedModel)">Load</button>
+
+                        @if (!string.IsNullOrWhiteSpace(_selectedModel))
+                        {
+                            <a class="btn btn-sm btn-outline-info"
+                               href="@($"/airuler/models/{_selectedModel}.json")"
+                               download>
+                                Download
+                            </a>
+                        }
                     </div>
                 </div>
                 <div class="card-body">
@@ -825,37 +833,7 @@ private async Task UploadSelectedFilesAsync()
     {
         _selectedMeasureId = id;
         _selectedRoiId = null;
-
-        if (_measures.TryGetValue(id, out var m))
-        {
-            _measureForm.IndexText = id;
-            _measureForm.StartText = m.Start;
-            _measureForm.EndText = m.End;
-            _measureForm.Direction = string.IsNullOrWhiteSpace(m.Direction) ? "x" : m.Direction;
-            _measureForm.GtText = m.Gt.ToString("0.###");
-            _measureForm.MarginText = m.Margin.ToString("0.###");
-            _measureForm.AdjustText = m.Adjust ?? "";
-        }
-
         Log($"Selected measure_{id}");
-        await PushCanvasStateAsync();
-        await InvokeAsync(StateHasChanged);
-    }
-
-    private async Task ClearMeasureEditorAsync()
-    {
-        _selectedMeasureId = null;
-        ResetMeasureForm();
-        Log("Measure editor cleared");
-        await PushCanvasStateAsync();
-        await InvokeAsync(StateHasChanged);
-    }
-
-    private async Task ClearRoiEditorAsync()
-    {
-        _selectedRoiId = null;
-        ResetRoiEditor();
-        Log("ROI editor cleared");
         await PushCanvasStateAsync();
         await InvokeAsync(StateHasChanged);
     }
@@ -938,11 +916,6 @@ private async Task UploadSelectedFilesAsync()
             Method = DefaultRoiMethod,
             ParameterText = "0.5"
         };
-    }
-
-    private void ResetMeasureForm()
-    {
-        _measureForm = new MeasureFormModel();
     }
 
     private void EnsureRoiEditorDefaults()
@@ -1104,35 +1077,6 @@ private async Task UploadSelectedFilesAsync()
         await DeleteRoiByIdAsync(rid.Value);
     }
 
-    private async Task ConfirmDeleteRoiAsync()
-    {
-        int? rid = null;
-
-        if (_selectedRoiId is not null)
-        {
-            rid = _selectedRoiId.Value;
-        }
-        else if (int.TryParse((_roiEditor.IdText ?? "").Trim(), out var parsed))
-        {
-            rid = parsed;
-        }
-
-        if (rid is null)
-        {
-            Log("ERROR: Select ROI or enter ROI ID first.");
-            return;
-        }
-
-        var ok = await JS.InvokeAsync<bool>("confirm", $"roi_{rid.Value} 를 삭제하시겠습니까?");
-        if (!ok)
-        {
-            Log("ROI delete canceled");
-            return;
-        }
-
-        await DeleteRoiByIdAsync(rid.Value);
-    }
-
     private async Task DeleteRoiByIdAsync(int rid)
     {
         var roi = _rois.FirstOrDefault(r => r.Id == rid);
@@ -1206,38 +1150,28 @@ private async Task UploadSelectedFilesAsync()
         await InvokeAsync(StateHasChanged);
     }
 
-    private async Task ConfirmDeleteMeasureAsync()
-    {
-        if (string.IsNullOrWhiteSpace(_selectedMeasureId))
-        {
-            Log("ERROR: Select a measure first.");
-            return;
-        }
-
-        var ok = await JS.InvokeAsync<bool>("confirm", $"measure_{_selectedMeasureId} 를 삭제하시겠습니까?");
-        if (!ok)
-        {
-            Log("Measure delete canceled");
-            return;
-        }
-
-        await DeleteMeasureAsync();
-    }
-
     private async Task DeleteMeasureAsync()
     {
-        if (string.IsNullOrWhiteSpace(_selectedMeasureId))
-        {
-            Log("ERROR: Select a measure first.");
-            return;
-        }
+        var idx = NormalizeMeasureId(_measureForm.IndexText);
 
-        var idx = _selectedMeasureId!;
+        // If the input box is empty, delete the currently selected measure (if any)
+        if (string.IsNullOrWhiteSpace(idx))
+        {
+            if (!string.IsNullOrWhiteSpace(_selectedMeasureId))
+            {
+                idx = _selectedMeasureId!;
+                _measureForm.IndexText = idx;
+            }
+            else
+            {
+                Log("ERROR: Measure index is required.");
+                return;
+            }
+        }
 
         if (_measures.Remove(idx))
         {
-            _selectedMeasureId = null;
-            ResetMeasureForm();
+            if (_selectedMeasureId == idx) _selectedMeasureId = null;
             Log($"measure_{idx} deleted");
             await PushCanvasStateAsync();
             await InvokeAsync(StateHasChanged);
@@ -1334,24 +1268,6 @@ private string? FindMeasureNearPoint(double x, double y, double thresholdPx)
         await File.WriteAllTextAsync(path, _jsonEditorText ?? "", Encoding.UTF8);
         Log($"Saved: /airuler/models/{model}.json");
         await InvokeAsync(StateHasChanged);
-    }
-
-    private async Task ConfirmSaveJsonAsync()
-    {
-        if (string.IsNullOrWhiteSpace(_selectedModel))
-        {
-            Log("ERROR: select model first.");
-            return;
-        }
-
-        var ok = await JS.InvokeAsync<bool>("confirm", $"현재 JSON을 '{_selectedModel}' 모델로 저장하시겠습니까?");
-        if (!ok)
-        {
-            Log("Save canceled");
-            return;
-        }
-
-        await SaveJsonAsync();
     }
 
     private async Task LoadJsonAsync()
@@ -1472,7 +1388,6 @@ private string? FindMeasureNearPoint(double x, double y, double thresholdPx)
         _jsonEditorText = "";
 
         ResetRoiEditor();
-        ResetMeasureForm();
     }
 
     private static bool IsImageFile(string name)
@@ -1621,13 +1536,68 @@ private string? FindMeasureNearPoint(double x, double y, double thresholdPx)
         return s.Trim();
     }
 
+        // ---------- Measure ordering (Natural sort for No.3-1, No.10-1, CP2-2, ...) ----------
+    private static readonly System.Text.RegularExpressions.Regex CpMeasureIndexRegex =
+        new(@"^CP(\d+)(?:-(\d+))?$", System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    private static readonly System.Text.RegularExpressions.Regex NoMeasureIndexRegex =
+        new(@"^No\.(\d+)(?:-(\d+))?$", System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    private static (int group, int a, int b, string raw) GetMeasureSortKey(string? id)
+    {
+        var s = (id ?? "").Trim();
+        if (string.IsNullOrEmpty(s))
+            return (9, int.MaxValue, int.MaxValue, "");
+
+        // 숫자 id: "1", "2", ...
+        if (int.TryParse(s, out var n))
+            return (0, n, 0, s);
+
+        // CP 계열: "CP1", "CP2-2"
+        var m = CpMeasureIndexRegex.Match(s);
+        if (m.Success && int.TryParse(m.Groups[1].Value, out var cpA))
+        {
+            var cpB = 0;
+            if (m.Groups[2].Success) int.TryParse(m.Groups[2].Value, out cpB);
+            return (1, cpA, cpB, s);
+        }
+
+        // No. 계열: "No.3-1", "No.10-2"
+        m = NoMeasureIndexRegex.Match(s);
+        if (m.Success && int.TryParse(m.Groups[1].Value, out var noA))
+        {
+            var noB = 0;
+            if (m.Groups[2].Success) int.TryParse(m.Groups[2].Value, out noB);
+            return (2, noA, noB, s);
+        }
+
+        // 기타: 문자열 기준
+        return (9, int.MaxValue, int.MaxValue, s);
+    }
+
+    private static int CompareMeasureId(string? x, string? y)
+    {
+        var kx = GetMeasureSortKey(x);
+        var ky = GetMeasureSortKey(y);
+
+        var c = kx.group.CompareTo(ky.group);
+        if (c != 0) return c;
+
+        c = kx.a.CompareTo(ky.a);
+        if (c != 0) return c;
+
+        c = kx.b.CompareTo(ky.b);
+        if (c != 0) return c;
+
+        // 동일 key면 raw 문자열로 안정화(대소문자 구분 유지)
+        return string.Compare(kx.raw, ky.raw, StringComparison.Ordinal);
+    }
+
     private IEnumerable<string> GetOrderedMeasureIds()
     {
-        // 숫자로만 된 id("1","2",...)는 숫자 기준으로 정렬, 그 외는 문자열 기준 정렬
+        // ✅ "No.10-1"이 "No.3-1"보다 먼저 오는 문제를 방지하기 위해 자연정렬 적용
         return _measures.Keys
-            .OrderBy(id => int.TryParse(id, out _) ? 0 : 1)
-            .ThenBy(id => int.TryParse(id, out var n) ? n : int.MaxValue)
-            .ThenBy(id => id, StringComparer.Ordinal)
+            .OrderBy(id => id, Comparer<string>.Create(CompareMeasureId))
             .ToList();
     }
 
