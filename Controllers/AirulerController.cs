@@ -328,7 +328,7 @@ namespace HawkAI.Controllers
             var sb = new StringBuilder();
 
             // Header
-            sb.Append("No,FileName,Timestamp,DeviceId,ImageSize,MeasureMethod,DetectedFilms,Film");
+            sb.Append("No,FileName,Timestamp,DeviceId,ImageSize,MeasureMethod,Film");
             foreach (var c in cols)
             {
                 sb.Append(',');
@@ -363,13 +363,11 @@ namespace HawkAI.Controllers
                         sb.Append(CsvEscape(row.ImageSize));
                         sb.Append(',');
                         sb.Append(CsvEscape(row.MeasureMethod));
-                        sb.Append(',');
-                        sb.Append(row.DetectedFilms);
                     }
                     else
                     {
                         // 7개 컬럼(No ~ DetectedFilms) 공란
-                        sb.Append(",,,,,,");
+                        sb.Append(",,,,,");
                     }
 
                     // Film
