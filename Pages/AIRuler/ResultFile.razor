@@ -1,4 +1,4 @@
-@page "/airuler/result/{ModelName}/{FileName}"
+@page "/airuler/results/{ModelName}/{FileName}"
 
 @using HawkAI.Data
 @using HawkAI.Data.AirulerResultService
@@ -14,10 +14,10 @@
     </h4>
 
     <div class="d-flex gap-2">
-        <a class="btn btn-sm btn-outline-secondary" href="/airuler/result">List</a>
+        <a class="btn btn-sm btn-outline-secondary" href="/airuler/results">List</a>
         @if (!string.IsNullOrWhiteSpace(ModelName))
         {
-            <a class="btn btn-sm btn-outline-secondary" href="@($"/airuler/result/{Uri.EscapeDataString(ModelName)}")">Back</a>
+            <a class="btn btn-sm btn-outline-secondary" href="@($"/airuler/results/{Uri.EscapeDataString(ModelName)}")">Back</a>
         }
     </div>
 </div>

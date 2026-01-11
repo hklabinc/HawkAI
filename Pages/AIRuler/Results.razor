@@ -1,4 +1,4 @@
-@page "/airuler/result"
+@page "/airuler/results"
 
 @using HawkAI.Data
 @using HawkAI.Data.AirulerResultService
@@ -135,7 +135,7 @@ else
         if (string.IsNullOrWhiteSpace(modelName))
             return;
 
-        Nav.NavigateTo($"/airuler/result/{Uri.EscapeDataString(modelName)}");
+        Nav.NavigateTo($"/airuler/results/{Uri.EscapeDataString(modelName)}");
     }
 
     private string ResultsRoot => Path.Combine(Env.WebRootPath, "airuler", "results");

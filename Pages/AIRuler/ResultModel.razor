@@ -1,4 +1,4 @@
-@page "/airuler/result/{ModelName}"
+@page "/airuler/results/{ModelName}"
 
 @using System.Text.Json
 @using HawkAI.Data
@@ -21,7 +21,7 @@
             <label class="form-check-label small" for="showErrSwitch">Show error</label>
         </div>
 
-        <a class="btn btn-sm btn-outline-secondary" href="/airuler/result">Back</a>
+        <a class="btn btn-sm btn-outline-secondary" href="/airuler/results">Back</a>
         <button class="btn btn-sm btn-outline-primary" @onclick="ReloadAsync">Refresh</button>
 
         <!-- ✅ Refresh 와 Save 사이에 Delete Selected 추가 -->
@@ -245,7 +245,7 @@ else if (_records.Count > 0)
         => $"/airuler/results/{Uri.EscapeDataString(modelName)}/thumbnail/{Uri.EscapeDataString(fileName)}";
 
     private static string DetailUrl(string modelName, string fileName)
-        => $"/airuler-result/{Uri.EscapeDataString(modelName)}/{Uri.EscapeDataString(fileName)}";
+        => $"/airuler/results/{Uri.EscapeDataString(modelName)}/{Uri.EscapeDataString(fileName)}";
 
     private string JsonFilePath(string modelName, string fileName)
         => Path.Combine(ResultsRoot, Path.GetFileName(modelName), "json", Path.GetFileNameWithoutExtension(fileName) + ".json");
