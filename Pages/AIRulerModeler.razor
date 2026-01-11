@@ -718,15 +718,11 @@ private async Task UploadSelectedFilesAsync()
         var hitMeasureId = FindMeasureNearPoint(x, y, thresholdPx: 8.0);
         if (hitMeasureId is not null)
         {
-            _selectedMeasureId = hitMeasureId;
-            _selectedRoiId = null;
-            Log($"Selected measure_{hitMeasureId}");
-            await PushCanvasStateAsync();
-            await InvokeAsync(StateHasChanged);
+            await SelectMeasureAsync(hitMeasureId);
             return;
         }
 
-// background
+        // background
         await ClearSelectionAsync();
     }
 
@@ -833,6 +829,19 @@ private async Task UploadSelectedFilesAsync()
     {
         _selectedMeasureId = id;
         _selectedRoiId = null;
+
+        // ✅ 선택된 measure 값을 Measure 입력폼에 채워넣기(복원)
+        if (_measures.TryGetValue(id, out var m))
+        {
+            _measureForm.IndexText = id;
+            _measureForm.StartText = m.Start;   // "roi_1" 형태
+            _measureForm.EndText = m.End;       // "roi_2" 형태
+            _measureForm.Direction = string.IsNullOrWhiteSpace(m.Direction) ? "x" : m.Direction;
+            _measureForm.GtText = m.Gt.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+            _measureForm.MarginText = m.Margin.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+            _measureForm.AdjustText = m.Adjust ?? "";
+        }
+
         Log($"Selected measure_{id}");
         await PushCanvasStateAsync();
         await InvokeAsync(StateHasChanged);
