@@ -1,4 +1,4 @@
-﻿@page "/projects"
+﻿@page "/aidetector/projects"
 @inject HawkAI.Data.ProjectService.IProjectService ProjectService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IWebHostEnvironment Env
@@ -1079,7 +1079,7 @@ else
 
     private void OpenProject(int id)
     {
-        Navigation.NavigateTo($"/projects/{id}");
+        Navigation.NavigateTo($"/aidetector/projects/{id}");
     }
 
     private async Task ReloadProjects()
@@ -1381,7 +1381,7 @@ else
             sb.AppendLine();
             sb.AppendLine("hklab:");
             sb.AppendLine($"  project: {project.Name.ToLower().Replace(" ", "-")}");                        
-            sb.AppendLine($"  url: https://hawkai.hknu.ac.kr/projects/{projectId}");
+            sb.AppendLine($"  url: https://hawkai.hknu.ac.kr/aidetector/projects/{projectId}");
             sb.AppendLine($"  task: {(exportAsSegmentation ? "segment" : "detect")}");
             int imgW = exportImgWidth > 0 ? exportImgWidth : (project.Images.FirstOrDefault()?.Width ?? 0);
             int imgH = exportImgHeight > 0 ? exportImgHeight : (project.Images.FirstOrDefault()?.Height ?? 0);

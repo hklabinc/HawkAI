@@ -258,3 +258,31 @@ input:checked + .slider:before {
         padding-left: 0.25rem !important;
         padding-right: 0.25rem !important;
     }
+
+
+/* 섹션 단위로 “묶여 보이게” 만드는 스타일 */
+.nav-section {
+    margin-top: .25rem;
+    padding-top: .25rem;
+}
+
+.nav-section-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, .70);
+    margin-top: .75rem;
+    margin-bottom: .20rem;
+}
+
+.nav-section-body {
+    margin-left: .75rem;
+    padding-left: .25rem;
+    border-left: 2px solid rgba(255, 255, 255, .12);
+}
+
+.nav-beta-badge {
+    font-size: 0.65rem;
+    padding: .18rem .45rem;
+}

@@ -1,4 +1,4 @@
-﻿@page "/cameras"
+﻿@page "/aicamera/cameras"
 @attribute [Authorize(Roles = "Admin")]
 @inject ICameraService CameraService
 @inject NavigationManager NavigationManager
@@ -71,11 +71,11 @@
 
     void ShowCamera(int id)
     {
-        NavigationManager.NavigateTo($"camera/{id}");
+        NavigationManager.NavigateTo($"aicamera/camera/{id}");
     }
 
     void CreateNewCamera()
     {
-        NavigationManager.NavigateTo("camera");
+        NavigationManager.NavigateTo("aicamera/camera");
     }
 }

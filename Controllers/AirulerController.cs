@@ -295,7 +295,7 @@ namespace HawkAI.Controllers
 
         /// <summary>
         /// ✅ 특정 모델의 결과를 CSV로 내보내기
-        /// - UI(/airuler-result/{model}) 테이블과 동일한 형태로 (파일 1개당 Film 개수만큼 서브 행)
+        /// - UI(/airuler/result/{model}) 테이블과 동일한 형태로 (파일 1개당 Film 개수만큼 서브 행)
         /// - showError=false이면 (err) 값은 제외
         /// </summary>
         [HttpGet("export/{modelName}")]

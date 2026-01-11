@@ -1,4 +1,4 @@
-﻿@page "/projects/{projectId:int}"
+﻿@page "/aidetector/projects/{projectId:int}"
 @inject DataDbContext Db
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
@@ -327,7 +327,7 @@ else
         project = await Db.Projects.FindAsync(projectId);
         if (project == null)
         {
-            Navigation.NavigateTo("/projects");
+            Navigation.NavigateTo("/aidetector/projects");
             return;
         }
 
