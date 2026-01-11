@@ -32,9 +32,9 @@ namespace HawkAI.Controllers
         private string AirulerRoot => Path.Combine(_env.WebRootPath, "airuler");
         private string ModelsDir => Path.Combine(AirulerRoot, "models");
         private string ImagesDir => Path.Combine(AirulerRoot, "images");
-        // NOTE: 기존 wwwroot/airuler/results 는 더 이상 사용하지 않는다.
-        // AIRuler 결과(Exif UserComment JSON 포함 JPG)는 요구사항에 따라 wwwroot/results/{model}/... 에 저장한다.
-        private string ResultsRoot => Path.Combine(_env.WebRootPath, "results");
+        // AIRuler 결과(Exif UserComment JSON 포함 JPG)는 요구사항에 따라
+        // wwwroot/airuler/results/{model}/(image|thumbnail|json) 에 저장한다.
+        private string ResultsRoot => Path.Combine(AirulerRoot, "results");
 
         private string ModelResultsRoot(string modelName) => Path.Combine(ResultsRoot, modelName);
         private string ModelResultsImageDir(string modelName) => Path.Combine(ModelResultsRoot(modelName), "image");
@@ -69,13 +69,13 @@ namespace HawkAI.Controllers
         private string ModelImagesDir(string modelName) => Path.Combine(ImagesDir, modelName);
 
         private static string ResultImageUrl(string modelName, string fileName)
-            => $"/results/{Uri.EscapeDataString(modelName)}/image/{Uri.EscapeDataString(fileName)}";
+            => $"/airuler/results/{Uri.EscapeDataString(modelName)}/image/{Uri.EscapeDataString(fileName)}";
 
         private static string ResultThumbnailUrl(string modelName, string fileName)
-            => $"/results/{Uri.EscapeDataString(modelName)}/thumbnail/{Uri.EscapeDataString(fileName)}";
+            => $"/airuler/results/{Uri.EscapeDataString(modelName)}/thumbnail/{Uri.EscapeDataString(fileName)}";
 
         private static string ResultJsonUrl(string modelName, string fileName)
-            => $"/results/{Uri.EscapeDataString(modelName)}/json/{Uri.EscapeDataString(Path.GetFileNameWithoutExtension(fileName) + ".json")}";
+            => $"/airuler/results/{Uri.EscapeDataString(modelName)}/json/{Uri.EscapeDataString(Path.GetFileNameWithoutExtension(fileName) + ".json")}";
 
         private static bool IsImageExt(string path)
         {
@@ -86,15 +86,15 @@ namespace HawkAI.Controllers
         // =========================
         // AIRuler Results (DCIM/AIRulerResult 업로드 대상)
         // - 업로드된 JPG의 EXIF(UserComment) JSON을 추출하여 DB에 저장하고
-        //   wwwroot/results/{modelName}/(image|thumbnail|json) 에 파일로 저장한다.
+        //   wwwroot/airuler/results/{modelName}/(image|thumbnail|json) 에 파일로 저장한다.
         // =========================
 
         /// <summary>
         /// ✅ 서버에 저장된 결과 목록(DB)
         /// - 정적 파일 경로:
-        ///   /results/{model}/image/{file}
-        ///   /results/{model}/thumbnail/{file}
-        ///   /results/{model}/json/{base}.json
+        ///   /airuler/results/{model}/image/{file}
+        ///   /airuler/results/{model}/thumbnail/{file}
+        ///   /airuler/results/{model}/json/{base}.json
         /// </summary>
         [HttpGet("results")]
         public async Task<IActionResult> ListResults()
@@ -125,7 +125,7 @@ namespace HawkAI.Controllers
 
         /// <summary>
         /// ✅ 결과 이미지 업로드
-        /// - 저장 위치: wwwroot/results/{modelName}/(image|thumbnail|json)
+        /// - 저장 위치: wwwroot/airuler/results/{modelName}/(image|thumbnail|json)
         /// - DB 저장: DataDbContext.AirulerFilmMeasureResults
         /// - 주의: EXIF(UserComment) JSON이 포함된 JPEG를 그대로 저장해야 하므로 원본은 재인코딩 금지.
         /// </summary>
@@ -208,7 +208,7 @@ namespace HawkAI.Controllers
                     if (root.TryGetProperty("results", out var resElem))
                         resultsJson = resElem.GetRawText();
 
-                    // 3) 폴더 구성: wwwroot/results/{model}/image|thumbnail|json
+                    // 3) 폴더 구성: wwwroot/airuler/results/{model}/image|thumbnail|json
                     Directory.CreateDirectory(ResultsRoot);
                     Directory.CreateDirectory(ModelResultsRoot(modelName));
                     var imgDir = ModelResultsImageDir(modelName);

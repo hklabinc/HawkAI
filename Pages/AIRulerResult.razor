@@ -89,7 +89,7 @@ else
     }
 
     private static string ThumbUrl(string modelName, string fileName)
-        => $"/results/{Uri.EscapeDataString(modelName)}/thumbnail/{Uri.EscapeDataString(fileName)}";
+        => $"/airuler/results/{Uri.EscapeDataString(modelName)}/thumbnail/{Uri.EscapeDataString(fileName)}";
 
     private async Task ReloadAsync()
     {
@@ -138,7 +138,7 @@ else
         Nav.NavigateTo($"/airuler-result/{Uri.EscapeDataString(modelName)}");
     }
 
-    private string ResultsRoot => Path.Combine(Env.WebRootPath, "results");
+    private string ResultsRoot => Path.Combine(Env.WebRootPath, "airuler", "results");
 
     private string ModelDirPath(string modelName)
         => Path.Combine(ResultsRoot, modelName);
@@ -148,7 +148,7 @@ else
         var selected = _modelCards.Where(x => x.IsSelectedForDelete).Select(x => x.ModelName).ToList();
         if (selected.Count == 0) return;
 
-        var ok = await JS.InvokeAsync<bool>("confirm", $"Delete selected model(s): {selected.Count}?\nThis will remove all DB rows and files under /results/{{model}}.");
+        var ok = await JS.InvokeAsync<bool>("confirm", $"Delete selected model(s): {selected.Count}?\nThis will remove all DB rows and files under /airuler/results/{{model}}.");
         if (!ok) return;
 
         await DeleteModelsAsync(selected);

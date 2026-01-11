@@ -188,10 +188,10 @@ else if (_records.Count > 0)
         await ReloadAsync();
     }
 
-    private string ResultsRoot => Path.Combine(Env.WebRootPath, "results");
+    private string ResultsRoot => Path.Combine(Env.WebRootPath, "airuler", "results");
 
     private static string ThumbUrl(string modelName, string fileName)
-        => $"/results/{Uri.EscapeDataString(modelName)}/thumbnail/{Uri.EscapeDataString(fileName)}";
+        => $"/airuler/results/{Uri.EscapeDataString(modelName)}/thumbnail/{Uri.EscapeDataString(fileName)}";
 
     private static string DetailUrl(string modelName, string fileName)
         => $"/airuler-result/{Uri.EscapeDataString(modelName)}/{Uri.EscapeDataString(fileName)}";

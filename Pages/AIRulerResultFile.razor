@@ -104,10 +104,10 @@ else
         }
     }
 
-    private string ResultsRoot => Path.Combine(Env.WebRootPath, "results");
+    private string ResultsRoot => Path.Combine(Env.WebRootPath, "airuler", "results");
 
     private static string ImageUrl(string modelName, string fileName)
-        => $"/results/{Uri.EscapeDataString(modelName)}/image/{Uri.EscapeDataString(fileName)}";
+        => $"/airuler/results/{Uri.EscapeDataString(modelName)}/image/{Uri.EscapeDataString(fileName)}";
 
     private string JsonFilePath(string modelName, string fileName)
         => Path.Combine(ResultsRoot, Path.GetFileName(modelName), "json", Path.GetFileNameWithoutExtension(fileName) + ".json");
