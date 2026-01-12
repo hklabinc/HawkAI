@@ -286,3 +286,36 @@ input:checked + .slider:before {
     font-size: 0.65rem;
     padding: .18rem .45rem;
 }
+
+
+
+.optimizer-grid {
+    display: grid;
+    grid-template-columns: 3fr 3fr 4fr; /* 3:3:4 */
+    gap: 1rem;
+    align-items: stretch;
+}
+
+/* 작은 화면에서는 세로로 쌓기 */
+@media (max-width: 992px) {
+    .optimizer-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.panel.card {
+    min-height: 560px;
+}
+
+.mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.95rem;
+}
+
+/* 입력이 많을 수 있으니 넉넉한 높이 + 마우스로 리사이즈 */
+textarea.resizable {
+    min-height: 480px;
+    resize: both; /* 가로/세로 모두 조절 */
+    overflow: auto;
+    width: 100%;
+}

@@ -1,0 +1,422 @@
+﻿@page "/airuler/calibration"
+@using System.Globalization
+@using System.Text.RegularExpressions
+@using System.Linq
+
+<PageTitle>Calibration</PageTitle>
+
+<h3 class="mb-3">Calibration</h3>
+
+<div class="optimizer-grid">
+    <!-- Left: Data -->
+    <div class="panel card">
+        <div class="card-header">
+            <b>Input Data</b> (@DataCountPreview)
+        </div>
+        <div class="card-body">
+            <textarea class="form-control mono resizable"
+                      placeholder="예) 319.608&#10;319.835&#10;319.675 ..."
+                      @bind="DataText" @bind:event="oninput"></textarea>
+            <div class="form-text">
+                구분자: 줄바꿈 / 공백 / 탭 / 콤마(,) / 세미콜론(;) 모두 가능
+            </div>
+        </div>
+    </div>
+
+    <!-- Middle: GT -->
+    <div class="panel card">
+        <div class="card-header">
+            <b>Ground Truth</b> (@GtCountPreview)
+        </div>
+        <div class="card-body">
+            <textarea class="form-control mono resizable"
+                      placeholder="예) 319.11&#10;(또는 data 개수만큼 여러 줄)"
+                      @bind="GtText" @bind:event="oninput"></textarea>
+            <div class="form-text">
+                GT가 1개면 모든 data에 동일하게 적용합니다.
+            </div>
+        </div>
+    </div>
+
+    <!-- Right: Compute + Results -->
+    <div class="panel card">
+        <div class="card-header">
+            <b>Optimize & Results</b>
+        </div>
+        <div class="card-body">
+            <button class="btn btn-primary w-100" @onclick="Compute">
+                최적 a 계산 (MAE)
+            </button>
+
+            <button class="btn btn-outline-secondary w-100 mt-2" @onclick="Clear">
+                입력/결과 초기화
+            </button>
+
+            @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+            {
+                <div class="alert alert-danger mt-3 mb-0" style="white-space: pre-wrap;">
+                    @ErrorMessage
+                </div>
+            }
+
+            @if (HasResults)
+            {
+                <div class="mt-3">
+                    <div class="small text-muted">
+                        data 개수: @N, gt 입력 개수: @GtCountResolved (@GtModeText)
+                    </div>
+
+                    <table class="table table-sm table-striped mt-2 mb-2">
+                        <thead>
+                            <tr>
+                                <th style="width: 70px;">OP</th>
+                                <th style="width: 180px;">a</th>
+                                <th style="width: 160px;">MAE</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>(base)</td>
+                                <td>-</td>
+                                <td>@FmtMae(BaselineMae)</td>
+                            </tr>
+                            <tr>
+                                <td>+</td>
+                                <td>@FmtA(AddA)</td>
+                                <td>@FmtMae(AddMae)</td>
+                            </tr>
+                            <tr>
+                                <td>*</td>
+                                <td>@FmtA(MulA)</td>
+                                <td>@FmtMae(MulMae)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="alert alert-success py-2 mb-0" style="white-space: pre-wrap;">
+                        <strong>Best:</strong>
+                        @BestSummary
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+
+@code
+{
+    private string DataText = "";
+    private string GtText = "";
+
+    private string ErrorMessage = "";
+    private bool HasResults = false;
+
+    private int N = 0;
+
+    private int GtCountResolved = 0;
+    private string GtModeText = "";
+
+    private double BaselineMae = double.NaN;
+
+    private double AddA = double.NaN;
+    private double AddMae = double.NaN;
+
+    private double MulA = double.NaN;
+    private double MulMae = double.NaN;
+
+    private string BestSummary = "";
+
+    private static readonly Regex SplitRegex = new Regex(@"[,\s;]+", RegexOptions.Compiled);
+
+    // ( ) 안에 들어갈 count (입력 중 실시간 갱신)
+    private int DataCountPreview => CountNumericTokens(DataText);
+    private int GtCountPreview => CountNumericTokens(GtText);
+
+    private void Clear()
+    {
+        DataText = "";
+        GtText = "";
+        ErrorMessage = "";
+        HasResults = false;
+        BestSummary = "";
+        N = 0;
+        GtCountResolved = 0;
+        GtModeText = "";
+    }
+
+    private void Compute()
+    {
+        ErrorMessage = "";
+        HasResults = false;
+        BestSummary = "";
+
+        // 1) parse data
+        var data = ParseNumbers(DataText, out var dataErr, "data");
+        if (dataErr is not null)
+        {
+            ErrorMessage = dataErr;
+            return;
+        }
+        if (data.Count == 0)
+        {
+            ErrorMessage = "data 값이 비어 있습니다. 왼쪽 입력창에 숫자를 1개 이상 넣어주세요.";
+            return;
+        }
+
+        // 2) parse gt
+        var gtInput = ParseNumbers(GtText, out var gtErr, "gt");
+        if (gtErr is not null)
+        {
+            ErrorMessage = gtErr;
+            return;
+        }
+        if (gtInput.Count == 0)
+        {
+            ErrorMessage = "gt 값이 비어 있습니다. 가운데 입력창에 숫자를 1개 이상 넣어주세요.";
+            return;
+        }
+
+        // 3) align gt length
+        List<double> gt;
+        if (gtInput.Count == 1)
+        {
+            gt = Enumerable.Repeat(gtInput[0], data.Count).ToList();
+            GtCountResolved = 1;
+            GtModeText = "1개 GT를 전체에 동일 적용";
+        }
+        else if (gtInput.Count == data.Count)
+        {
+            gt = gtInput;
+            GtCountResolved = gtInput.Count;
+            GtModeText = "data 개수와 동일";
+        }
+        else
+        {
+            ErrorMessage =
+                $"입력 개수 불일치: data={data.Count}개, gt={gtInput.Count}개 입니다.\n" +
+                "gt가 1개면 전체 data에 동일 적용됩니다.\n" +
+                "gt를 여러 개 입력할 경우에는 data 개수와 동일해야 합니다.";
+            return;
+        }
+
+        N = data.Count;
+
+        // 4) baseline
+        BaselineMae = MaeDataVsGt(data, gt);
+
+        // 5) + 최적 a (a는 음수 포함) : median(gt - data)
+        AddA = OptimalAddA_Mae(gt, data);
+        AddMae = MaeAdd(data, gt, AddA);
+
+        // 6) * 최적 a : weighted median of (gt/data) with weights |data|
+        MulA = OptimalMulA_Mae(gt, data);
+        MulMae = MaeMul(data, gt, MulA);
+
+        // 7) best summary (Expression 없이)
+        const double tol = 1e-12;
+        if (AddMae < MulMae - tol)
+        {
+            BestSummary = $"+   (a={FmtA(AddA)}, MAE={FmtMae(AddMae)})";
+        }
+        else if (MulMae < AddMae - tol)
+        {
+            BestSummary = $"*   (a={FmtA(MulA)}, MAE={FmtMae(MulMae)})";
+        }
+        else
+        {
+            BestSummary =
+                $"동률(거의 동일): MAE={FmtMae(AddMae)}\n" +
+                $"+ (a={FmtA(AddA)})\n" +
+                $"* (a={FmtA(MulA)})";
+        }
+
+        HasResults = true;
+    }
+
+    // -----------------------
+    // Parsing helpers
+    // -----------------------
+    private static int CountNumericTokens(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return 0;
+
+        var tokens = SplitRegex.Split(text.Trim());
+        int count = 0;
+
+        foreach (var raw in tokens)
+        {
+            var token = raw.Trim();
+            if (string.IsNullOrEmpty(token))
+                continue;
+
+            // 헤더를 실수로 붙여넣는 경우를 약간 관대하게 처리
+            if (string.Equals(token, "gt", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(token, "data", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (TryParseFiniteDouble(token, out _))
+                count++;
+        }
+
+        return count;
+    }
+
+    private static List<double> ParseNumbers(string? text, out string? error, string fieldName)
+    {
+        error = null;
+        var list = new List<double>();
+
+        if (string.IsNullOrWhiteSpace(text))
+            return list;
+
+        var tokens = SplitRegex.Split(text.Trim());
+        int idx = 0;
+
+        foreach (var raw in tokens)
+        {
+            var token = raw.Trim();
+            if (string.IsNullOrEmpty(token))
+                continue;
+
+            if (string.Equals(token, "gt", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(token, "data", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            idx++;
+            if (!TryParseFiniteDouble(token, out var v))
+            {
+                error =
+                    $"{fieldName} 입력에서 숫자로 변환할 수 없는 값이 있습니다: '{token}'\n" +
+                    $"(토큰 #{idx})\n" +
+                    "구분자는 줄바꿈/공백/탭/콤마/세미콜론을 사용할 수 있고, 소수점은 '.'을 사용하세요.";
+                return new List<double>();
+            }
+
+            list.Add(v);
+        }
+
+        return list;
+    }
+
+    private static bool TryParseFiniteDouble(string token, out double value)
+    {
+        if (double.TryParse(token, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out value))
+            return !double.IsNaN(value) && !double.IsInfinity(value);
+
+        if (double.TryParse(token, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out value))
+            return !double.IsNaN(value) && !double.IsInfinity(value);
+
+        return false;
+    }
+
+    // -----------------------
+    // Math helpers (Python과 동일한 로직)
+    // -----------------------
+    private static double Median(List<double> values)
+    {
+        if (values.Count == 0)
+            throw new InvalidOperationException("Median: empty list");
+
+        var sorted = values.OrderBy(v => v).ToList();
+        int n = sorted.Count;
+
+        if (n % 2 == 1)
+            return sorted[n / 2];
+
+        return (sorted[n / 2 - 1] + sorted[n / 2]) / 2.0;
+    }
+
+    private static double WeightedMedian(List<double> values, List<double> weights)
+    {
+        if (values.Count == 0)
+            throw new InvalidOperationException("WeightedMedian: empty list");
+        if (values.Count != weights.Count)
+            throw new InvalidOperationException("WeightedMedian: length mismatch");
+
+        var pairs = values.Zip(weights, (v, w) => (v, w))
+                          .OrderBy(p => p.v)
+                          .ToList();
+
+        double totalW = pairs.Sum(p => p.w);
+        if (totalW <= 0.0)
+            return Median(values);
+
+        double cutoff = 0.5 * totalW;
+        double cum = 0.0;
+
+        foreach (var (v, w) in pairs)
+        {
+            cum += w;
+            if (cum >= cutoff)
+                return v;
+        }
+
+        return pairs[^1].v;
+    }
+
+    // + 최적 a (MAE) : median(gt - data)
+    private static double OptimalAddA_Mae(List<double> gt, List<double> data)
+    {
+        var diffs = new List<double>(data.Count);
+        for (int i = 0; i < data.Count; i++)
+            diffs.Add(gt[i] - data[i]);
+
+        return Median(diffs);
+    }
+
+    // * 최적 a (MAE) : weighted median of (gt/data) with weights |data| (data!=0)
+    private static double OptimalMulA_Mae(List<double> gt, List<double> data)
+    {
+        var ratios = new List<double>();
+        var weights = new List<double>();
+
+        for (int i = 0; i < data.Count; i++)
+        {
+            double x = data[i];
+            if (x == 0.0)
+                continue;
+
+            ratios.Add(gt[i] / x);
+            weights.Add(Math.Abs(x));
+        }
+
+        if (ratios.Count == 0)
+            return 1.0;
+
+        return WeightedMedian(ratios, weights);
+    }
+
+    private static double MaeDataVsGt(List<double> data, List<double> gt)
+    {
+        double sum = 0.0;
+        for (int i = 0; i < data.Count; i++)
+            sum += Math.Abs(data[i] - gt[i]);
+
+        return sum / data.Count;
+    }
+
+    private static double MaeAdd(List<double> data, List<double> gt, double a)
+    {
+        double sum = 0.0;
+        for (int i = 0; i < data.Count; i++)
+            sum += Math.Abs((data[i] + a) - gt[i]);
+
+        return sum / data.Count;
+    }
+
+    private static double MaeMul(List<double> data, List<double> gt, double a)
+    {
+        double sum = 0.0;
+        for (int i = 0; i < data.Count; i++)
+            sum += Math.Abs((data[i] * a) - gt[i]);
+
+        return sum / data.Count;
+    }
+
+    // Formatting
+    private static string FmtA(double v) => v.ToString("F6", CultureInfo.InvariantCulture);
+    private static string FmtMae(double v) => v.ToString("F5", CultureInfo.InvariantCulture);
+}
+
