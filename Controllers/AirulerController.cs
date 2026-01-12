@@ -7,8 +7,8 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Processing;
 using System.Text;
-using System.Text.Json;
 using System.Text.Encodings.Web;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace HawkAI.Controllers
@@ -40,23 +40,6 @@ namespace HawkAI.Controllers
         private string ModelResultsImageDir(string modelName) => Path.Combine(ModelResultsRoot(modelName), "image");
         private string ModelResultsThumbnailDir(string modelName) => Path.Combine(ModelResultsRoot(modelName), "thumbnail");
         private string ModelResultsJsonDir(string modelName) => Path.Combine(ModelResultsRoot(modelName), "json");
-
-        private string SanitizeModelName(string raw)
-        {
-            raw = (raw ?? "").Trim();
-            if (raw.Length == 0) return "";
-
-            // 공백은 underscore로
-            raw = raw.Replace(' ', '_');
-
-            // 위험 문자 제거
-            raw = UnsafeChars.Replace(raw, "");
-
-            // 길이 제한(너무 긴 파일명 방지)
-            if (raw.Length > 80) raw = raw.Substring(0, 80);
-
-            return raw;
-        }
 
         private void EnsureBaseDirs()
         {
@@ -188,7 +171,7 @@ namespace HawkAI.Controllers
 
                     // 필수 필드
                     var modelNameRaw = GetString(root, "modelName");
-                    var modelName = SanitizeModelName(modelNameRaw);
+                    var modelName = AirulerNameHelper.SanitizeModelName(modelNameRaw);
                     if (string.IsNullOrWhiteSpace(modelName)) modelName = "Unknown";
 
                     var deviceId = GetString(root, "deviceId");
@@ -303,7 +286,7 @@ namespace HawkAI.Controllers
         {
             EnsureBaseDirs();
 
-            var model = SanitizeModelName(modelName);
+            var model = AirulerNameHelper.SanitizeModelName(modelName);
             if (string.IsNullOrWhiteSpace(model))
                 return BadRequest("Invalid modelName.");
 
@@ -617,7 +600,7 @@ namespace HawkAI.Controllers
         {
             EnsureBaseDirs();
 
-            var model = SanitizeModelName(req.ModelName);
+            var model = AirulerNameHelper.SanitizeModelName(req.ModelName);
             if (string.IsNullOrWhiteSpace(model))
                 return BadRequest("ModelName is invalid.");
 
@@ -631,7 +614,7 @@ namespace HawkAI.Controllers
         {
             EnsureBaseDirs();
 
-            var model = SanitizeModelName(modelName);
+            var model = AirulerNameHelper.SanitizeModelName(modelName);
             if (string.IsNullOrWhiteSpace(model))
                 return BadRequest("Invalid modelName.");
 
@@ -661,7 +644,7 @@ namespace HawkAI.Controllers
         {
             EnsureBaseDirs();
 
-            var model = SanitizeModelName(modelName);
+            var model = AirulerNameHelper.SanitizeModelName(modelName);
             if (string.IsNullOrWhiteSpace(model))
                 return BadRequest("Invalid modelName.");
 
@@ -712,7 +695,7 @@ namespace HawkAI.Controllers
         {
             EnsureBaseDirs();
 
-            var model = SanitizeModelName(modelName);
+            var model = AirulerNameHelper.SanitizeModelName(modelName);
             var jsonPath = Path.Combine(ModelsDir, $"{model}.json");
 
             if (!System.IO.File.Exists(jsonPath))
@@ -730,7 +713,7 @@ namespace HawkAI.Controllers
         {
             EnsureBaseDirs();
 
-            var model = SanitizeModelName(modelName);
+            var model = AirulerNameHelper.SanitizeModelName(modelName);
             if (string.IsNullOrWhiteSpace(model))
                 return BadRequest("Invalid modelName.");
 
