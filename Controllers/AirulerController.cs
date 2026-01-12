@@ -3,9 +3,6 @@ using HawkAI.Data.AirulerResultService;
 using HawkAI.Helper;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Jpeg;
-using SixLabors.ImageSharp.Processing;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -38,7 +35,6 @@ namespace HawkAI.Controllers
 
         private string ModelResultsRoot(string modelName) => Path.Combine(ResultsRoot, modelName);
         private string ModelResultsImageDir(string modelName) => Path.Combine(ModelResultsRoot(modelName), "image");
-        private string ModelResultsThumbnailDir(string modelName) => Path.Combine(ModelResultsRoot(modelName), "thumbnail");
         private string ModelResultsJsonDir(string modelName) => Path.Combine(ModelResultsRoot(modelName), "json");
 
         private void EnsureBaseDirs()
@@ -53,9 +49,6 @@ namespace HawkAI.Controllers
 
         private static string ResultImageUrl(string modelName, string fileName)
             => $"/airuler/results/{Uri.EscapeDataString(modelName)}/image/{Uri.EscapeDataString(fileName)}";
-
-        private static string ResultThumbnailUrl(string modelName, string fileName)
-            => $"/airuler/results/{Uri.EscapeDataString(modelName)}/thumbnail/{Uri.EscapeDataString(fileName)}";
 
         private static string ResultJsonUrl(string modelName, string fileName)
             => $"/airuler/results/{Uri.EscapeDataString(modelName)}/json/{Uri.EscapeDataString(Path.GetFileNameWithoutExtension(fileName) + ".json")}";
@@ -93,7 +86,6 @@ namespace HawkAI.Controllers
                     modelName = x.ModelName,
                     fileName = x.FileName,
                     imageUrl = ResultImageUrl(x.ModelName, x.FileName),
-                    thumbnailUrl = ResultThumbnailUrl(x.ModelName, x.FileName),
                     jsonUrl = ResultJsonUrl(x.ModelName, x.FileName),
                     timestampUtc = x.TimestampUtc,
                     deviceId = x.DeviceId,
@@ -195,10 +187,8 @@ namespace HawkAI.Controllers
                     Directory.CreateDirectory(ResultsRoot);
                     Directory.CreateDirectory(ModelResultsRoot(modelName));
                     var imgDir = ModelResultsImageDir(modelName);
-                    var thumbDir = ModelResultsThumbnailDir(modelName);
                     var jsonDir = ModelResultsJsonDir(modelName);
                     Directory.CreateDirectory(imgDir);
-                    Directory.CreateDirectory(thumbDir);
                     Directory.CreateDirectory(jsonDir);
 
                     // 4) 저장 파일명 결정(중복 처리)
@@ -234,11 +224,7 @@ namespace HawkAI.Controllers
                         });
                     await System.IO.File.WriteAllTextAsync(jsonPath, prettyJson, new UTF8Encoding(false));
 
-                    // 7) Thumbnail 생성
-                    var thumbPath = Path.Combine(thumbDir, targetName);
-                    await CreateThumbnailAsync(imagePath, thumbPath);
-
-                    // 8) DB 저장
+                    // 7) DB 저장
                     var entity = new AirulerFilmMeasureResult
                     {
                         FileName = targetName,
@@ -261,7 +247,6 @@ namespace HawkAI.Controllers
                         modelName,
                         fileName = targetName,
                         imageUrl = ResultImageUrl(modelName, targetName),
-                        thumbnailUrl = ResultThumbnailUrl(modelName, targetName),
                         jsonUrl = ResultJsonUrl(modelName, targetName)
                     });
                 }
@@ -499,20 +484,6 @@ namespace HawkAI.Controllers
             // CSV 표준: " 는 "" 로 이스케이프
             var escaped = s.Replace("\"", "\"\"");
             return $"\"{escaped}\"";
-        }
-
-        private static async Task CreateThumbnailAsync(string imagePath, string thumbPath)
-        {
-            // 썸네일은 원본 해상도가 매우 크므로 1/10 ~ 1/20 수준으로 축소
-            using var img = await Image.LoadAsync(imagePath);
-            var maxDim = Math.Max(img.Width, img.Height);
-            var scale = maxDim >= 12000 ? 0.05 : 0.1; // 큰 이미지는 더 축소
-
-            var newW = Math.Max(1, (int)Math.Round(img.Width * scale));
-            var newH = Math.Max(1, (int)Math.Round(img.Height * scale));
-
-            img.Mutate(x => x.Resize(newW, newH));
-            await img.SaveAsJpegAsync(thumbPath, new JpegEncoder { Quality = 80 });
         }
 
         private static string GetString(JsonElement root, string name)

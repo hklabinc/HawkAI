@@ -43,7 +43,7 @@ else
         @foreach (var m in _modelCards)
         {
             <div class="card" style="width: 320px; position: relative;">
-                <img src="@m.RepresentativeThumbnailUrl"
+                <img src="@m.RepresentativeImageUrl"
                      class="card-img-top"
                      style="height: 180px; object-fit: contain; object-position: center; background: #f8f9fa; cursor: pointer;"
                      @onclick="() => GoToModel(m.ModelName)" />
@@ -131,7 +131,7 @@ else
         public string ModelName { get; init; } = string.Empty;
         public int FileCount { get; init; }
         public DateTime LatestTimestampUtc { get; init; }
-        public string RepresentativeThumbnailUrl { get; init; } = string.Empty;
+        public string RepresentativeImageUrl { get; init; } = string.Empty;
         public bool IsSelectedForDelete { get; set; }
 
         public string LatestTimestampLocal => LatestTimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
@@ -146,8 +146,8 @@ else
         await ReloadAsync();
     }
 
-    private static string ThumbUrl(string modelName, string fileName)
-        => $"/airuler/results/{Uri.EscapeDataString(modelName)}/thumbnail/{Uri.EscapeDataString(fileName)}";
+    private static string ImageUrl(string modelName, string fileName)
+        => $"/airuler/results/{Uri.EscapeDataString(modelName)}/image/{Uri.EscapeDataString(fileName)}";
 
     private async Task ReloadAsync()
     {
@@ -173,7 +173,7 @@ else
                         ModelName = latest.ModelName,
                         FileCount = g.Count(),
                         LatestTimestampUtc = latest.TimestampUtc,
-                        RepresentativeThumbnailUrl = ThumbUrl(latest.ModelName, latest.FileName),
+                        RepresentativeImageUrl = ImageUrl(latest.ModelName, latest.FileName),
                         IsSelectedForDelete = prev.TryGetValue(latest.ModelName, out var sel) && sel
                     };
                 })
@@ -304,13 +304,6 @@ else
             _renameError = $"Model '{newName}' already exists.";
             return;
         }
-
-        var ok = await JS.InvokeAsync<bool>(
-            "confirm",
-            $"Rename model?\n\nFrom: {oldName}\nTo: {newName}\n\nThis will update DB rows and rename folder under /airuler/results/."
-        );
-
-        if (!ok) return;
 
         _renaming = true;
         _renameError = null;

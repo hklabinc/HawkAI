@@ -21,6 +21,19 @@
             <label class="form-check-label small" for="showErrSwitch">Show error</label>
         </div>
 
+        <div class="d-flex align-items-center gap-2">
+            <label class="small text-muted mb-0" for="pageSizeInput">Rows</label>
+            <input id="pageSizeInput"
+                   class="form-control form-control-sm"
+                   style="width: 84px;"
+                   type="number"
+                   min="1"
+                   max="200"
+                   step="1"
+                   @bind="PageSize"
+                   @bind:event="oninput" />
+        </div>
+
         <a class="btn btn-sm btn-outline-secondary" href="/airuler/results">Back</a>
         <button class="btn btn-sm btn-outline-primary" @onclick="ReloadAsync">Refresh</button>
 
@@ -73,7 +86,6 @@ else if (_records.Count > 0)
                         </div>
                     </th>
 
-                    <th style="min-width: 180px;"><strong>Image</strong></th>
                     <th style="min-width: 210px;"><strong>Info</strong></th>
                     <th style="min-width: 50px;"><strong>Film</strong></th>
 
@@ -93,10 +105,17 @@ else if (_records.Count > 0)
             </thead>
 
             <tbody>
-                @for (var recIdx = 0; recIdx < _records.Count; recIdx++)
+                @{
+                    var page = Math.Clamp(_page, 1, TotalPages);
+                    var pageSize = Math.Max(1, PageSize);
+                    var baseNo = (page - 1) * pageSize;
+                    var pageRecords = PagedRecords.ToList();
+                }
+
+                @for (var recIdx = 0; recIdx < pageRecords.Count; recIdx++)
                 {
-                    var r = _records[recIdx];
-                    var no = recIdx + 1;
+                    var r = pageRecords[recIdx];
+                    var no = baseNo + recIdx + 1;
 
                     var filmRows = r.Films.Count > 0 ? r.Films : new List<FilmRowVm> { new FilmRowVm { Film = 0 } };
                     var rowspan = filmRows.Count;
@@ -117,17 +136,12 @@ else if (_records.Count > 0)
                                 </td>
 
                                 <td rowspan="@rowspan" style="vertical-align: top;">
-                                    <a class="btn btn-link p-0 text-start" href="@r.DetailPageUrl" style="text-decoration:none;">
-                                        <div style="width: 170px;">
-                                            <img src="@r.ThumbnailUrl"
-                                                 style="width: 170px; height: 96px; object-fit: contain; object-position: center; background: #f8f9fa; border: 1px solid #eee;" />
-                                        </div>
-                                    </a>
-                                </td>
-
-                                <td rowspan="@rowspan" style="vertical-align: top;">
                                     <div class="small">
-                                        <div><b>@r.Entity.FileName</b></div>
+                                        <div>
+                                            <a href="@r.DetailPageUrl" style="text-decoration:none;">
+                                                <b>@r.Entity.FileName</b>
+                                            </a>
+                                        </div>
                                         <div><b>Time</b>: @r.TimestampLocal</div>
                                         <div><b>Device</b>: @r.Entity.DeviceId</div>
                                         <div><b>Size</b>: @r.Entity.ImageSize</div>
@@ -172,12 +186,94 @@ else if (_records.Count > 0)
             </tbody>
         </table>
     </div>
+
+    @if (_records.Count > 0)
+    {
+        <div class="d-flex justify-content-center mt-2">
+            <div class="btn-group" role="group" aria-label="Pagination">
+                <button class="btn btn-sm btn-outline-secondary"
+                        disabled="@(_page <= 1)"
+                        @onclick="() => GoToPage(_page - 1)">
+                    Prev
+                </button>
+
+                @foreach (var p in GetPageNumbers())
+                {
+                    if (p == -1)
+                    {
+                        <button class="btn btn-sm btn-outline-secondary" disabled>…</button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-sm @(_page == p ? "btn-primary" : "btn-outline-secondary")"
+                                @onclick="() => GoToPage(p)">
+                            @p
+                        </button>
+                    }
+                }
+
+                <button class="btn btn-sm btn-outline-secondary"
+                        disabled="@(_page >= TotalPages)"
+                        @onclick="() => GoToPage(_page + 1)">
+                    Next
+                </button>
+            </div>
+        </div>
+    }
 }
 
 @code {
     [Parameter] public string? ModelName { get; set; }
 
     private bool _showError = true;
+
+    // Pagination (records per page)
+    private int _pageSize = 10;   // default
+    private int PageSize
+    {
+        get => _pageSize;
+        set
+        {
+            var v = value;
+            if (v < 1) v = 1;
+            if (v > 200) v = 200;
+
+            if (_pageSize != v)
+            {
+                _pageSize = v;
+                _page = 1; // ✅ 페이지 크기 바꾸면 1페이지로
+            }
+        }
+    }
+    private int _page = 1;        // 1-based
+
+    private int TotalPages
+    {
+        get
+        {
+            var size = Math.Max(1, PageSize);
+            var total = _records.Count;
+            return Math.Max(1, (int)Math.Ceiling(total / (double)size));
+        }
+    }
+
+    private IEnumerable<RecordVm> PagedRecords
+    {
+        get
+        {
+            var size = Math.Max(1, PageSize);
+            var page = Math.Clamp(_page, 1, TotalPages);
+            var skip = (page - 1) * size;
+            return _records.Skip(skip).Take(size);
+        }
+    }
+
+    private void NormalizePaging()
+    {
+        if (PageSize < 1) PageSize = 1;
+        if (PageSize > 200) PageSize = 200; // 과도한 렌더 방지
+        _page = Math.Clamp(_page, 1, TotalPages);
+    }
 
     private sealed class MeasureColumnVm
     {
@@ -298,6 +394,9 @@ else if (_records.Count > 0)
 
             _measureColumns = cols;
             _records = vms;
+
+            // 페이지네이션 보정
+            NormalizePaging();
         }
         catch (Exception ex)
         {
@@ -456,5 +555,38 @@ else if (_records.Count > 0)
         {
             // ignore
         }
+    }
+
+    private void GoToPage(int p)
+    {
+        _page = Math.Clamp(p, 1, TotalPages);
+    }
+
+    private IEnumerable<int> GetPageNumbers()
+    {
+        // 표시 예: Prev [1] [2] ... [N] Next
+        // 페이지가 많으면 가운데만 보여주고 ... 넣음
+        var total = TotalPages;
+        var cur = Math.Clamp(_page, 1, total);
+
+        if (total <= 12)
+        {
+            for (int i = 1; i <= total; i++) yield return i;
+            yield break;
+        }
+
+        // 항상 1,2, 마지막 2개는 보여주고, 현재 주변 2개도 표시
+        yield return 1;
+        yield return 2;
+
+        var start = Math.Max(3, cur - 2);
+        var end = Math.Min(total - 2, cur + 2);
+
+        if (start > 3) yield return -1; // ...
+        for (int i = start; i <= end; i++) yield return i;
+        if (end < total - 2) yield return -1; // ...
+
+        yield return total - 1;
+        yield return total;
     }
 }
