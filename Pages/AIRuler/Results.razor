@@ -1,5 +1,8 @@
 @page "/airuler/results"
 
+@using System.Text
+@using System.Text.Json
+@using System.Text.Encodings.Web
 @using HawkAI.Data
 @using HawkAI.Data.AirulerResultService
 @using HawkAI.Helper
@@ -16,6 +19,13 @@
     <button class="btn btn-outline-primary" @onclick="ReloadAsync">
         <span class="oi oi-reload"></span>
         Refresh
+    </button>
+
+    <button class="btn btn-success"
+            @onclick="PrepareCopyOrMerge"
+            disabled="@(!_modelCards.Any(x => x.IsSelectedForDelete))">
+        <span class="oi oi-transfer"></span>
+        Copy / Merge
     </button>
 
     <button class="btn btn-danger" @onclick="ConfirmDeleteSelectedModelsAsync" disabled="@(!_modelCards.Any(x => x.IsSelectedForDelete))">
@@ -117,6 +127,78 @@ else
     </div>
 }
 
+@if (_showCopyMergeModal)
+{
+    <!-- Backdrop -->
+    <div class="modal-backdrop fade show"></div>
+
+    <!-- Modal -->
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" style="background: rgba(0,0,0,0.2);">
+        <div class="modal-dialog modal-dialog-centered" role="document" style="max-width: 460px;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h6 class="modal-title">
+                        <b>@(_copyMergeIsCopyMode ? "Copy Model" : "Merge Models")</b>
+                    </h6>
+                    <button type="button" class="btn-close" @onclick="CloseCopyMergeModal"></button>
+                </div>
+
+                <div class="modal-body">
+                    @if (_copyMergeIsCopyMode)
+                    {
+                        <div class="small text-muted mb-2">
+                            Copy model: <b>@(_copyMergeSources.FirstOrDefault() ?? "")</b>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="small text-muted mb-2">
+                            Merge models (@_copyMergeSources.Count):
+                        </div>
+                        <div class="border rounded p-2" style="max-height: 120px; overflow:auto;">
+                            <ul class="mb-0 small">
+                                @foreach (var s in _copyMergeSources)
+                                {
+                                    <li>@s</li>
+                                }
+                            </ul>
+                        </div>
+
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="allowDup" @bind="_copyMergeAllowDuplicates" />
+                            <label class="form-check-label small" for="allowDup">
+                                Allow duplicate filenames (auto rename with _1, _2...)
+                            </label>
+                        </div>
+                    }
+
+                    <div class="mt-3">
+                        <label class="form-label">Target model name</label>
+                        <input class="form-control" @bind="_copyMergeTargetName" placeholder="e.g. M2379-00" />
+                        <div class="form-text">Allowed: A-Z, a-z, 0-9, '_' '-'</div>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(_copyMergeError))
+                    {
+                        <div class="text-danger small mt-2">@_copyMergeError</div>
+                    }
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-sm btn-outline-secondary" @onclick="CloseCopyMergeModal" disabled="@_copyMergeWorking">Cancel</button>
+                <button class="btn btn-sm btn-success"
+                        @onclick="ExecuteCopyOrMergeAsync"
+                        disabled="@_copyMergeWorking">
+                    @(_copyMergeWorking
+                                        ? (_copyMergeIsCopyMode ? "Copying..." : "Merging...")
+                                        : (_copyMergeIsCopyMode ? "Copy" : "Merge"))
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+}
+
 
 @code {
     // ---- Rename Modal State ----
@@ -125,6 +207,15 @@ else
     private string _renameOldName = "";
     private string _renameNewName = "";
     private string? _renameError;
+
+    // ---- Copy/Merge Modal State ----
+    private bool _showCopyMergeModal = false;
+    private bool _copyMergeIsCopyMode = true;
+    private bool _copyMergeWorking = false;
+    private bool _copyMergeAllowDuplicates = true;
+    private string _copyMergeTargetName = "";
+    private string? _copyMergeError;
+    private List<string> _copyMergeSources = new();
 
     private sealed class ModelCardVm
     {
@@ -361,5 +452,376 @@ else
         var root = Path.GetFullPath(ResultsRoot);
         if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase))
             throw new Exception("Invalid path (outside results root).");
+    }
+
+    // =========================
+    // Copy / Merge
+    // =========================
+    private async Task PrepareCopyOrMerge()
+    {
+        var selected = _modelCards
+            .Where(x => x.IsSelectedForDelete)
+            .Select(x => x.ModelName)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (selected.Count == 0)
+        {
+            await JS.InvokeVoidAsync("alert", "⚠️ Please select at least one model.");
+            return;
+        }
+
+        // Rename modal이 켜져있으면 닫아주기(중복 모달 방지)
+        _showRenameModal = false;
+
+        if (selected.Count == 1)
+            OpenCopyModal(selected[0]);
+        else
+            OpenMergeModal(selected);
+    }
+
+    private void OpenCopyModal(string sourceModel)
+    {
+        _copyMergeIsCopyMode = true;
+        _copyMergeSources = new List<string> { sourceModel };
+        _copyMergeAllowDuplicates = true; // copy 모드에서는 의미 없음
+        _copyMergeTargetName = $"{sourceModel}_Copy_{DateTime.Now:yyyyMMdd_HHmmss}";
+        _copyMergeError = null;
+        _showCopyMergeModal = true;
+    }
+
+    private void OpenMergeModal(List<string> sources)
+    {
+        _copyMergeIsCopyMode = false;
+        _copyMergeSources = sources
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x)
+            .ToList();
+
+        _copyMergeAllowDuplicates = true;
+
+        // 기본값은 선택한 모델명들을 '-'로 연결(너무 길면 fallback)
+        var joined = string.Join("-", _copyMergeSources);
+        _copyMergeTargetName = joined.Length <= 80 ? joined : $"Merged_{DateTime.Now:yyyyMMdd_HHmmss}";
+
+        _copyMergeError = null;
+        _showCopyMergeModal = true;
+    }
+
+    private void CloseCopyMergeModal()
+    {
+        _showCopyMergeModal = false;
+        _copyMergeWorking = false;
+        _copyMergeError = null;
+        _copyMergeSources = new();
+        _copyMergeTargetName = "";
+        _copyMergeAllowDuplicates = true;
+    }
+
+    private async Task ExecuteCopyOrMergeAsync()
+    {
+        if (_copyMergeWorking)
+            return;
+
+        _copyMergeError = null;
+
+        var sources = _copyMergeSources
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (sources.Count == 0)
+        {
+            _copyMergeError = "No source model selected.";
+            return;
+        }
+
+        var targetRaw = (_copyMergeTargetName ?? "").Trim();
+        var target = AirulerNameHelper.SanitizeModelName(targetRaw);
+        if (string.IsNullOrWhiteSpace(target))
+        {
+            _copyMergeError = "Target model name is empty.";
+            return;
+        }
+
+        if (sources.Any(s => string.Equals(s, target, StringComparison.OrdinalIgnoreCase)))
+        {
+            _copyMergeError = "Target model name must be different from selected model(s).";
+            return;
+        }
+
+        if (await ModelExistsAsync(target))
+        {
+            _copyMergeError = $"Model '{target}' already exists.";
+            return;
+        }
+
+        _copyMergeWorking = true;
+
+        try
+        {
+            int copiedCount;
+            if (_copyMergeIsCopyMode)
+            {
+                copiedCount = await CopyModelAsync(sources[0], target);
+                _statusMessage = $"Copied: {sources[0]} → {target} ({copiedCount} file(s))";
+            }
+            else
+            {
+                copiedCount = await MergeModelsAsync(sources, target, _copyMergeAllowDuplicates);
+                _statusMessage = $"Merged: {string.Join(", ", sources)} → {target} ({copiedCount} file(s))";
+            }
+
+            // ✅ 작업 후 선택 해제(실수 방지)
+            foreach (var c in _modelCards)
+                c.IsSelectedForDelete = false;
+
+            CloseCopyMergeModal();
+            await ReloadAsync();
+        }
+        catch (Exception ex)
+        {
+            _copyMergeError = ex.Message;
+        }
+        finally
+        {
+            _copyMergeWorking = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task<bool> ModelExistsAsync(string modelName)
+    {
+        if (string.IsNullOrWhiteSpace(modelName))
+            return false;
+
+        // 1) 폴더 존재
+        var dir = ModelDirPath(modelName);
+        EnsureUnderResultsRoot(dir);
+        if (Directory.Exists(dir))
+            return true;
+
+        // 2) DB 존재
+        return await Db.AirulerFilmMeasureResults
+            .AsNoTracking()
+            .AnyAsync(x => x.ModelName == modelName);
+    }
+
+    private async Task<int> CopyModelAsync(string sourceModel, string targetModel)
+    {
+        // copy는 merge의 special case (source 1개)
+        return await CopyOrMergeCoreAsync(new List<string> { sourceModel }, targetModel, allowDuplicateRename: true);
+    }
+
+    private async Task<int> MergeModelsAsync(List<string> sourceModels, string targetModel, bool allowDuplicateRename)
+    {
+        if (sourceModels is null || sourceModels.Count < 2)
+            throw new Exception("Select at least 2 models to merge.");
+
+        return await CopyOrMergeCoreAsync(sourceModels, targetModel, allowDuplicateRename);
+    }
+
+    private string ModelImageDirPath(string modelName) => Path.Combine(ModelDirPath(modelName), "image");
+    private string ModelJsonDirPath(string modelName) => Path.Combine(ModelDirPath(modelName), "json");
+
+    private string ModelImageFilePath(string modelName, string fileName)
+        => Path.Combine(ModelImageDirPath(modelName), Path.GetFileName(fileName));
+
+    private string ModelJsonFilePath(string modelName, string fileName)
+        => Path.Combine(ModelJsonDirPath(modelName), Path.GetFileNameWithoutExtension(fileName) + ".json");
+
+    private async Task<int> CopyOrMergeCoreAsync(List<string> sourceModels, string targetModel, bool allowDuplicateRename)
+    {
+        var sources = sourceModels
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (sources.Count == 0)
+            throw new Exception("No source models.");
+
+        // Target folders
+        Directory.CreateDirectory(ResultsRoot);
+        var targetDir = ModelDirPath(targetModel);
+        var targetImgDir = ModelImageDirPath(targetModel);
+        var targetJsonDir = ModelJsonDirPath(targetModel);
+
+        EnsureUnderResultsRoot(targetDir);
+        EnsureUnderResultsRoot(targetImgDir);
+        EnsureUnderResultsRoot(targetJsonDir);
+
+        if (Directory.Exists(targetDir))
+            throw new Exception($"Target folder already exists: {targetDir}");
+
+        Directory.CreateDirectory(targetImgDir);
+        Directory.CreateDirectory(targetJsonDir);
+
+        var usedFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var newEntities = new List<AirulerFilmMeasureResult>();
+
+        try
+        {
+            // 1) 파일 복사 + 엔티티 준비
+            foreach (var srcModel in sources)
+            {
+                var rows = await Db.AirulerFilmMeasureResults
+                    .AsNoTracking()
+                    .Where(x => x.ModelName == srcModel)
+                    .OrderByDescending(x => x.TimestampUtc)
+                    .ThenByDescending(x => x.Id)
+                    .ToListAsync();
+
+                foreach (var r in rows)
+                {
+                    var srcFileName = Path.GetFileName(r.FileName);
+                    if (string.IsNullOrWhiteSpace(srcFileName))
+                        continue;
+
+                    var targetFileName = MakeUniqueFileName(srcFileName, usedFileNames, allowDuplicateRename);
+                    if (string.IsNullOrWhiteSpace(targetFileName))
+                    {
+                        // allowDuplicateRename=false 인 경우 중복은 skip
+                        continue;
+                    }
+
+                    // image copy (필수)
+                    var srcImagePath = ModelImageFilePath(srcModel, srcFileName);
+                    var dstImagePath = ModelImageFilePath(targetModel, targetFileName);
+                    EnsureUnderResultsRoot(srcImagePath);
+                    EnsureUnderResultsRoot(dstImagePath);
+
+                    if (!System.IO.File.Exists(srcImagePath))
+                        throw new Exception($"Source image not found: /airuler/results/{srcModel}/image/{srcFileName}");
+
+                    System.IO.File.Copy(srcImagePath, dstImagePath, overwrite: false);
+
+                    // json copy (없으면 fallback 생성)
+                    var srcJsonPath = ModelJsonFilePath(srcModel, srcFileName);
+                    var dstJsonPath = ModelJsonFilePath(targetModel, targetFileName);
+                    EnsureUnderResultsRoot(srcJsonPath);
+                    EnsureUnderResultsRoot(dstJsonPath);
+
+                    if (System.IO.File.Exists(srcJsonPath))
+                    {
+                        System.IO.File.Copy(srcJsonPath, dstJsonPath, overwrite: false);
+                    }
+                    else
+                    {
+                        var fallback = BuildFallbackUserCommentJson(r, targetModel);
+                        await System.IO.File.WriteAllTextAsync(dstJsonPath, fallback, new UTF8Encoding(false));
+                    }
+
+                    // DB row copy
+                    newEntities.Add(new AirulerFilmMeasureResult
+                    {
+                        FileName = targetFileName,
+                        TimestampUtc = r.TimestampUtc,
+                        DeviceId = r.DeviceId,
+                        ModelName = targetModel,
+                        ImageSize = r.ImageSize,
+                        MeasureMethod = r.MeasureMethod,
+                        DetectedFilms = r.DetectedFilms,
+                        ResultsJson = r.ResultsJson
+                    });
+                }
+            }
+
+            // 2) DB insert (transaction)
+            await using var tx = await Db.Database.BeginTransactionAsync();
+            Db.AirulerFilmMeasureResults.AddRange(newEntities);
+            await Db.SaveChangesAsync();
+            await tx.CommitAsync();
+
+            return newEntities.Count;
+        }
+        catch
+        {
+            // 실패 시 폴더 정리
+            SafeDeleteDirectory(targetDir);
+            throw;
+        }
+    }
+
+    private static string MakeUniqueFileName(string desired, HashSet<string> used, bool allowDuplicateRename)
+    {
+        desired = Path.GetFileName(desired);
+        if (string.IsNullOrWhiteSpace(desired))
+            return string.Empty;
+
+        var baseName = Path.GetFileNameWithoutExtension(desired);
+        var ext = Path.GetExtension(desired);
+        if (string.IsNullOrWhiteSpace(baseName)) baseName = "result";
+        if (string.IsNullOrWhiteSpace(ext)) ext = ".jpg";
+
+        var candidate = $"{baseName}{ext}";
+        var i = 1;
+        while (!used.Add(candidate))
+        {
+            if (!allowDuplicateRename)
+                return string.Empty;
+
+            candidate = $"{baseName}_{i}{ext}";
+            i++;
+        }
+
+        return candidate;
+    }
+
+    private static (int w, int h) ParseImageSize(string? imageSize)
+    {
+        if (string.IsNullOrWhiteSpace(imageSize))
+            return (0, 0);
+
+        var s = imageSize.Trim();
+        var parts = s.Split('*', 'x', 'X');
+        if (parts.Length < 2)
+            return (0, 0);
+
+        if (int.TryParse(parts[0].Trim(), out var w) && int.TryParse(parts[1].Trim(), out var h))
+            return (w, h);
+
+        return (0, 0);
+    }
+
+    private static string BuildFallbackUserCommentJson(AirulerFilmMeasureResult row, string modelName)
+    {
+        // 원본 json 파일이 없어도, 최소한 detail 페이지에서 볼 수 있도록 대체 JSON 생성
+        JsonElement resultsEl;
+        try
+        {
+            using var d = JsonDocument.Parse(string.IsNullOrWhiteSpace(row.ResultsJson) ? "[]" : row.ResultsJson);
+            resultsEl = d.RootElement.Clone();
+        }
+        catch
+        {
+            using var d = JsonDocument.Parse("[]");
+            resultsEl = d.RootElement.Clone();
+        }
+
+        var (w, h) = ParseImageSize(row.ImageSize);
+
+        var obj = new Dictionary<string, object?>
+        {
+            ["modelName"] = modelName,
+            ["deviceId"] = row.DeviceId,
+            ["measureMethod"] = row.MeasureMethod,
+            ["detectedFilms"] = row.DetectedFilms,
+            ["timestampMs"] = new DateTimeOffset(row.TimestampUtc).ToUnixTimeMilliseconds(),
+            ["timestamp"] = row.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"),
+            ["image"] = (w > 0 && h > 0) ? new Dictionary<string, object?> { ["width"] = w, ["height"] = h } : null,
+            ["results"] = resultsEl
+        };
+
+        // null 제거(깨끗하게)
+        var cleaned = obj.Where(kv => kv.Value is not null)
+            .ToDictionary(kv => kv.Key, kv => kv.Value);
+
+        return JsonSerializer.Serialize(cleaned, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        });
     }
 }
