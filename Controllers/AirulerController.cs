@@ -502,6 +502,26 @@ namespace HawkAI.Controllers
                 }
             }
 
+            // ✅ 전체 film 번호(모든 index의 union) → 오름차순
+            var filmOrder = agg.Values
+                .SelectMany(fm => fm.Keys)
+                .Distinct()
+                .OrderBy(x => x)
+                .ToList();
+
+            if (filmOrder.Count == 0)
+            {
+                return Ok(new
+                {
+                    success = true,
+                    modelName = model,
+                    message = "No err values found to calibrate.",
+                    savedPath = $"/airuler/models/{model}.json",
+                    updatedMeasures = 0
+                });
+            }
+
+
             // 4) 모델 JSON에서 measure_{index} 찾아 adjust 업데이트
             var updated = new List<string>();
             var notFoundInModel = new List<string>();
@@ -519,27 +539,38 @@ namespace HawkAI.Controllers
                     continue;
                 }
 
-                // film 번호 순서대로 errAvg -> (규칙에 따라 부호 반대로) 문자열 생성
+                // ✅ 기존 adjust를 읽어서(없으면 0,0,...) + 이번 delta(-errAvg)를 더해서 저장
+                var existingAdjustText = measureObj["adjust"]?.GetValue<string>() ?? "";
+                var existingVals = ParseAdjustList(existingAdjustText); // "-0.912, +0.123" → [-0.912, 0.123]
+
+                // index별 film 집계
                 var filmMap = kv.Value;
-                var parts = new List<string>();
 
-                foreach (var filmNo in filmMap.Keys.OrderBy(x => x))
+                // 새 adjust 값 만들기(전체 filmOrder 기준)
+                var parts = new List<string>(filmOrder.Count);
+
+                for (int i = 0; i < filmOrder.Count; i++)
                 {
-                    var a = filmMap[filmNo];
-                    if (a.Count <= 0) continue;
+                    var filmNo = filmOrder[i];
 
-                    var avgErr = a.SumErr / a.Count;
+                    // 기존 값(없으면 0)
+                    var oldVal = (i < existingVals.Count) ? existingVals[i] : 0.0;
 
-                    // ✅ 규칙:
-                    // errAvg 양수 => "-" 붙이기
-                    // errAvg 음수 => "+" 붙이기
-                    parts.Add(FormatAdjustFromErrAvg(avgErr));
+                    // 이번 errAvg(없으면 0)
+                    double avgErr = 0.0;
+                    if (filmMap.TryGetValue(filmNo, out var a) && a.Count > 0)
+                        avgErr = a.SumErr / a.Count;
+
+                    // ✅ 규칙: errAvg 양수면 -, 음수면 +  ==> delta = -errAvg
+                    var delta = -avgErr;
+
+                    var newVal = oldVal + delta;
+
+                    // "+0.323" / "-1.012" 형태로 포맷
+                    parts.Add(FormatSignedAdjust(newVal));
                 }
 
-                var newAdjust = string.Join(", ", parts);
-
-                // adjust 덮어쓰기
-                measureObj["adjust"] = newAdjust;
+                measureObj["adjust"] = string.Join(", ", parts);
 
                 updated.Add(actualKey); // 실제 key명(원본 대소문자 유지)
             }
@@ -582,16 +613,6 @@ namespace HawkAI.Controllers
             return false;
         }
 
-        private static string FormatAdjustFromErrAvg(double avgErr)
-        {
-            // errAvg 양수 => "-" + abs(errAvg)
-            // errAvg 음수 => "+" + abs(errAvg)
-            var abs = Math.Abs(Math.Round(avgErr, 6));
-            var num = abs.ToString("0.######", CultureInfo.InvariantCulture);
-
-            return avgErr >= 0 ? "-" + num : "+" + num;
-        }
-
         private static double? GetNullableDouble(JsonElement e, string name)
         {
             if (!e.TryGetProperty(name, out var p))
@@ -618,6 +639,56 @@ namespace HawkAI.Controllers
 
             return null;
         }
+
+        private static List<double> ParseAdjustList(string? adjust)
+        {
+            // adjust: "" 이면 0,0,...로 취급할 것이므로 빈 리스트 반환
+            if (string.IsNullOrWhiteSpace(adjust))
+                return new List<double>();
+
+            // 콤마 구분: "-0.912, +0.123"
+            var tokens = adjust.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            var list = new List<double>(tokens.Length);
+            foreach (var t in tokens)
+            {
+                var s = t.Trim();
+
+                // 괄호가 들어간 케이스 방어: "(+0.123)" 같은 형태
+                if (s.Length >= 2 && s.StartsWith("(") && s.EndsWith(")"))
+                    s = s[1..^1].Trim();
+
+                // 숫자 파싱 실패하면 0으로 처리(안전)
+                if (double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var d) ||
+                    double.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, out d))
+                {
+                    list.Add(d);
+                }
+                else
+                {
+                    // 예: "*0.998565" 같은 비수치가 들어있으면 이번 로직에서는 0으로 보고 누적 적용
+                    list.Add(0.0);
+                }
+            }
+
+            return list;
+        }
+
+        private static string FormatSignedAdjust(double value)
+        {
+            // 너무 긴 소수는 보기 안 좋으니 6자리 정도로 정리
+            var v = Math.Round(value, 6);
+
+            var abs = Math.Abs(v);
+            var num = abs.ToString("0.######", CultureInfo.InvariantCulture);
+
+            if (v < 0) return "-" + num;
+            if (v > 0) return "+" + num;
+
+            // 0은 0으로
+            return "0";
+        }
+
 
         private sealed class ExportMeasureColumn
         {
