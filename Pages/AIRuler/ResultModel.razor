@@ -13,6 +13,10 @@
 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
     <h4 class="mb-0">
         <strong>@ModelName</strong>
+        @if (!string.IsNullOrWhiteSpace(DeviceId))
+        {
+            <span class="text-muted" style="font-size: 0.95rem;"> · device: @DeviceId</span>
+        }
         <span class="text-muted" style="font-size: 0.95rem;">(@_records.Count)</span>
     </h4>
 
@@ -388,7 +392,10 @@ else if (_records.Count > 0)
 
     private string ExportUrl
         => CanExport
-            ? $"/api/airuler/export/{Uri.EscapeDataString(ModelName!)}?showError={_showError.ToString().ToLowerInvariant()}"
+            ? $"/api/airuler/export/{Uri.EscapeDataString(ModelName!)}?showError={_showError.ToString().ToLowerInvariant()}" +
+              (string.IsNullOrWhiteSpace(DeviceId)
+                  ? string.Empty
+                  : $"&deviceId={Uri.EscapeDataString(DeviceId)}")
             : "#";
 
     protected override async Task OnParametersSetAsync()
@@ -401,8 +408,15 @@ else if (_records.Count > 0)
     private static string ThumbUrl(string modelName, string fileName)
         => $"/airuler/results/{Uri.EscapeDataString(modelName)}/thumbnail/{Uri.EscapeDataString(fileName)}";
 
-    private static string DetailUrl(string modelName, string fileName)
-        => $"/airuler/results/{Uri.EscapeDataString(modelName)}/{Uri.EscapeDataString(fileName)}";
+    private static string DetailUrl(string modelName, string fileName, string? deviceId)
+    {
+        if (!string.IsNullOrWhiteSpace(deviceId))
+        {
+            return $"/airuler/results/{Uri.EscapeDataString(modelName)}/device/{Uri.EscapeDataString(deviceId)}/{Uri.EscapeDataString(fileName)}";
+        }
+
+        return $"/airuler/results/{Uri.EscapeDataString(modelName)}/{Uri.EscapeDataString(fileName)}";
+    }
 
     private string JsonFilePath(string modelName, string fileName)
         => Path.Combine(ResultsRoot, Path.GetFileName(modelName), "json", Path.GetFileNameWithoutExtension(fileName) + ".json");
@@ -429,9 +443,15 @@ else if (_records.Count > 0)
 
         try
         {
-            var rows = await Db.AirulerFilmMeasureResults
+            IQueryable<AirulerFilmMeasureResult> query = Db.AirulerFilmMeasureResults
                 .AsNoTracking()
-                .Where(x => x.ModelName == ModelName)
+                .Where(x => x.ModelName == ModelName);
+
+            // ✅ /device/{DeviceId} 경로로 접근한 경우 해당 DeviceId 결과만 표시
+            if (!string.IsNullOrWhiteSpace(DeviceId))
+                query = query.Where(x => x.DeviceId == DeviceId);
+
+            var rows = await query
                 .OrderByDescending(x => x.TimestampUtc)
                 .ThenByDescending(x => x.Id)
                 .ToListAsync();
@@ -447,7 +467,8 @@ else if (_records.Count > 0)
                 {
                     Entity = e,
                     ThumbnailUrl = ThumbUrl(e.ModelName, e.FileName),
-                    DetailPageUrl = DetailUrl(e.ModelName, e.FileName),
+                    // ✅ 항상 device 경로를 포함해 상세 페이지로 이동(디바이스별 구분)
+                    DetailPageUrl = DetailUrl(e.ModelName, e.FileName, e.DeviceId),
                     Films = films,
                     IsSelected = selectedIds.Contains(e.Id)
                 });
@@ -664,9 +685,14 @@ else if (_records.Count > 0)
                 return;
 
             // tracking 필요(삭제)
-            var ents = await Db.AirulerFilmMeasureResults
-                .Where(x => x.ModelName == ModelName && ids.Contains(x.Id))
-                .ToListAsync();
+            IQueryable<AirulerFilmMeasureResult> delQuery = Db.AirulerFilmMeasureResults
+                .Where(x => x.ModelName == ModelName && ids.Contains(x.Id));
+
+            // ✅ /device/{DeviceId} 화면에서는 동일한 DeviceId 내에서만 삭제
+            if (!string.IsNullOrWhiteSpace(DeviceId))
+                delQuery = delQuery.Where(x => x.DeviceId == DeviceId);
+
+            var ents = await delQuery.ToListAsync();
 
             // 파일 삭제 먼저 시도 (실패해도 계속)
             foreach (var ent in ents)

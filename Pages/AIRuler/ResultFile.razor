@@ -4,6 +4,7 @@
 @using HawkAI.Data
 @using HawkAI.Data.AirulerResultService
 @using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Web
 
 @inject DataDbContext Db
 @inject IWebHostEnvironment Env
@@ -11,6 +12,10 @@
 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
     <h4 class="mb-0">
         <strong>@ModelName</strong>
+        @if (!string.IsNullOrWhiteSpace(DeviceId))
+        {
+            <span class="text-muted" style="font-size: 0.95rem;"> · device: @DeviceId</span>
+        }
         <span class="text-muted" style="font-size: 0.95rem;">@("/" + FileName)</span>
     </h4>
 
@@ -18,7 +23,7 @@
         <a class="btn btn-sm btn-outline-secondary" href="/airuler/results">List</a>
         @if (!string.IsNullOrWhiteSpace(ModelName))
         {
-            <a class="btn btn-sm btn-outline-secondary" href="@($"/airuler/results/{Uri.EscapeDataString(ModelName)}")">Back</a>
+            <a class="btn btn-sm btn-outline-secondary" href="@BackUrl">Back</a>
         }
     </div>
 </div>
@@ -34,7 +39,15 @@ else if (_record == null)
 else
 {
     <div class="mt-3">
-        <img src="@_imageUrl" style="max-width: 100%; height: auto; border: 1px solid #eee;" />
+        <div class="airuler-resultfile-viewer"
+             tabindex="0"
+             title="Click to focus · Ctrl+'+'/'-' zoom · Ctrl+Arrow pan"
+             @onkeydown="OnViewerKeyDown"
+             @onkeydown:preventDefault="true">
+            <div class="airuler-resultfile-transform" style="@TransformStyle">
+                <img class="airuler-resultfile-image" src="@_imageUrl" alt="@FileName" />
+            </div>
+        </div>
         <div class="mt-2 small text-muted">
             <b>Time</b>: @_record.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
             <span class="text-muted"> · </span>
@@ -62,12 +75,72 @@ else
     private string _jsonText = string.Empty;
     private string _imageUrl = string.Empty;
 
+    // ✅ Image viewer transform (Ctrl+'+'/'-' zoom, Ctrl+Arrow pan)
+    private double _zoomFactor = 1.0;
+    private int _panX = 0;
+    private int _panY = 0;
+
+    private string TransformStyle
+        => string.Format(
+            System.Globalization.CultureInfo.InvariantCulture,
+            "transform: translate({0}px, {1}px) scale({2});",
+            _panX, _panY, _zoomFactor
+        );
+
+    private Task OnViewerKeyDown(KeyboardEventArgs e)
+    {
+        if (!e.CtrlKey)
+            return Task.CompletedTask;
+
+        var handled = false;
+
+        // Ctrl + '+' / '=' : zoom in
+        if (e.Key == "+" || e.Key == "=" || e.Key == "Add")
+        {
+            _zoomFactor = Math.Min(10.0, _zoomFactor * 1.1);
+            handled = true;
+        }
+        // Ctrl + '-' : zoom out
+        else if (e.Key == "-" || e.Key == "Subtract")
+        {
+            _zoomFactor = Math.Max(0.1, _zoomFactor / 1.1);
+            handled = true;
+        }
+        // Ctrl + Arrow : pan
+        else if (e.Key.StartsWith("Arrow", StringComparison.Ordinal))
+        {
+            const int step = 20;
+
+            if (e.Key == "ArrowLeft") _panX += step;
+            if (e.Key == "ArrowRight") _panX -= step;
+            if (e.Key == "ArrowUp") _panY += step;
+            if (e.Key == "ArrowDown") _panY -= step;
+
+            handled = true;
+        }
+
+        if (handled)
+            StateHasChanged();
+
+        return Task.CompletedTask;
+    }
+
+    private string BackUrl
+        => string.IsNullOrWhiteSpace(ModelName)
+            ? "/airuler/results"
+            : string.IsNullOrWhiteSpace(DeviceId)
+                ? $"/airuler/results/{Uri.EscapeDataString(ModelName)}"
+                : $"/airuler/results/{Uri.EscapeDataString(ModelName)}/device/{Uri.EscapeDataString(DeviceId)}";
+
     protected override async Task OnParametersSetAsync()
     {
         _record = null;
         _loadError = null;
         _jsonText = string.Empty;
         _imageUrl = string.Empty;
+        _zoomFactor = 1.0;
+        _panX = 0;
+        _panY = 0;
 
         if (string.IsNullOrWhiteSpace(ModelName) || string.IsNullOrWhiteSpace(FileName))
         {
@@ -78,9 +151,15 @@ else
         try
         {
             // DB 기준으로 record 확인
-            _record = await Db.AirulerFilmMeasureResults
+            var query = Db.AirulerFilmMeasureResults
                 .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.ModelName == ModelName && x.FileName == FileName);
+                .Where(x => x.ModelName == ModelName && x.FileName == FileName);
+
+            // ✅ /device/{DeviceId} 로 접근한 경우 해당 device 결과만 매칭
+            if (!string.IsNullOrWhiteSpace(DeviceId))
+                query = query.Where(x => x.DeviceId == DeviceId);
+
+            _record = await query.FirstOrDefaultAsync();
 
             if (_record == null)
                 return;
