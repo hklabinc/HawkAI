@@ -15,73 +15,8 @@
                 <span class="oi oi-home" aria-hidden="true"></span> Home
             </NavLink>
         </div> *@
-
-        <!-- ===================== AI Camera (Admin) ===================== -->
-        <AuthorizeView Roles="Admin">
-            <div class="nav-section">
-                <div class="nav-section-title px-3" @onclick:stopPropagation="true">
-                    AI Camera
-                </div>
-                <div class="nav-section-body">
-                    <div class="nav-item px-3">
-                        <NavLink class="nav-link" href="/aicamera/dashboard">
-                            <span class="oi oi-grid-three-up" aria-hidden="true"></span> Dashboard
-                        </NavLink>
-                    </div>
-                    <div class="nav-item px-3">
-                        <NavLink class="nav-link" href="/aicamera/cameras">
-                            <span class="oi oi-camera-slr" aria-hidden="true"></span> Camera
-                        </NavLink>
-                    </div>
-                    <div class="nav-item px-3">
-                        <NavLink class="nav-link" href="/aicamera/events">
-                            <span class="oi oi-list-rich" aria-hidden="true"></span> Event
-                        </NavLink>
-                    </div>
-                    <div class="nav-item px-3">
-                        <NavLink class="nav-link" href="/aicamera/video">
-                            <span class="oi oi-video" aria-hidden="true"></span> Video
-                        </NavLink>
-                    </div>
-                </div>
-            </div>
-        </AuthorizeView>
-
-        <!-- ===================== AIRuler (Admin,Normal) ===================== -->
+        
         <AuthorizeView Roles="Admin,Normal">
-            <div class="nav-section">
-                <div class="nav-section-title px-3" @onclick:stopPropagation="true">
-                    AI Ruler
-                </div>
-                <div class="nav-section-body">
-                    <div class="nav-item px-3">
-                        <NavLink class="nav-link" href="/airuler/modeler">
-                            <span class="oi oi-wrench" aria-hidden="true"></span> Modeler
-                        </NavLink>
-                    </div>
-                    <div class="nav-item px-3">
-                        <NavLink class="nav-link" href="/airuler/results">
-                            <span class="oi oi-bar-chart" aria-hidden="true"></span> Results
-                        </NavLink>
-                    </div>
-                    <div class="nav-item px-3">
-                        <NavLink class="nav-link" href="/airuler/calibration">
-                            <span class="oi oi-resize-both" aria-hidden="true"></span> Calibration
-                        </NavLink>
-                    </div>
-                    <div class="nav-item px-3">
-                        <NavLink class="nav-link" href="/airuler/info">
-                            <span class="oi oi-folder" aria-hidden="true"></span> Folder
-                        </NavLink>
-                    </div>
-                    <div class="nav-item px-3">
-                        <NavLink class="nav-link" href="/airuler/release">
-                            <span class="oi oi-cloud-download" aria-hidden="true"></span> Release
-                        </NavLink>
-                    </div>
-                </div>
-            </div>
-
             <!-- ===================== AI Detector (Admin,Normal) ===================== -->
             <div class="nav-section">
                 <div class="nav-section-title px-3" @onclick:stopPropagation="true">
@@ -116,6 +51,72 @@
                     <div class="nav-item px-3">
                         <NavLink class="nav-link" href="/aidetector/server-status">
                             <span class="oi oi-hard-drive" aria-hidden="true"></span> Server Status
+                        </NavLink>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===================== AIRuler (Admin,Normal) ===================== -->
+            <div class="nav-section">
+                <div class="nav-section-title px-3" @onclick:stopPropagation="true">
+                    AI Ruler
+                </div>
+                <div class="nav-section-body">
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="/airuler/modeler">
+                            <span class="oi oi-wrench" aria-hidden="true"></span> Modeler
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="/airuler/results">
+                            <span class="oi oi-bar-chart" aria-hidden="true"></span> Results
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="/airuler/calibration">
+                            <span class="oi oi-target" aria-hidden="true"></span> Calibration
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="/airuler/info">
+                            <span class="oi oi-folder" aria-hidden="true"></span> Folder
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="/airuler/release">
+                            <span class="oi oi-cloud-download" aria-hidden="true"></span> Release
+                        </NavLink>
+                    </div>
+                </div>
+            </div>
+        </AuthorizeView>
+
+
+        <!-- ===================== AI Camera (Admin) ===================== -->
+        <AuthorizeView Roles="Admin">
+            <div class="nav-section">
+                <div class="nav-section-title px-3" @onclick:stopPropagation="true">
+                    AI Camera
+                </div>
+                <div class="nav-section-body">
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="/aicamera/dashboard">
+                            <span class="oi oi-grid-three-up" aria-hidden="true"></span> Dashboard
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="/aicamera/cameras">
+                            <span class="oi oi-camera-slr" aria-hidden="true"></span> Camera
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="/aicamera/events">
+                            <span class="oi oi-list-rich" aria-hidden="true"></span> Event
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="/aicamera/video">
+                            <span class="oi oi-video" aria-hidden="true"></span> Video
                         </NavLink>
                     </div>
                 </div>

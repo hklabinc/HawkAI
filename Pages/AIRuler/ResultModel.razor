@@ -1,5 +1,4 @@
 @page "/airuler/results/{ModelName}"
-@page "/airuler/results/{ModelName}/device/{DeviceId}"
 
 @using System.Text.Json
 @using HawkAI.Data
@@ -12,15 +11,19 @@
 
 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
     <h4 class="mb-0">
-        <strong>@ModelName</strong>        
+        <strong>@ModelName</strong>
         <span class="text-muted" style="font-size: 0.95rem;">(@_records.Count)</span>
-        @if (!string.IsNullOrWhiteSpace(DeviceId))
-        {
-            <span class="text-muted" style="font-size: 0.95rem;"> at @DeviceId</span>
-        }
     </h4>
 
     <div class="d-flex align-items-center gap-3 flex-wrap">
+
+        <button class="btn btn-sm btn-outline-secondary"
+                type="button"
+                @onclick="OpenSpecModalAsync"
+                disabled="@(!CanShowSpec)">
+            Show Spec
+        </button>
+
         <div class="form-check form-switch mb-0">
             <input class="form-check-input" type="checkbox" id="showErrSwitch" @bind="_showError" />
             <label class="form-check-label small" for="showErrSwitch">Show error</label>
@@ -49,15 +52,6 @@
             <span class="oi oi-trash"></span>
             Delete Selected
         </button>
-
-        <!-- ✅ Calibration (Warning) 버튼 추가: Save to CSV 왼쪽 -->
-        <a class="btn btn-sm btn-warning @(!CanCalibrate ? "disabled" : "")"
-           href="@CalibrationUrl"
-           target="_blank"
-           aria-disabled="@(!CanCalibrate)"
-           tabindex="@(!CanCalibrate ? "-1" : null)">
-            Calibration
-        </a>
 
         <a class="btn btn-sm btn-success @(!CanExport ? "disabled" : "")"
            href="@ExportUrl"
@@ -157,6 +151,7 @@ else if (_records.Count > 0)
                                             </a>
                                         </div>
                                         <div><b>Time</b>: @r.TimestampLocal</div>
+                                        <div><b>Device</b>: @r.Entity.DeviceId</div>
                                         <div><b>Size</b>: @r.Entity.ImageSize</div>
                                         <div><b>Method</b>: @r.Entity.MeasureMethod</div>
                                     </div>
@@ -235,14 +230,55 @@ else if (_records.Count > 0)
     }
 }
 
+@if (_showSpecModal)
+{
+    <!-- Backdrop -->
+    <div class="modal-backdrop fade show" @onclick="CloseSpecModal"></div>
+
+    <!-- Modal -->
+    <div class="modal fade show d-block"
+         tabindex="-1"
+         role="dialog"
+         style="background: rgba(0,0,0,0.2);"
+         @onclick="CloseSpecModal">
+        <div class="modal-dialog modal-dialog-centered modal-xl"
+             role="document"
+             @onclick:stopPropagation="true">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h6 class="modal-title">
+                        <b>Spec</b>
+                        @if (!string.IsNullOrWhiteSpace(_specModelName))
+                        {
+                            <span class="text-muted" style="font-size: 0.95rem;">(@_specModelName)</span>
+                        }
+                    </h6>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="CloseSpecModal"></button>
+                </div>
+                <div class="modal-body p-0 text-center" style="background:#fff;">
+                    @if (!string.IsNullOrWhiteSpace(_specLoadError))
+                    {
+                        <div class="p-3 text-muted">@_specLoadError</div>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(_specImageUrl))
+                    {
+                        <img src="@_specImageUrl"
+                             style="max-width:100%; height:auto; cursor:pointer; display:block; margin:0 auto;"
+                             @onclick="CloseSpecModal" />
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     [Parameter] public string? ModelName { get; set; }
-    [Parameter] public string? DeviceId { get; set; } // ✅ 추가
 
     private bool _showError = true;
 
     // Pagination (records per page)
-    private int _pageSize = 20;   // default
+    private int _pageSize = 10;   // default
     private int PageSize
     {
         get => _pageSize;
@@ -325,14 +361,15 @@ else if (_records.Count > 0)
     private string? _loadError;
     private string? _statusMessage;
 
+    // ---- Spec modal ----
+    private bool _showSpecModal = false;
+    private string? _specModelName;
+    private string? _specImageUrl;
+    private string? _specLoadError;
+
     private bool CanExport => !string.IsNullOrWhiteSpace(ModelName) && _records.Count > 0;
     private bool CanDeleteSelected => _records.Any(r => r.IsSelected);
-    private bool CanCalibrate => !string.IsNullOrWhiteSpace(ModelName) && _records.Count > 0;
-
-    private string CalibrationUrl
-        => CanCalibrate
-            ? $"/api/airuler/calibration/{Uri.EscapeDataString(ModelName!)}"
-            : "#";
+    private bool CanShowSpec => !string.IsNullOrWhiteSpace(ModelName) || _records.Count > 0;
 
 
     // ✅ 헤더 "전체 선택" 체크박스 바인딩
@@ -348,7 +385,7 @@ else if (_records.Count > 0)
 
     private string ExportUrl
         => CanExport
-            ? $"/api/airuler/export/{Uri.EscapeDataString(ModelName!)}?showError={_showError.ToString().ToLowerInvariant()}{(string.IsNullOrWhiteSpace(DeviceId) ? string.Empty : $"&deviceId={Uri.EscapeDataString(DeviceId)}")}"
+            ? $"/api/airuler/export/{Uri.EscapeDataString(ModelName!)}?showError={_showError.ToString().ToLowerInvariant()}"
             : "#";
 
     protected override async Task OnParametersSetAsync()
@@ -389,14 +426,9 @@ else if (_records.Count > 0)
 
         try
         {
-            var q = Db.AirulerFilmMeasureResults
-                    .AsNoTracking()
-                    .Where(x => x.ModelName == ModelName);
-
-            if (!string.IsNullOrWhiteSpace(DeviceId))
-                q = q.Where(x => x.DeviceId == DeviceId);
-
-            var rows = await q
+            var rows = await Db.AirulerFilmMeasureResults
+                .AsNoTracking()
+                .Where(x => x.ModelName == ModelName)
                 .OrderByDescending(x => x.TimestampUtc)
                 .ThenByDescending(x => x.Id)
                 .ToListAsync();
@@ -512,6 +544,93 @@ else if (_records.Count > 0)
         }
 
         return string.Empty;
+    }
+
+
+    private async Task OpenSpecModalAsync()
+    {
+        _specLoadError = null;
+
+        var specModel = await ResolveSpecModelNameAsync();
+        _specModelName = specModel;
+
+        if (string.IsNullOrWhiteSpace(specModel))
+        {
+            _specImageUrl = null;
+            _specLoadError = "Spec model name not found.";
+        }
+        else
+        {
+            var file = $"{specModel}.png";
+            var fullPath = Path.Combine(Env.WebRootPath, "airuler", "spec", file);
+
+            _specImageUrl = $"/airuler/spec/{Uri.EscapeDataString(file)}";
+
+            if (!System.IO.File.Exists(fullPath))
+                _specLoadError = $"Spec image not found: {file}";
+        }
+
+        _showSpecModal = true;
+    }
+
+    private void CloseSpecModal()
+    {
+        _showSpecModal = false;
+    }
+
+    private async Task<string?> ResolveSpecModelNameAsync()
+    {
+        // 1) Prefer: read from latest JSON file under /airuler/results/{model}/json/{file}.json
+        try
+        {
+            if (_records.Count > 0)
+            {
+                // ReloadAsync()에서 Timestamp desc 로 정렬했으므로 [0]이 가장 최신
+                var ent = _records[0].Entity;
+
+                var jsonPath = JsonFilePath(ent.ModelName, ent.FileName);
+                if (System.IO.File.Exists(jsonPath))
+                {
+                    var txt = await System.IO.File.ReadAllTextAsync(jsonPath);
+                    using var doc = JsonDocument.Parse(txt);
+
+                    if (doc.RootElement.TryGetProperty("modelName", out var p) && p.ValueKind == JsonValueKind.String)
+                    {
+                        var name = (p.GetString() ?? "").Trim();
+                        if (!string.IsNullOrWhiteSpace(name))
+                            return SanitizeSpecName(name);
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // ignore and fallback
+        }
+
+        // 2) Fallback: route param before '_' (e.g. "M2379-00_xxx")
+        var fallback = (ModelName ?? "").Trim();
+        var under = fallback.IndexOf('_');
+        if (under > 0)
+            fallback = fallback.Substring(0, under);
+
+        return SanitizeSpecName(fallback);
+    }
+
+    private static string SanitizeSpecName(string? name)
+    {
+        name = (name ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(name))
+            return string.Empty;
+
+        // allow only: a-zA-Z0-9 _ - .
+        var sb = new System.Text.StringBuilder(name.Length);
+        foreach (var ch in name)
+        {
+            if (char.IsLetterOrDigit(ch) || ch == '_' || ch == '-' || ch == '.')
+                sb.Append(ch);
+        }
+        return sb.ToString();
     }
 
     private async Task ConfirmDeleteSelectedAsync()
