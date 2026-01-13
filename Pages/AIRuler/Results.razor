@@ -302,6 +302,7 @@ else
         }
 
         Nav.NavigateTo($"/airuler/results/{Uri.EscapeDataString(modelName)}/device/{Uri.EscapeDataString(deviceId)}");
+        //Nav.NavigateTo($"/airuler/results/{Uri.EscapeDataString(modelName)}");
     }
 
     private string ResultsRoot => Path.Combine(Env.WebRootPath, "airuler", "results");

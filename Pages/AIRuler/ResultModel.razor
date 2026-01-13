@@ -1,4 +1,5 @@
 @page "/airuler/results/{ModelName}"
+@page "/airuler/results/{ModelName}/device/{DeviceId}"
 
 @using System.Text.Json
 @using HawkAI.Data
@@ -243,6 +244,7 @@ else if (_records.Count > 0)
          @onclick="CloseSpecModal">
         <div class="modal-dialog modal-dialog-centered modal-xl"
              role="document"
+             style="max-width: 80vw;"
              @onclick:stopPropagation="true">
             <div class="modal-content">
                 <div class="modal-header">
@@ -274,6 +276,7 @@ else if (_records.Count > 0)
 
 @code {
     [Parameter] public string? ModelName { get; set; }
+    [Parameter] public string? DeviceId { get; set; }
 
     private bool _showError = true;
 
