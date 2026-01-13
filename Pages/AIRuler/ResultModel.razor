@@ -45,6 +45,15 @@
             Delete Selected
         </button>
 
+        <!-- ✅ Calibration (Warning) 버튼 추가: Save to CSV 왼쪽 -->
+        <a class="btn btn-sm btn-warning @(!CanCalibrate ? "disabled" : "")"
+           href="@CalibrationUrl"
+           target="_blank"
+           aria-disabled="@(!CanCalibrate)"
+           tabindex="@(!CanCalibrate ? "-1" : null)">
+            Calibration
+        </a>
+
         <a class="btn btn-sm btn-success @(!CanExport ? "disabled" : "")"
            href="@ExportUrl"
            target="_blank"
@@ -313,6 +322,13 @@ else if (_records.Count > 0)
 
     private bool CanExport => !string.IsNullOrWhiteSpace(ModelName) && _records.Count > 0;
     private bool CanDeleteSelected => _records.Any(r => r.IsSelected);
+    private bool CanCalibrate => !string.IsNullOrWhiteSpace(ModelName) && _records.Count > 0;
+
+    private string CalibrationUrl
+        => CanCalibrate
+            ? $"/api/airuler/calibration/{Uri.EscapeDataString(ModelName!)}"
+            : "#";
+
 
     // ✅ 헤더 "전체 선택" 체크박스 바인딩
     private bool SelectAll

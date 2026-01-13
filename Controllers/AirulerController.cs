@@ -7,6 +7,8 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Globalization;
+using System.Text.Json.Nodes;
 
 namespace HawkAI.Controllers
 {
@@ -379,6 +381,242 @@ namespace HawkAI.Controllers
             var fileName = $"{safeName}_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
 
             return File(bytes, "text/csv; charset=utf-8", fileName);
+        }
+
+        // ✅ Calibration 적용 (모델 JSON의 adjust를 film별 errAvg로 덮어쓰기)
+        // - GET/POST 둘 다 지원: UI에서 링크로 호출하든(fetch) 호출하든 OK
+        [HttpGet("calibration/{modelName}")]
+        public Task<IActionResult> ApplyCalibrationToModelJson_Get(string modelName)
+            => ApplyCalibrationToModelJson_Internal(modelName);
+
+        [HttpPost("calibration/{modelName}")]
+        public Task<IActionResult> ApplyCalibrationToModelJson_Post(string modelName)
+            => ApplyCalibrationToModelJson_Internal(modelName);
+
+        private sealed class ErrAgg
+        {
+            public double SumErr;
+            public int Count;
+        }
+
+        private async Task<IActionResult> ApplyCalibrationToModelJson_Internal(string modelName)
+        {
+            EnsureBaseDirs();
+
+            var model = AirulerNameHelper.SanitizeModelName(modelName);
+            if (string.IsNullOrWhiteSpace(model))
+                return BadRequest("Invalid modelName.");
+
+            // 1) 모델 JSON 로드: wwwroot/airuler/models/{model}.json
+            var modelJsonPath = Path.Combine(ModelsDir, $"{model}.json");
+            if (!System.IO.File.Exists(modelJsonPath))
+                return NotFound($"Model json not found: /airuler/models/{model}.json");
+
+            JsonObject rootObj;
+            try
+            {
+                var txt = await System.IO.File.ReadAllTextAsync(modelJsonPath, Encoding.UTF8);
+                var node = JsonNode.Parse(txt);
+                rootObj = node as JsonObject
+                    ?? throw new Exception("Model json root is not an object.");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest($"Failed to read/parse model json: {ex.Message}");
+            }
+
+            // 2) DB에서 해당 모델 결과 로드
+            // (errAvg만 필요하므로 ResultsJson만 있으면 되지만, 간단히 Row 단위로 로드)
+            var rows = await _db.AirulerFilmMeasureResults
+                .AsNoTracking()
+                .Where(x => x.ModelName == model)
+                .ToListAsync();
+
+            if (rows.Count == 0)
+            {
+                return Ok(new
+                {
+                    success = true,
+                    modelName = model,
+                    message = "No DB rows to calibrate.",
+                    savedPath = $"/airuler/models/{model}.json",
+                    updatedMeasures = 0
+                });
+            }
+
+            // 3) (index -> (film -> sum/count)) 형태로 err 집계
+            //    ※ valueAvg/nValue 등은 이제 안 씀
+            var agg = new Dictionary<string, Dictionary<int, ErrAgg>>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var r in rows)
+            {
+                if (string.IsNullOrWhiteSpace(r.ResultsJson))
+                    continue;
+
+                try
+                {
+                    using var doc = JsonDocument.Parse(r.ResultsJson);
+                    if (doc.RootElement.ValueKind != JsonValueKind.Array)
+                        continue;
+
+                    foreach (var filmEl in doc.RootElement.EnumerateArray())
+                    {
+                        if (!filmEl.TryGetProperty("film", out var fnoEl)) continue;
+                        if (fnoEl.ValueKind != JsonValueKind.Number) continue;
+                        if (!fnoEl.TryGetInt32(out var filmNo)) continue;
+                        if (filmNo <= 0) continue;
+
+                        if (!filmEl.TryGetProperty("measures", out var measEl) || measEl.ValueKind != JsonValueKind.Array)
+                            continue;
+
+                        foreach (var m in measEl.EnumerateArray())
+                        {
+                            var idx = GetString(m, "index");
+                            if (string.IsNullOrWhiteSpace(idx))
+                                continue;
+
+                            var err = GetNullableDouble(m, "err");
+                            if (!err.HasValue)
+                                continue;
+
+                            if (!agg.TryGetValue(idx, out var filmMap))
+                            {
+                                filmMap = new Dictionary<int, ErrAgg>();
+                                agg[idx] = filmMap;
+                            }
+
+                            if (!filmMap.TryGetValue(filmNo, out var a))
+                            {
+                                a = new ErrAgg();
+                                filmMap[filmNo] = a;
+                            }
+
+                            a.SumErr += err.Value;
+                            a.Count++;
+                        }
+                    }
+                }
+                catch
+                {
+                    // 파싱 실패 row는 무시
+                }
+            }
+
+            // 4) 모델 JSON에서 measure_{index} 찾아 adjust 업데이트
+            var updated = new List<string>();
+            var notFoundInModel = new List<string>();
+
+            foreach (var kv in agg)
+            {
+                var index = kv.Key; // 예: "CP1", "No.10-1"
+                var measureProp = "measure_" + index;
+
+                // measure 키는 대소문자/문자열이 정확히 같아야 하므로, ignore-case로 실제 키 찾아줌
+                if (!TryGetPropertyIgnoreCase(rootObj, measureProp, out var actualKey, out var measureNode) ||
+                    measureNode is not JsonObject measureObj)
+                {
+                    notFoundInModel.Add(measureProp);
+                    continue;
+                }
+
+                // film 번호 순서대로 errAvg -> (규칙에 따라 부호 반대로) 문자열 생성
+                var filmMap = kv.Value;
+                var parts = new List<string>();
+
+                foreach (var filmNo in filmMap.Keys.OrderBy(x => x))
+                {
+                    var a = filmMap[filmNo];
+                    if (a.Count <= 0) continue;
+
+                    var avgErr = a.SumErr / a.Count;
+
+                    // ✅ 규칙:
+                    // errAvg 양수 => "-" 붙이기
+                    // errAvg 음수 => "+" 붙이기
+                    parts.Add(FormatAdjustFromErrAvg(avgErr));
+                }
+
+                var newAdjust = string.Join(", ", parts);
+
+                // adjust 덮어쓰기
+                measureObj["adjust"] = newAdjust;
+
+                updated.Add(actualKey); // 실제 key명(원본 대소문자 유지)
+            }
+
+            // 5) 저장(덮어쓰기)
+            var outJson = rootObj.ToJsonString(new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            });
+
+            await System.IO.File.WriteAllTextAsync(modelJsonPath, outJson, new UTF8Encoding(false));
+
+            return Ok(new
+            {
+                success = true,
+                modelName = model,
+                savedPath = $"/airuler/models/{model}.json",
+                dbRows = rows.Count,
+                updatedMeasures = updated.Count,
+                updatedKeys = updated,
+                notFoundKeys = notFoundInModel
+            });
+        }
+
+        private static bool TryGetPropertyIgnoreCase(JsonObject obj, string key, out string actualKey, out JsonNode? value)
+        {
+            foreach (var kv in obj)
+            {
+                if (string.Equals(kv.Key, key, StringComparison.OrdinalIgnoreCase))
+                {
+                    actualKey = kv.Key;
+                    value = kv.Value;
+                    return true;
+                }
+            }
+
+            actualKey = key;
+            value = null;
+            return false;
+        }
+
+        private static string FormatAdjustFromErrAvg(double avgErr)
+        {
+            // errAvg 양수 => "-" + abs(errAvg)
+            // errAvg 음수 => "+" + abs(errAvg)
+            var abs = Math.Abs(Math.Round(avgErr, 6));
+            var num = abs.ToString("0.######", CultureInfo.InvariantCulture);
+
+            return avgErr >= 0 ? "-" + num : "+" + num;
+        }
+
+        private static double? GetNullableDouble(JsonElement e, string name)
+        {
+            if (!e.TryGetProperty(name, out var p))
+                return null;
+
+            if (p.ValueKind == JsonValueKind.Number)
+            {
+                if (p.TryGetDouble(out var d)) return d;
+                return null;
+            }
+
+            if (p.ValueKind == JsonValueKind.String)
+            {
+                var s = p.GetString();
+                if (string.IsNullOrWhiteSpace(s)) return null;
+
+                if (double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var d))
+                    return d;
+
+                // fallback
+                if (double.TryParse(s, out d))
+                    return d;
+            }
+
+            return null;
         }
 
         private sealed class ExportMeasureColumn
