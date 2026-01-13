@@ -56,9 +56,9 @@ else
                 <img src="@m.RepresentativeImageUrl"
                      class="card-img-top"
                      style="height: 180px; object-fit: contain; object-position: center; background: #f8f9fa; cursor: pointer;"
-                     @onclick="() => GoToModel(m.ModelName)" />
+                     @onclick="() => GoToModel(m.ModelName, m.DeviceId)" />
 
-                <div class="card-body" style="cursor:pointer;" @onclick="() => GoToModel(m.ModelName)">
+                <div class="card-body" style="cursor:pointer;" @onclick="() => GoToModel(m.ModelName, m.DeviceId)">
                     <h5 class="card-title mb-1 d-flex align-items-center gap-2">
                         <strong class="text-truncate" style="max-width: 180px;">@m.ModelName</strong>
                         <span class="text-muted" style="font-size: 0.95rem;">(@m.FileCount)</span>
@@ -70,8 +70,11 @@ else
                             Edit
                         </button>
                     </h5>
-                    <p class="card-text text-muted" style="font-size: 0.85rem;">
+                    <p class="card-text text-muted mb-0" style="font-size: 0.85rem;">
                         Updated @m.LatestTimestampLocal
+                    </p>
+                    <p class="card-text text-muted mb-0" style="font-size: 0.85rem;">
+                        Created by @m.DeviceId
                     </p>
                 </div>
 
@@ -220,6 +223,7 @@ else
     private sealed class ModelCardVm
     {
         public string ModelName { get; init; } = string.Empty;
+        public string DeviceId { get; init; } = string.Empty;   // ✅ 추가
         public int FileCount { get; init; }
         public DateTime LatestTimestampUtc { get; init; }
         public string RepresentativeImageUrl { get; init; } = string.Empty;
@@ -247,29 +251,36 @@ else
 
         try
         {
-            // 체크 상태 보존용
-            var prev = _modelCards.ToDictionary(x => x.ModelName, x => x.IsSelectedForDelete, StringComparer.OrdinalIgnoreCase);
+                // 체크 상태 보존용 (ModelName + DeviceId 기준)
+            var prev = _modelCards.ToDictionary(
+                x => $"{x.ModelName}||{x.DeviceId}",
+                x => x.IsSelectedForDelete,
+                StringComparer.OrdinalIgnoreCase);
 
             var all = await Db.AirulerFilmMeasureResults
                 .AsNoTracking()
                 .ToListAsync();
 
             _modelCards = all
-                .GroupBy(x => x.ModelName, StringComparer.OrdinalIgnoreCase)
+                .GroupBy(x => $"{x.ModelName}||{x.DeviceId}", StringComparer.OrdinalIgnoreCase) // ✅ 변경
                 .Select(g =>
                 {
                     var latest = g.OrderByDescending(x => x.TimestampUtc).First();
+                    var key = $"{latest.ModelName}||{latest.DeviceId}";
+
                     return new ModelCardVm
                     {
                         ModelName = latest.ModelName,
+                        DeviceId = latest.DeviceId ?? string.Empty, // ✅
                         FileCount = g.Count(),
                         LatestTimestampUtc = latest.TimestampUtc,
                         RepresentativeImageUrl = ImageUrl(latest.ModelName, latest.FileName),
-                        IsSelectedForDelete = prev.TryGetValue(latest.ModelName, out var sel) && sel
+                        IsSelectedForDelete = prev.TryGetValue(key, out var sel) && sel
                     };
                 })
                 .OrderByDescending(x => x.LatestTimestampUtc)
                 .ThenBy(x => x.ModelName)
+                .ThenBy(x => x.DeviceId)
                 .ToList();
         }
         catch (Exception ex)
@@ -279,49 +290,112 @@ else
         }
     }
 
-    private void GoToModel(string modelName)
+    private void GoToModel(string modelName, string deviceId)
     {
         if (string.IsNullOrWhiteSpace(modelName))
             return;
 
-        Nav.NavigateTo($"/airuler/results/{Uri.EscapeDataString(modelName)}");
+        if (string.IsNullOrWhiteSpace(deviceId))
+        {
+            Nav.NavigateTo($"/airuler/results/{Uri.EscapeDataString(modelName)}");
+            return;
+        }
+
+        Nav.NavigateTo($"/airuler/results/{Uri.EscapeDataString(modelName)}/device/{Uri.EscapeDataString(deviceId)}");
     }
 
     private string ResultsRoot => Path.Combine(Env.WebRootPath, "airuler", "results");
 
     private string ModelDirPath(string modelName)
-        => Path.Combine(ResultsRoot, modelName);
+        => Path.Combine(ResultsRoot, Path.GetFileName(modelName));
+
+    private string ImageFilePath(string modelName, string fileName)
+        => Path.Combine(ResultsRoot, Path.GetFileName(modelName), "image", Path.GetFileName(fileName));
+
+    private string JsonFilePath(string modelName, string fileName)
+        => Path.Combine(ResultsRoot, Path.GetFileName(modelName), "json", Path.GetFileNameWithoutExtension(fileName) + ".json");
+
+    private void SafeDeleteFile(string path)
+    {
+        try
+        {
+            var full = Path.GetFullPath(path);
+            var root = Path.GetFullPath(ResultsRoot);
+            if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase)) return;
+
+            if (System.IO.File.Exists(full))
+                System.IO.File.Delete(full);
+        }
+        catch
+        {
+            // ignore
+        }
+    }
 
     private async Task ConfirmDeleteSelectedModelsAsync()
     {
-        var selected = _modelCards.Where(x => x.IsSelectedForDelete).Select(x => x.ModelName).ToList();
+        var selected = _modelCards
+            .Where(x => x.IsSelectedForDelete)
+            .Select(x => (ModelName: x.ModelName, DeviceId: x.DeviceId))
+            .ToList();
+
         if (selected.Count == 0) return;
 
-        var ok = await JS.InvokeAsync<bool>("confirm", $"Delete selected model(s): {selected.Count}?\nThis will remove all DB rows and files under /airuler/results/{{model}}.");
+        var ok = await JS.InvokeAsync<bool>(
+            "confirm",
+            $"Delete selected card(s): {selected.Count}?\nThis will remove DB rows and files for the selected (model, device) groups."
+        );
         if (!ok) return;
 
         await DeleteModelsAsync(selected);
     }
 
-    private async Task DeleteModelsAsync(List<string> modelNames)
+    private async Task DeleteModelsAsync(List<(string ModelName, string DeviceId)> modelDeviceKeys)
     {
         try
         {
-            var rows = await Db.AirulerFilmMeasureResults
-                .Where(x => modelNames.Contains(x.ModelName))
-                .ToListAsync();
+            var rowsToDelete = new List<AirulerFilmMeasureResult>();
+            var affectedModels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            Db.AirulerFilmMeasureResults.RemoveRange(rows);
-            await Db.SaveChangesAsync();
-
-            // 폴더 삭제
-            foreach (var m in modelNames)
+            foreach (var (modelName, deviceId) in modelDeviceKeys)
             {
-                var dir = ModelDirPath(m);
-                SafeDeleteDirectory(dir);
+                if (string.IsNullOrWhiteSpace(modelName))
+                    continue;
+
+                affectedModels.Add(modelName);
+
+                var rows = await Db.AirulerFilmMeasureResults
+                    .Where(x => x.ModelName == modelName && x.DeviceId == deviceId)
+                    .ToListAsync();
+
+                // 파일 삭제(실패해도 계속)
+                foreach (var r in rows)
+                {
+                    SafeDeleteFile(ImageFilePath(r.ModelName, r.FileName));
+                    SafeDeleteFile(JsonFilePath(r.ModelName, r.FileName));
+                }
+
+                rowsToDelete.AddRange(rows);
             }
 
-            _statusMessage = $"Deleted models: {string.Join(", ", modelNames)}";
+            if (rowsToDelete.Count > 0)
+            {
+                Db.AirulerFilmMeasureResults.RemoveRange(rowsToDelete);
+                await Db.SaveChangesAsync();
+            }
+
+            // 모델에 남은 row가 하나도 없으면 폴더 삭제
+            foreach (var modelName in affectedModels)
+            {
+                var stillExists = await Db.AirulerFilmMeasureResults
+                    .AsNoTracking()
+                    .AnyAsync(x => x.ModelName == modelName);
+
+                if (!stillExists)
+                    SafeDeleteDirectory(ModelDirPath(modelName));
+            }
+
+            _statusMessage = $"Deleted: {modelDeviceKeys.Count} card(s), {rowsToDelete.Count} file(s)";
             await ReloadAsync();
         }
         catch (Exception ex)

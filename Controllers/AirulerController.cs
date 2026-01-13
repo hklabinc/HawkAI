@@ -269,7 +269,10 @@ namespace HawkAI.Controllers
         /// - showError=false이면 (err) 값은 제외
         /// </summary>
         [HttpGet("export/{modelName}")]
-        public async Task<IActionResult> ExportModelResultsCsv(string modelName, [FromQuery] bool showError = true)
+        public async Task<IActionResult> ExportModelResultsCsv(
+            string modelName,
+            [FromQuery] bool showError = true,
+            [FromQuery] string? deviceId = null)
         {
             EnsureBaseDirs();
 
@@ -277,14 +280,22 @@ namespace HawkAI.Controllers
             if (string.IsNullOrWhiteSpace(model))
                 return BadRequest("Invalid modelName.");
 
-            var rows = await _db.AirulerFilmMeasureResults
+            var device = (deviceId ?? "").Trim();
+
+            var q = _db.AirulerFilmMeasureResults
                 .AsNoTracking()
-                .Where(x => x.ModelName == model)
+                .Where(x => x.ModelName == model);
+
+            if (!string.IsNullOrWhiteSpace(device))
+                q = q.Where(x => x.DeviceId == device);
+
+            var rows = await q
                 .OrderByDescending(x => x.TimestampUtc)
                 .ThenByDescending(x => x.Id)
                 .ToListAsync();
 
-            // 측정 Index 컬럼을 UI와 동일하게 '처음 등장한 순서'로 수집
+
+                // 측정 Index 컬럼을 UI와 동일하게 '처음 등장한 순서'로 수집
             var cols = new List<ExportMeasureColumn>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 

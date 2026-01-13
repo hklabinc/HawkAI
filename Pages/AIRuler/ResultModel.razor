@@ -1,4 +1,5 @@
 @page "/airuler/results/{ModelName}"
+@page "/airuler/results/{ModelName}/device/{DeviceId}"
 
 @using System.Text.Json
 @using HawkAI.Data
@@ -11,8 +12,12 @@
 
 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
     <h4 class="mb-0">
-        <strong>@ModelName</strong>
+        <strong>@ModelName</strong>        
         <span class="text-muted" style="font-size: 0.95rem;">(@_records.Count)</span>
+        @if (!string.IsNullOrWhiteSpace(DeviceId))
+        {
+            <span class="text-muted" style="font-size: 0.95rem;"> at @DeviceId</span>
+        }
     </h4>
 
     <div class="d-flex align-items-center gap-3 flex-wrap">
@@ -152,7 +157,6 @@ else if (_records.Count > 0)
                                             </a>
                                         </div>
                                         <div><b>Time</b>: @r.TimestampLocal</div>
-                                        <div><b>Device</b>: @r.Entity.DeviceId</div>
                                         <div><b>Size</b>: @r.Entity.ImageSize</div>
                                         <div><b>Method</b>: @r.Entity.MeasureMethod</div>
                                     </div>
@@ -233,6 +237,7 @@ else if (_records.Count > 0)
 
 @code {
     [Parameter] public string? ModelName { get; set; }
+    [Parameter] public string? DeviceId { get; set; } // ✅ 추가
 
     private bool _showError = true;
 
@@ -343,7 +348,7 @@ else if (_records.Count > 0)
 
     private string ExportUrl
         => CanExport
-            ? $"/api/airuler/export/{Uri.EscapeDataString(ModelName!)}?showError={_showError.ToString().ToLowerInvariant()}"
+            ? $"/api/airuler/export/{Uri.EscapeDataString(ModelName!)}?showError={_showError.ToString().ToLowerInvariant()}{(string.IsNullOrWhiteSpace(DeviceId) ? string.Empty : $"&deviceId={Uri.EscapeDataString(DeviceId)}")}"
             : "#";
 
     protected override async Task OnParametersSetAsync()
@@ -384,9 +389,14 @@ else if (_records.Count > 0)
 
         try
         {
-            var rows = await Db.AirulerFilmMeasureResults
-                .AsNoTracking()
-                .Where(x => x.ModelName == ModelName)
+            var q = Db.AirulerFilmMeasureResults
+                    .AsNoTracking()
+                    .Where(x => x.ModelName == ModelName);
+
+            if (!string.IsNullOrWhiteSpace(DeviceId))
+                q = q.Where(x => x.DeviceId == DeviceId);
+
+            var rows = await q
                 .OrderByDescending(x => x.TimestampUtc)
                 .ThenByDescending(x => x.Id)
                 .ToListAsync();
