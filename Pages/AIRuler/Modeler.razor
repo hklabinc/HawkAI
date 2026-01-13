@@ -2,6 +2,7 @@
 @using System.Text
 @using System.Text.Json
 @using System.Text.Encodings.Web
+@using System.Text.Json.Nodes
 @inject IWebHostEnvironment Env
 @inject IJSRuntime JS
 @implements IAsyncDisposable
@@ -249,24 +250,45 @@
         <!-- 4) JSON -->
         <div class="col-12 col-xl-3">
             <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <span><b>JSON</b></span>
-                    <div class="d-flex gap-2 flex-wrap">
-                        <button class="btn btn-sm btn-primary" @onclick="GenerateJsonToEditor">Generate JSON</button>
-                        <button class="btn btn-sm btn-outline-primary" @onclick="ApplyJsonEditorAsync">Apply to Viewer</button>
-                        <button class="btn btn-sm btn-warning" @onclick="LoadJsonAsync" disabled="@string.IsNullOrWhiteSpace(_selectedModel)">Load</button>
-                        <button class="btn btn-sm btn-danger" @onclick="SaveJsonAsync" disabled="@string.IsNullOrWhiteSpace(_selectedModel)">Save</button>                        
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <span>JSON</span>
 
-                        @if (!string.IsNullOrWhiteSpace(_selectedModel))
-                        {
-                            <a class="btn btn-sm btn-success"
-                               href="@($"/airuler/models/{_selectedModel}.json")"
-                               download>
-                                Download
-                            </a>
-                        }
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button class="btn btn-sm btn-primary" @onclick="GenerateJsonToEditor">Generate JSON</button>
+                            <button class="btn btn-sm btn-outline-primary" @onclick="ApplyJsonEditorAsync">Apply to Viewer</button>
+                            <button class="btn btn-sm btn-success" @onclick="SaveJsonAsync" disabled="@string.IsNullOrWhiteSpace(_selectedModel)">Save</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="LoadJsonAsync" disabled="@string.IsNullOrWhiteSpace(_selectedModel)">Load</button>
+
+                            @if (!string.IsNullOrWhiteSpace(_selectedModel))
+                            {
+                                <a class="btn btn-sm btn-outline-info"
+                                   href="@($"/airuler/models/{_selectedModel}.json")"
+                                   download>
+                                    Download
+                                </a>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- ✅ Generate~Download 버튼 밑 “일괄 변경” Row -->
+                    <div class="mt-2 d-flex align-items-center gap-2 flex-wrap">
+                        <!-- margin 일괄 변경 -->
+                        <div class="input-group input-group-sm" style="max-width: 260px;">
+                            <span class="input-group-text">Margin</span>
+                            <input class="form-control" type="number" step="0.01" @bind="_bulkMarginText" />
+                            <button class="btn btn-warning" type="button" @onclick="ConfirmSetAllMarginsAsync">
+                                Set All
+                            </button>
+                        </div>
+
+                        <!-- adjust 일괄 초기화 -->
+                        <button class="btn btn-sm btn-outline-danger" type="button" @onclick="ConfirmResetAllAdjustAsync">
+                            Reset Adjust
+                        </button>
                     </div>
                 </div>
+
                 <div class="card-body">
                     <textarea class="airuler-json form-control" style="height:520px; resize:vertical;" @bind="_jsonEditorText"></textarea>
                 </div>
@@ -308,8 +330,10 @@
     private readonly Dictionary<string, Measure> _measures = new(StringComparer.Ordinal);
 private int? _selectedRoiId = null;
     private string? _selectedMeasureId = null;
-// JSON + Log
+    // JSON + Log
     private string _jsonEditorText = "";
+    // ✅ JSON 편집기에서 measure_* margin 일괄 적용용 입력값
+    private string _bulkMarginText = "0.2";
     private readonly List<string> _logs = new();
     private string _logText => string.Join("\n", _logs.TakeLast(250));
 
@@ -1777,4 +1801,145 @@ private static string ReadString(JsonElement obj, string propName, string defaul
         await PushCanvasStateAsync();
         await InvokeAsync(StateHasChanged);
     }
+
+    private async Task ConfirmSetAllMarginsAsync()
+    {
+        // 숫자 파싱
+        if (!TryParseDouble(_bulkMarginText, out var margin))
+        {
+            Log("ERROR: Margin 값이 숫자가 아닙니다.");
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        if (margin < 0)
+        {
+            Log("ERROR: Margin 값은 0 이상이어야 합니다.");
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        var ok = await JS.InvokeAsync<bool>(
+            "confirm",
+            $"모든 measure_* 의 margin 값을 '{margin.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)}' 로 일괄 변경할까요?\n\n(이 작업은 JSON 편집기 화면(_jsonEditorText)만 변경합니다. Apply/Save 전까지 실제 반영되지 않습니다.)"
+        );
+
+        if (!ok) return;
+
+        if (TryMutateJsonEditorMeasures(measureObj =>
+        {
+            // margin을 숫자(JSON number)로 저장
+            measureObj["margin"] = margin;
+        }, out var updatedCount, out var err))
+        {
+            Log($"OK: measure_* margin 일괄 변경 완료 ({updatedCount}개).");
+        }
+        else
+        {
+            Log($"ERROR: margin 일괄 변경 실패: {err}");
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ConfirmResetAllAdjustAsync()
+    {
+        var ok = await JS.InvokeAsync<bool>(
+            "confirm",
+            "모든 measure_* 의 adjust 값을 \"\" 로 초기화(Reset)할까요?\n\n(이 작업은 JSON 편집기 화면(_jsonEditorText)만 변경합니다. Apply/Save 전까지 실제 반영되지 않습니다.)"
+        );
+
+        if (!ok) return;
+
+        if (TryMutateJsonEditorMeasures(measureObj =>
+        {
+            measureObj["adjust"] = "";
+        }, out var updatedCount, out var err))
+        {
+            Log($"OK: measure_* adjust Reset 완료 ({updatedCount}개).");
+        }
+        else
+        {
+            Log($"ERROR: adjust Reset 실패: {err}");
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// _jsonEditorText를 JSON Object로 파싱한 뒤,
+    /// 모든 "measure_*" 객체에 대해 mutate(measureObj)를 수행하고
+    /// 다시 pretty JSON으로 _jsonEditorText를 갱신한다.
+    /// </summary>
+    private bool TryMutateJsonEditorMeasures(Action<System.Text.Json.Nodes.JsonObject> mutate,
+                                            out int updatedCount,
+                                            out string error)
+    {
+        updatedCount = 0;
+        error = "";
+
+        try
+        {
+            var txt = _jsonEditorText ?? "";
+            if (string.IsNullOrWhiteSpace(txt))
+            {
+                error = "JSON 편집기 내용이 비어있습니다. 먼저 Generate JSON 또는 Load를 하세요.";
+                return false;
+            }
+
+            var node = System.Text.Json.Nodes.JsonNode.Parse(txt);
+            if (node is not System.Text.Json.Nodes.JsonObject root)
+            {
+                error = "JSON 루트가 object가 아닙니다.";
+                return false;
+            }
+
+            foreach (var kv in root.ToList())
+            {
+                if (!kv.Key.StartsWith("measure_", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (kv.Value is System.Text.Json.Nodes.JsonObject measureObj)
+                {
+                    mutate(measureObj);
+                    updatedCount++;
+                }
+            }
+
+            // 다시 예쁘게 출력해서 편집기 반영
+            _jsonEditorText = root.ToJsonString(new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            });
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    private static bool TryParseDouble(string? text, out double value)
+    {
+        text = (text ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            value = 0;
+            return false;
+        }
+
+        // 우선 InvariantCulture(점(.) 소수) 우선
+        if (double.TryParse(text,
+            System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out value))
+            return true;
+
+        // fallback: 현재 문화권
+        return double.TryParse(text, out value);
+    }
+
 }
