@@ -248,7 +248,7 @@ else if (_records.Count > 0)
          @onclick="CloseSpecModal">
         <div class="modal-dialog modal-dialog-centered modal-xl"
              role="document"
-             style="max-width: 80vw;"
+             style="max-width:95vw; width:95vw;" 
              @onclick:stopPropagation="true">
             <div class="modal-content">
                 <div class="modal-header">
@@ -261,7 +261,8 @@ else if (_records.Count > 0)
                     </h6>
                     <button type="button" class="btn-close" aria-label="Close" @onclick="CloseSpecModal"></button>
                 </div>
-                <div class="modal-body p-0 text-center" style="background:#fff;">
+
+                <div class="modal-body p-0" style="background:#fff; max-height:85vh; overflow:auto;">
                     @if (!string.IsNullOrWhiteSpace(_specLoadError))
                     {
                         <div class="p-3 text-muted">@_specLoadError</div>
@@ -269,7 +270,7 @@ else if (_records.Count > 0)
                     else if (!string.IsNullOrWhiteSpace(_specImageUrl))
                     {
                         <img src="@_specImageUrl"
-                             style="max-width:100%; height:auto; cursor:pointer; display:block; margin:0 auto;"
+                             style="width:100%; height:auto; display:block; cursor:pointer;"
                              @onclick="CloseSpecModal" />
                     }
                 </div>

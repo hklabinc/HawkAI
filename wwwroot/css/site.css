@@ -321,14 +321,17 @@ textarea.resizable {
 }
 
 
+/* “원래 창 크기 느낌”으로: 브라우저 폭에 맞추고, 적당한 높이 + overflow hidden */
 .airuler-resultfile-viewer {
     width: 100%;
-    height: 70vh;
-    overflow: hidden;
-    background: #f8f9fa;
+    max-width: 100%;
+    height: 60vh; /* 필요하면 60~80vh로 조절 */
     border: 1px solid #eee;
-    border-radius: .25rem;
+    background: #fafafa;
+    overflow: hidden;
     position: relative;
+    outline: none;
+    cursor: default;
 }
 
     .airuler-resultfile-viewer:focus {
@@ -336,17 +339,16 @@ textarea.resizable {
         outline-offset: 2px;
     }
 
+/* pan/zoom 변환 적용 대상 */
 .airuler-resultfile-transform {
-    width: 100%;
-    height: 100%;
-    transform-origin: 0 0;
+    transform-origin: 0 0; /* 좌상단 기준으로 scale/translate */
+    will-change: transform;
 }
 
+/* 기본 상태에서 “창 폭에 맞게” 이미지가 줄어들도록 */
 .airuler-resultfile-image {
     width: 100%;
-    height: 100%;
-    object-fit: contain;
-    object-position: center;
+    height: auto;
     display: block;
     user-select: none;
     -webkit-user-drag: none;

@@ -9,6 +9,7 @@
 @inject DataDbContext Db
 @inject IWebHostEnvironment Env
 
+
 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
     <h4 class="mb-0">
         <strong>@ModelName</strong>
@@ -41,13 +42,16 @@ else
     <div class="mt-3">
         <div class="airuler-resultfile-viewer"
              tabindex="0"
+             @ref="_viewerRef"
              title="Click to focus · Ctrl+'+'/'-' zoom · Ctrl+Arrow pan"
+             @onclick="FocusViewerAsync"
              @onkeydown="OnViewerKeyDown"
              @onkeydown:preventDefault="true">
             <div class="airuler-resultfile-transform" style="@TransformStyle">
                 <img class="airuler-resultfile-image" src="@_imageUrl" alt="@FileName" />
             </div>
         </div>
+
         <div class="mt-2 small text-muted">
             <b>Time</b>: @_record.TimestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
             <span class="text-muted"> · </span>
@@ -74,6 +78,14 @@ else
     private string? _loadError;
     private string _jsonText = string.Empty;
     private string _imageUrl = string.Empty;
+
+    // ✅ viewer focus
+    private ElementReference _viewerRef;
+    private async Task FocusViewerAsync()
+    {
+        // 클릭하면 키보드 입력이 바로 먹도록 포커스
+        await _viewerRef.FocusAsync();
+    }
 
     // ✅ Image viewer transform (Ctrl+'+'/'-' zoom, Ctrl+Arrow pan)
     private double _zoomFactor = 1.0;
@@ -107,7 +119,7 @@ else
             handled = true;
         }
         // Ctrl + Arrow : pan
-        else if (e.Key.StartsWith("Arrow", StringComparison.Ordinal))
+        else if (!string.IsNullOrWhiteSpace(e.Key) && e.Key.StartsWith("Arrow", StringComparison.Ordinal))
         {
             const int step = 20;
 
@@ -138,6 +150,8 @@ else
         _loadError = null;
         _jsonText = string.Empty;
         _imageUrl = string.Empty;
+
+        // ✅ 리셋: 기본은 “창에 맞춰 보이는 상태” (img width:100% 덕분에 너무 크게 안 나옴)
         _zoomFactor = 1.0;
         _panX = 0;
         _panY = 0;
@@ -150,12 +164,10 @@ else
 
         try
         {
-            // DB 기준으로 record 확인
             var query = Db.AirulerFilmMeasureResults
                 .AsNoTracking()
                 .Where(x => x.ModelName == ModelName && x.FileName == FileName);
 
-            // ✅ /device/{DeviceId} 로 접근한 경우 해당 device 결과만 매칭
             if (!string.IsNullOrWhiteSpace(DeviceId))
                 query = query.Where(x => x.DeviceId == DeviceId);
 
@@ -166,16 +178,11 @@ else
 
             _imageUrl = ImageUrl(_record.ModelName, _record.FileName);
 
-            // Raw JSON 파일 읽기
             var jsonPath = JsonFilePath(_record.ModelName, _record.FileName);
             if (System.IO.File.Exists(jsonPath))
-            {
                 _jsonText = await System.IO.File.ReadAllTextAsync(jsonPath);
-            }
             else
-            {
                 _jsonText = "(JSON file not found on server.)";
-            }
         }
         catch (Exception ex)
         {
