@@ -43,7 +43,7 @@ else
         <div class="airuler-resultfile-viewer"
              tabindex="0"
              @ref="_viewerRef"
-             title="Click to focus · Ctrl+'+'/'-' zoom · Ctrl+Arrow pan"
+             title="Click to focus · Ctrl+'+'/'-' zoom · Ctrl+0 reset · Ctrl+Arrow pan"
              @onclick="FocusViewerAsync"
              @onkeydown="OnViewerKeyDown"
              @onkeydown:preventDefault="true">
@@ -79,19 +79,20 @@ else
     private string _jsonText = string.Empty;
     private string _imageUrl = string.Empty;
 
-    // ✅ viewer focus
+    // ✅ viewer focus (키보드 확대/이동이 먹도록)
     private ElementReference _viewerRef;
     private async Task FocusViewerAsync()
     {
-        // 클릭하면 키보드 입력이 바로 먹도록 포커스
+        // 클릭하면 뷰어에 포커스 → Ctrl+'+'/'-' 키 이벤트를 뷰어에서 받음
         await _viewerRef.FocusAsync();
     }
 
-    // ✅ Image viewer transform (Ctrl+'+'/'-' zoom, Ctrl+Arrow pan)
+    // ✅ Pan/Zoom state
     private double _zoomFactor = 1.0;
     private int _panX = 0;
     private int _panY = 0;
 
+    // translate는 화면 픽셀 단위로 적용되도록 "translate(...) scale(...)" 순서 유지
     private string TransformStyle
         => string.Format(
             System.Globalization.CultureInfo.InvariantCulture,
@@ -118,11 +119,20 @@ else
             _zoomFactor = Math.Max(0.1, _zoomFactor / 1.1);
             handled = true;
         }
+        // Ctrl + 0 : reset (fit 상태로)
+        else if (e.Key == "0" || e.Key == "NumPad0")
+        {
+            _zoomFactor = 1.0;
+            _panX = 0;
+            _panY = 0;
+            handled = true;
+        }
         // Ctrl + Arrow : pan
         else if (!string.IsNullOrWhiteSpace(e.Key) && e.Key.StartsWith("Arrow", StringComparison.Ordinal))
         {
             const int step = 20;
 
+            // Modeler.razor와 동일 방향
             if (e.Key == "ArrowLeft") _panX += step;
             if (e.Key == "ArrowRight") _panX -= step;
             if (e.Key == "ArrowUp") _panY += step;
@@ -151,7 +161,7 @@ else
         _jsonText = string.Empty;
         _imageUrl = string.Empty;
 
-        // ✅ 리셋: 기본은 “창에 맞춰 보이는 상태” (img width:100% 덕분에 너무 크게 안 나옴)
+        // ✅ 새로운 파일로 넘어가면 기본 fit 상태로 리셋
         _zoomFactor = 1.0;
         _panX = 0;
         _panY = 0;
@@ -164,10 +174,12 @@ else
 
         try
         {
+            // DB 기준으로 record 확인
             var query = Db.AirulerFilmMeasureResults
                 .AsNoTracking()
                 .Where(x => x.ModelName == ModelName && x.FileName == FileName);
 
+            // ✅ /device/{DeviceId} 로 접근한 경우 해당 device 결과만 매칭
             if (!string.IsNullOrWhiteSpace(DeviceId))
                 query = query.Where(x => x.DeviceId == DeviceId);
 
@@ -178,11 +190,16 @@ else
 
             _imageUrl = ImageUrl(_record.ModelName, _record.FileName);
 
+            // Raw JSON 파일 읽기
             var jsonPath = JsonFilePath(_record.ModelName, _record.FileName);
             if (System.IO.File.Exists(jsonPath))
+            {
                 _jsonText = await System.IO.File.ReadAllTextAsync(jsonPath);
+            }
             else
+            {
                 _jsonText = "(JSON file not found on server.)";
+            }
         }
         catch (Exception ex)
         {

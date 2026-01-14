@@ -320,36 +320,39 @@ textarea.resizable {
     width: 100%;
 }
 
-
-/* “원래 창 크기 느낌”으로: 브라우저 폭에 맞추고, 적당한 높이 + overflow hidden */
+/*
+            "Modeler"처럼 이미지 자체 크기에 따라 페이지가 커지지 않도록,
+               "보이는 창(Viewer)"을 고정 크기로 만들고 그 안에 이미지를 fit(contain) 시킵니다.
+               (고해상도 이미지여도 항상 창 안에 맞춰서 보임)
+        */
 .airuler-resultfile-viewer {
     width: 100%;
     max-width: 100%;
-    height: 60vh; /* 필요하면 60~80vh로 조절 */
+    /* 화면 크기에 따라 적당히 고정된 느낌 */
+    height: min(70vh, 680px);
+    min-height: 320px;
     border: 1px solid #eee;
     background: #fafafa;
     overflow: hidden;
     position: relative;
     outline: none;
-    cursor: default;
 }
 
-    .airuler-resultfile-viewer:focus {
-        outline: 2px solid rgba(13,110,253,.25);
-        outline-offset: 2px;
-    }
-
-/* pan/zoom 변환 적용 대상 */
+/* pan/zoom 대상 컨테이너 (viewer 영역과 동일 크기) */
 .airuler-resultfile-transform {
-    transform-origin: 0 0; /* 좌상단 기준으로 scale/translate */
+    width: 100%;
+    height: 100%;
+    transform-origin: 50% 50%;
     will-change: transform;
 }
 
-/* 기본 상태에서 “창 폭에 맞게” 이미지가 줄어들도록 */
+/* 기본 상태에서 viewer 창에 맞게(전체가 보이도록) */
 .airuler-resultfile-image {
     width: 100%;
-    height: auto;
+    height: 100%;
+    object-fit: contain;
     display: block;
     user-select: none;
     -webkit-user-drag: none;
+    pointer-events: none;
 }
