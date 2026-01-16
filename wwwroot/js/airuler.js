@@ -506,3 +506,41 @@ window.airulerCanvas = (() => {
     return { init, setState, setTransform, getFitTransform, draw, dispose };
 })();
 
+
+
+
+// ---- AIRuler Calibration (preview/apply) ----
+window.hkAiruler = window.hkAiruler || {};
+
+// Returns: response text (JSON)
+window.hkAiruler.calibrationPreview = async (modelName) => {
+    const url = `/api/airuler/calibration-preview/${encodeURIComponent(modelName)}`;
+    const res = await fetch(url, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+        credentials: 'same-origin'
+    });
+
+    const text = await res.text();
+    if (!res.ok) {
+        throw new Error(`HTTP ${res.status} ${res.statusText}\n${text}`);
+    }
+    return text;
+};
+
+// Returns: response text (JSON)
+window.hkAiruler.calibrationApply = async (modelName) => {
+    const url = `/api/airuler/calibration/${encodeURIComponent(modelName)}`;
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json' },
+        credentials: 'same-origin'
+    });
+
+    const text = await res.text();
+    if (!res.ok) {
+        throw new Error(`HTTP ${res.status} ${res.statusText}\n${text}`);
+    }
+    return text;
+};
+
