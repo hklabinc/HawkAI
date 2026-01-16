@@ -404,6 +404,223 @@ namespace HawkAI.Controllers
         public Task<IActionResult> ApplyCalibrationToModelJson_Post(string modelName)
             => ApplyCalibrationToModelJson_Internal(modelName);
 
+
+        // ✅ Calibration Preview (dry-run)
+        // - 모델 JSON을 저장하지 않고, 어떤 measure의 adjust가 어떻게 바뀌는지 미리 보여준다.
+        [HttpGet("calibration-preview/{modelName}")]
+        public Task<IActionResult> PreviewCalibrationToModelJson_Get(string modelName)
+            => PreviewCalibrationToModelJson_Internal(modelName);
+
+        private sealed class CalibrationPreviewChange
+        {
+            public string Key { get; set; } = string.Empty;
+            public string Index { get; set; } = string.Empty;
+            public string MeasureProp { get; set; } = string.Empty;
+            public string OldAdjust { get; set; } = string.Empty;
+            public string DeltaAdjust { get; set; } = string.Empty;
+            public string NewAdjust { get; set; } = string.Empty;
+        }
+
+        private async Task<IActionResult> PreviewCalibrationToModelJson_Internal(string modelName)
+        {
+            EnsureBaseDirs();
+
+            var model = AirulerNameHelper.SanitizeModelName(modelName);
+            if (string.IsNullOrWhiteSpace(model))
+                return BadRequest("Invalid modelName.");
+
+            // 1) 모델 JSON 로드: wwwroot/airuler/models/{model}.json
+            var modelJsonPath = Path.Combine(ModelsDir, $"{model}.json");
+            if (!System.IO.File.Exists(modelJsonPath))
+                return NotFound($"Model json not found: /airuler/models/{model}.json");
+
+            JsonObject rootObj;
+            try
+            {
+                var txt = await System.IO.File.ReadAllTextAsync(modelJsonPath, Encoding.UTF8);
+                var node = JsonNode.Parse(txt);
+                rootObj = node as JsonObject
+                    ?? throw new Exception("Model json root is not an object.");
+            }
+            catch (Exception ex)
+            {
+                return BadRequest($"Failed to read/parse model json: {ex.Message}");
+            }
+
+            // 2) DB rows load
+            var rows = await _db.AirulerFilmMeasureResults
+                .AsNoTracking()
+                .Where(x => x.ModelName == model)
+                .ToListAsync();
+
+            if (rows.Count == 0)
+            {
+                return Ok(new
+                {
+                    success = true,
+                    modelName = model,
+                    message = "No DB rows to calibrate.",
+                    savedPath = $"/airuler/models/{model}.json",
+                    dbRows = 0,
+                    filmOrder = Array.Empty<int>(),
+                    updatedMeasures = 0,
+                    changes = Array.Empty<object>(),
+                    notFoundKeys = Array.Empty<string>()
+                });
+            }
+
+            // 3) agg compute (same as apply)
+            var agg = new Dictionary<string, Dictionary<int, ErrAgg>>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var r in rows)
+            {
+                if (string.IsNullOrWhiteSpace(r.ResultsJson))
+                    continue;
+
+                try
+                {
+                    using var doc = JsonDocument.Parse(r.ResultsJson);
+                    if (doc.RootElement.ValueKind != JsonValueKind.Array)
+                        continue;
+
+                    foreach (var filmEl in doc.RootElement.EnumerateArray())
+                    {
+                        if (!filmEl.TryGetProperty("film", out var fnoEl)) continue;
+                        if (fnoEl.ValueKind != JsonValueKind.Number) continue;
+                        if (!fnoEl.TryGetInt32(out var filmNo)) continue;
+                        if (filmNo <= 0) continue;
+
+                        if (!filmEl.TryGetProperty("measures", out var measEl) || measEl.ValueKind != JsonValueKind.Array)
+                            continue;
+
+                        foreach (var m in measEl.EnumerateArray())
+                        {
+                            var idx = GetString(m, "index");
+                            if (string.IsNullOrWhiteSpace(idx))
+                                continue;
+
+                            var err = GetNullableDouble(m, "err");
+                            if (!err.HasValue)
+                                continue;
+
+                            if (!agg.TryGetValue(idx, out var filmMap))
+                            {
+                                filmMap = new Dictionary<int, ErrAgg>();
+                                agg[idx] = filmMap;
+                            }
+
+                            if (!filmMap.TryGetValue(filmNo, out var a))
+                            {
+                                a = new ErrAgg();
+                                filmMap[filmNo] = a;
+                            }
+
+                            a.SumErr += err.Value;
+                            a.Count++;
+                        }
+                    }
+                }
+                catch
+                {
+                    // ignore parse error
+                }
+            }
+
+            var filmOrder = agg.Values
+                .SelectMany(fm => fm.Keys)
+                .Distinct()
+                .OrderBy(x => x)
+                .ToList();
+
+            if (filmOrder.Count == 0)
+            {
+                return Ok(new
+                {
+                    success = true,
+                    modelName = model,
+                    message = "No err values found to calibrate.",
+                    savedPath = $"/airuler/models/{model}.json",
+                    dbRows = rows.Count,
+                    filmOrder = Array.Empty<int>(),
+                    updatedMeasures = 0,
+                    changes = Array.Empty<object>(),
+                    notFoundKeys = Array.Empty<string>()
+                });
+            }
+
+            var changes = new List<CalibrationPreviewChange>();
+            var notFoundInModel = new List<string>();
+
+            foreach (var kv in agg)
+            {
+                var index = kv.Key;
+                var measureProp = "measure_" + index;
+
+                if (!TryGetPropertyIgnoreCase(rootObj, measureProp, out var actualKey, out var measureNode) ||
+                    measureNode is not JsonObject measureObj)
+                {
+                    notFoundInModel.Add(measureProp);
+                    continue;
+                }
+
+                string existingAdjustText;
+                try
+                {
+                    existingAdjustText = measureObj["adjust"]?.GetValue<string>() ?? string.Empty;
+                }
+                catch
+                {
+                    existingAdjustText = measureObj["adjust"]?.ToString() ?? string.Empty;
+                }
+
+                var existingVals = ParseAdjustList(existingAdjustText);
+                var filmMap = kv.Value;
+
+                var partsNew = new List<string>(filmOrder.Count);
+                var partsDelta = new List<string>(filmOrder.Count);
+
+                for (int i = 0; i < filmOrder.Count; i++)
+                {
+                    var filmNo = filmOrder[i];
+
+                    var oldVal = (i < existingVals.Count) ? existingVals[i] : 0.0;
+
+                    double avgErr = 0.0;
+                    if (filmMap.TryGetValue(filmNo, out var a) && a.Count > 0)
+                        avgErr = a.SumErr / a.Count;
+
+                    var delta = -avgErr;
+                    var newVal = oldVal + delta;
+
+                    partsDelta.Add(FormatSignedAdjust(delta));
+                    partsNew.Add(FormatSignedAdjust(newVal));
+                }
+
+                changes.Add(new CalibrationPreviewChange
+                {
+                    Key = actualKey,
+                    Index = index,
+                    MeasureProp = measureProp,
+                    OldAdjust = existingAdjustText,
+                    DeltaAdjust = string.Join(", ", partsDelta),
+                    NewAdjust = string.Join(", ", partsNew)
+                });
+            }
+
+            return Ok(new
+            {
+                success = true,
+                modelName = model,
+                savedPath = $"/airuler/models/{model}.json",
+                dbRows = rows.Count,
+                filmOrder = filmOrder,
+                updatedMeasures = changes.Count,
+                changes = changes,
+                notFoundKeys = notFoundInModel
+            });
+        }
+
+
         private sealed class ErrAgg
         {
             public double SumErr;

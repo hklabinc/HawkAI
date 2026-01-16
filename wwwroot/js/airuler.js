@@ -505,3 +505,4 @@ window.airulerCanvas = (() => {
 
     return { init, setState, setTransform, getFitTransform, draw, dispose };
 })();
+

@@ -58,14 +58,13 @@
             Delete Selected
         </button>
 
-        <!-- ✅ Calibration (Warning) 버튼 추가: Save to CSV 왼쪽 -->
-        <a class="btn btn-sm btn-warning @(!CanCalibrate ? "disabled" : "")"
-           href="@CalibrationUrl"
-           target="_blank"
-           aria-disabled="@(!CanCalibrate)"
-           tabindex="@(!CanCalibrate ? "-1" : null)">
-            Calibration
-        </a>
+        <!-- ✅ Calibration (Preview → Apply) -->
+        <button class="btn btn-sm btn-warning"
+                type="button"
+                disabled="@(!CanCalibrate || _calibrationPreviewLoading || _calibrationApplying)"
+                @onclick="OpenCalibrationPreviewModalAsync">
+            @(_calibrationPreviewLoading ? "Calibration..." : "Calibration")
+        </button>
 
         <a class="btn btn-sm btn-success @(!CanExport ? "disabled" : "")"
            href="@ExportUrl"
@@ -257,7 +256,7 @@ else if (_records.Count > 0)
          @onclick="CloseSpecModal">
         <div class="modal-dialog modal-dialog-centered modal-xl"
              role="document"
-             style="max-width:80vw; width:80vw;" 
+             style="max-width:80vw; width:80vw;"
              @onclick:stopPropagation="true">
             <div class="modal-content">
                 <div class="modal-header">
@@ -282,6 +281,126 @@ else if (_records.Count > 0)
                              style="width:100%; height:auto; display:block; cursor:pointer;"
                              @onclick="CloseSpecModal" />
                     }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_showCalibrationModal)
+{
+    <!-- Backdrop -->
+    <div class="modal-backdrop fade show" @onclick="CloseCalibrationModal"></div>
+
+    <!-- Modal -->
+    <div class="modal fade show d-block"
+         tabindex="-1"
+         role="dialog"
+         style="background: rgba(0,0,0,0.2);"
+         @onclick="CloseCalibrationModal">
+        <div class="modal-dialog modal-dialog-centered modal-xl"
+             role="document"
+             style="max-width:90vw; width:90vw;"
+             @onclick:stopPropagation="true">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h6 class="modal-title">
+                        <b>Calibration Preview</b>
+                        @if (!string.IsNullOrWhiteSpace(ModelName))
+                        {
+                            <span class="text-muted" style="font-size: 0.95rem;">(@ModelName)</span>
+                        }
+                    </h6>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="CloseCalibrationModal"></button>
+                </div>
+
+                <div class="modal-body" style="background:#fff;">
+                    @if (_calibrationPreviewLoading)
+                    {
+                        <div class="text-muted">Loading preview...</div>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(_calibrationError))
+                    {
+                        <div class="alert alert-warning" style="white-space: pre-wrap;">@_calibrationError</div>
+                    }
+                    else if (_calibrationPreview == null)
+                    {
+                        <div class="text-muted">No preview data.</div>
+                    }
+                    else
+                    {
+                        <div class="small mb-2">
+                            <div><b>Target JSON</b>: @_calibrationPreview.SavedPath</div>
+                            <div><b>DB rows used</b>: @_calibrationPreview.DbRows</div>
+
+                            @if ((_calibrationPreview.FilmOrder?.Count ?? 0) > 0)
+                            {
+                                <div><b>Films</b>: @string.Join(", ", _calibrationPreview.FilmOrder!)</div>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(_calibrationPreview.Message))
+                            {
+                                <div class="text-muted mt-1">@_calibrationPreview.Message</div>
+                            }
+
+                            @if ((_calibrationPreview.NotFoundKeys?.Count ?? 0) > 0)
+                            {
+                                <div class="text-warning mt-1">
+                                    <b>Not found in model json</b>: @_calibrationPreview.NotFoundKeys!.Count
+                                </div>
+                            }
+                        </div>
+
+                        @if ((_calibrationPreview.Changes?.Count ?? 0) > 0)
+                        {
+                            <div class="table-responsive" style="max-height:60vh; overflow:auto;">
+                                <table class="table table-sm table-hover align-middle">
+                                    <thead class="table-light" style="position: sticky; top: 0; z-index: 1;">
+                                        <tr>
+                                            <th style="min-width:200px;">Measure</th>
+                                            <th style="min-width:260px;">Old adjust</th>
+                                            <th style="min-width:260px;">Delta (add)</th>
+                                            <th style="min-width:260px;">New adjust</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var ch in _calibrationPreview.Changes!)
+                                        {
+                                            <tr>
+                                                <td class="small">
+                                                    <div><b>@ch.Key</b></div>
+                                                    <div class="text-muted">@ch.MeasureProp</div>
+                                                </td>
+                                                <td style="@MonoCellStyle">@DisplayAdjust(ch.OldAdjust)</td>
+                                                <td style="@MonoCellStyle">@DisplayAdjust(ch.DeltaAdjust)</td>
+                                                <td style="@MonoCellStyle">@DisplayAdjust(ch.NewAdjust)</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-muted">No adjust changes.</div>
+                        }
+                    }
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-sm btn-outline-secondary"
+                            type="button"
+                            @onclick="CloseCalibrationModal"
+                            disabled="@_calibrationApplying">
+                        Cancel
+                    </button>
+
+                    <button class="btn btn-sm btn-warning"
+                            type="button"
+                            @onclick="ApplyCalibrationAsync"
+                            disabled="@(!CanApplyCalibration)">
+                        @(_calibrationApplying ? "Applying..." : "Apply")
+                    </button>
                 </div>
             </div>
         </div>
@@ -373,6 +492,41 @@ else if (_records.Count > 0)
         public bool IsSelected { get; set; }
     }
 
+    private sealed class CalibrationPreviewResponse
+    {
+        public bool Success { get; set; }
+        public string? ModelName { get; set; }
+        public string? SavedPath { get; set; }
+        public int DbRows { get; set; }
+        public List<int>? FilmOrder { get; set; }
+        public int UpdatedMeasures { get; set; }
+        public List<CalibrationPreviewChange>? Changes { get; set; }
+        public List<string>? NotFoundKeys { get; set; }
+        public string? Message { get; set; }
+    }
+
+    private sealed class CalibrationPreviewChange
+    {
+        public string? Key { get; set; }
+        public string? Index { get; set; }
+        public string? MeasureProp { get; set; }
+        public string? OldAdjust { get; set; }
+        public string? DeltaAdjust { get; set; }
+        public string? NewAdjust { get; set; }
+    }
+
+    private sealed class CalibrationApplyResponse
+    {
+        public bool Success { get; set; }
+        public string? ModelName { get; set; }
+        public string? SavedPath { get; set; }
+        public int DbRows { get; set; }
+        public int UpdatedMeasures { get; set; }
+        public List<string>? UpdatedKeys { get; set; }
+        public List<string>? NotFoundKeys { get; set; }
+        public string? Message { get; set; }
+    }
+
     private List<RecordVm> _records = new();
     private List<MeasureColumnVm> _measureColumns = new();
     private string? _loadError;
@@ -384,15 +538,29 @@ else if (_records.Count > 0)
     private string? _specImageUrl;
     private string? _specLoadError;
 
+    // ---- Calibration preview modal ----
+    private bool _showCalibrationModal = false;
+    private bool _calibrationPreviewLoading = false;
+    private bool _calibrationApplying = false;
+    private CalibrationPreviewResponse? _calibrationPreview;
+    private string? _calibrationError;
+
     private bool CanExport => !string.IsNullOrWhiteSpace(ModelName) && _records.Count > 0;
     private bool CanDeleteSelected => _records.Any(r => r.IsSelected);
     private bool CanShowSpec => !string.IsNullOrWhiteSpace(ModelName) || _records.Count > 0;
+
     private bool CanCalibrate => !string.IsNullOrWhiteSpace(ModelName) && _records.Count > 0;
 
-    private string CalibrationUrl
-        => CanCalibrate
-            ? $"/api/airuler/calibration/{Uri.EscapeDataString(ModelName!)}"
-            : "#";    
+    private bool CanApplyCalibration
+        => !_calibrationPreviewLoading
+           && !_calibrationApplying
+           && (_calibrationPreview?.Success ?? false)
+           && ((_calibrationPreview?.Changes?.Count ?? 0) > 0);
+
+    private static readonly JsonSerializerOptions CalibrationJsonOpts = new() { PropertyNameCaseInsensitive = true };
+
+    private string MonoCellStyle
+        => "font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace; font-size: 0.85rem; white-space: pre-wrap; word-break: break-word;";
 
     // ✅ 헤더 "전체 선택" 체크박스 바인딩
     private bool SelectAll
@@ -482,7 +650,6 @@ else if (_records.Count > 0)
                 {
                     Entity = e,
                     ThumbnailUrl = ThumbUrl(e.ModelName, e.FileName),
-                    // ✅ 항상 device 경로를 포함해 상세 페이지로 이동(디바이스별 구분)
                     DetailPageUrl = DetailUrl(e.ModelName, e.FileName, e.DeviceId),
                     Films = films,
                     IsSelected = selectedIds.Contains(e.Id)
@@ -492,7 +659,6 @@ else if (_records.Count > 0)
             _measureColumns = cols;
             _records = vms;
 
-            // 페이지네이션 보정
             NormalizePaging();
         }
         catch (Exception ex)
@@ -585,7 +751,6 @@ else if (_records.Count > 0)
         return string.Empty;
     }
 
-
     private async Task OpenSpecModalAsync()
     {
         _specLoadError = null;
@@ -624,7 +789,6 @@ else if (_records.Count > 0)
         {
             if (_records.Count > 0)
             {
-                // ReloadAsync()에서 Timestamp desc 로 정렬했으므로 [0]이 가장 최신
                 var ent = _records[0].Entity;
 
                 var jsonPath = JsonFilePath(ent.ModelName, ent.FileName);
@@ -672,6 +836,89 @@ else if (_records.Count > 0)
         return sb.ToString();
     }
 
+    private async Task OpenCalibrationPreviewModalAsync()
+    {
+        if (string.IsNullOrWhiteSpace(ModelName))
+            return;
+
+        _calibrationError = null;
+        _calibrationPreview = null;
+        _calibrationPreviewLoading = true;
+        _calibrationApplying = false;
+        _showCalibrationModal = true;
+
+        try
+        {
+            var raw = await JS.InvokeAsync<string>("hkAiruler.calibrationPreview", ModelName);
+            _calibrationPreview = JsonSerializer.Deserialize<CalibrationPreviewResponse>(raw, CalibrationJsonOpts);
+
+            if (_calibrationPreview == null)
+                _calibrationError = "Preview response parse failed.";
+        }
+        catch (Exception ex)
+        {
+            _calibrationError = ex.Message;
+        }
+        finally
+        {
+            _calibrationPreviewLoading = false;
+        }
+    }
+
+    private void CloseCalibrationModal()
+    {
+        _showCalibrationModal = false;
+    }
+
+    private static string DisplayAdjust(string? s)
+        => string.IsNullOrWhiteSpace(s) ? "0" : s;
+
+    private async Task ApplyCalibrationAsync()
+    {
+        if (string.IsNullOrWhiteSpace(ModelName))
+            return;
+
+        if (_calibrationApplying)
+            return;
+
+        _calibrationError = null;
+        _calibrationApplying = true;
+
+        try
+        {
+            var raw = await JS.InvokeAsync<string>("hkAiruler.calibrationApply", ModelName);
+            var res = JsonSerializer.Deserialize<CalibrationApplyResponse>(raw, CalibrationJsonOpts);
+
+            if (res != null && res.Success)
+            {
+                if (!string.IsNullOrWhiteSpace(res.Message))
+                {
+                    _statusMessage = res.Message;
+                }
+                else
+                {
+                    var updated = res.UpdatedMeasures;
+                    var notFound = res.NotFoundKeys?.Count ?? 0;
+                    _statusMessage = $"Calibration applied: {res.SavedPath} (updated {updated}, notFound {notFound})";
+                }
+
+                CloseCalibrationModal();
+            }
+            else
+            {
+                _calibrationError = $"Calibration apply failed or unexpected response:\n{raw}";
+            }
+        }
+        catch (Exception ex)
+        {
+            _calibrationError = ex.Message;
+        }
+        finally
+        {
+            _calibrationApplying = false;
+        }
+    }
+
     private async Task ConfirmDeleteSelectedAsync()
     {
         if (string.IsNullOrWhiteSpace(ModelName))
@@ -700,14 +947,9 @@ else if (_records.Count > 0)
                 return;
 
             // tracking 필요(삭제)
-            IQueryable<AirulerFilmMeasureResult> delQuery = Db.AirulerFilmMeasureResults
-                .Where(x => x.ModelName == ModelName && ids.Contains(x.Id));
-
-            // ✅ /device/{DeviceId} 화면에서는 동일한 DeviceId 내에서만 삭제
-            if (!string.IsNullOrWhiteSpace(DeviceId))
-                delQuery = delQuery.Where(x => x.DeviceId == DeviceId);
-
-            var ents = await delQuery.ToListAsync();
+            var ents = await Db.AirulerFilmMeasureResults
+                .Where(x => x.ModelName == ModelName && ids.Contains(x.Id))
+                .ToListAsync();
 
             // 파일 삭제 먼저 시도 (실패해도 계속)
             foreach (var ent in ents)
@@ -753,8 +995,6 @@ else if (_records.Count > 0)
 
     private IEnumerable<int> GetPageNumbers()
     {
-        // 표시 예: Prev [1] [2] ... [N] Next
-        // 페이지가 많으면 가운데만 보여주고 ... 넣음
         var total = TotalPages;
         var cur = Math.Clamp(_page, 1, total);
 
@@ -764,7 +1004,6 @@ else if (_records.Count > 0)
             yield break;
         }
 
-        // 항상 1,2, 마지막 2개는 보여주고, 현재 주변 2개도 표시
         yield return 1;
         yield return 2;
 
