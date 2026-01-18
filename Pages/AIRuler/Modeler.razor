@@ -18,7 +18,8 @@
                 <span class="ms-auto airuler-hint">
                     (ROI: Arrow 이동 / Shift+Arrow 크기 / Delete 삭제 / Ctrl+C,X,V View: Ctrl+'+' 확대 / Ctrl+'-' 축소 / Ctrl+Arrow 팬 (Viewer만))
                 </span>
-            </div></div>
+            </div>
+        </div>
 
         <div class="card-body p-0">
             <div id="airulerViewerHost" class="airuler-viewer-host">
@@ -33,7 +34,7 @@
         </div>
     </div>
 
-        <!-- =================== Bottom Panels =================== -->
+    <!-- =================== Bottom Panels =================== -->
     <div class="row g-2 mt-2">
 
         <!-- 1) Model / Images / Upload -->
@@ -118,7 +119,7 @@
                 <div class="card-body">
                     <div class="mb-2">
                         <label class="form-label">ROI ID</label>
-                        <input class="form-control" type="number" step="1" @bind="_roiEditor.IdText" placeholder="e.g. 1" />
+                        <input class="form-control" type="text" @bind="_roiEditor.IdText" placeholder="e.g. 1, A_1, roi_A_1" />
                     </div>
 
                     <div class="row g-1 mb-2">
@@ -164,7 +165,7 @@
                     <hr />
 
                     <div style="height:320px; min-height:120px; resize:vertical; overflow:auto; border:1px solid #eee; padding:6px;">
-                        @foreach (var r in _rois.OrderBy(r => r.Id))
+                        @foreach (var r in _rois.OrderBy(r => GetRoiSortKey(r.Id)))
                         {
                             <button class="btn btn-sm @(r.Id == _selectedRoiId ? "btn-danger" : "btn-light")"
                                     style="width:100%; text-align:left; margin-bottom:4px;"
@@ -271,7 +272,7 @@
                         </div>
                     </div>
 
-                    <!-- ✅ Generate~Download 버튼 밑 “일괄 변경” Row -->                    
+                    <!-- ✅ Generate~Download 버튼 밑 “일괄 변경” Row -->
                     <div class="mt-2 d-flex align-items-center gap-2 flex-wrap justify-content-end">
                         <!-- margin 일괄 변경 -->
                         <div class="input-group input-group-sm" style="max-width: 260px;">
@@ -328,7 +329,7 @@
     // ROI / Measure
     private readonly List<Roi> _rois = new();
     private readonly Dictionary<string, Measure> _measures = new(StringComparer.Ordinal);
-private int? _selectedRoiId = null;
+    private string? _selectedRoiId = null;
     private string? _selectedMeasureId = null;
     // JSON + Log
     private string _jsonEditorText = "";
@@ -482,7 +483,7 @@ private int? _selectedRoiId = null;
         await RefreshImagesAsync();
     }
 
-        private async Task DeleteSelectedModelAsync()
+    private async Task DeleteSelectedModelAsync()
     {
         if (string.IsNullOrWhiteSpace(_selectedModel)) return;
 
@@ -526,7 +527,7 @@ private int? _selectedRoiId = null;
         await InvokeAsync(StateHasChanged);
     }
 
-private async Task OnModelChanged(ChangeEventArgs e)
+    private async Task OnModelChanged(ChangeEventArgs e)
     {
         _selectedModel = e.Value?.ToString();
         _selectedImage = null;
@@ -575,7 +576,7 @@ private async Task OnModelChanged(ChangeEventArgs e)
         }
     }
 
-        private async Task SelectImageAsync(string file)
+    private async Task SelectImageAsync(string file)
     {
         if (string.IsNullOrWhiteSpace(_selectedModel)) return;
 
@@ -618,7 +619,7 @@ private async Task OnModelChanged(ChangeEventArgs e)
         Log($"Selected {_pendingFiles.Count} file(s) for upload.");
     }
 
-private async Task UploadSelectedFilesAsync()
+    private async Task UploadSelectedFilesAsync()
     {
         if (string.IsNullOrWhiteSpace(_selectedModel)) return;
         if (_pendingFiles.Count == 0) return;
@@ -834,7 +835,7 @@ private async Task UploadSelectedFilesAsync()
         await InvokeAsync(StateHasChanged);
     }
 
-    private async Task SelectRoiAsync(int id)
+    private async Task SelectRoiAsync(string id)
     {
         _selectedRoiId = id;
         _selectedMeasureId = null;
@@ -875,7 +876,7 @@ private async Task UploadSelectedFilesAsync()
     private void CopySelectedRoi()
     {
         if (_selectedRoiId is null) return;
-        var roi = _rois.FirstOrDefault(r => r.Id == _selectedRoiId.Value);
+        var roi = _rois.FirstOrDefault(r => r.Id == _selectedRoiId);
         if (roi is null) return;
         _clipboardRoi = roi.Clone();
         Log($"Copied roi_{roi.Id}");
@@ -913,7 +914,7 @@ private async Task UploadSelectedFilesAsync()
     private void MoveOrResizeSelectedRoiByKey(string key, bool resize)
     {
         if (_selectedRoiId is null) return;
-        var roi = _rois.FirstOrDefault(r => r.Id == _selectedRoiId.Value);
+        var roi = _rois.FirstOrDefault(r => r.Id == _selectedRoiId);
         if (roi is null) return;
 
         if (resize)
@@ -961,7 +962,7 @@ private async Task UploadSelectedFilesAsync()
 
     private void LoadRoiIntoEditor(Roi roi)
     {
-        _roiEditor.IdText = roi.Id.ToString();
+        _roiEditor.IdText = roi.Id;
         _roiEditor.XText = ((int)Math.Round(roi.X)).ToString();
         _roiEditor.YText = ((int)Math.Round(roi.Y)).ToString();
         _roiEditor.WText = ((int)Math.Round(roi.W)).ToString();
@@ -980,10 +981,11 @@ private async Task UploadSelectedFilesAsync()
 
         EnsureRoiEditorDefaults();
 
-        // ID
-        if (!int.TryParse((_roiEditor.IdText ?? "").Trim(), out var newId))
+        // ID (allow numeric OR custom string; user may type 'roi_xxx' or just 'xxx')
+        var newId = NormalizeRoiIdSuffix(_roiEditor.IdText);
+        if (newId is null)
         {
-            Log("ERROR: ROI ID must be an integer.");
+            Log("ERROR: ROI ID is empty or contains invalid characters. Use letters/digits/_/- (e.g. 1, A_1, roi_A_1).");
             return;
         }
 
@@ -1033,7 +1035,7 @@ private async Task UploadSelectedFilesAsync()
         // if selected ROI exists -> update that ROI (rename allowed)
         if (_selectedRoiId is not null)
         {
-            var oldId = _selectedRoiId.Value;
+            var oldId = _selectedRoiId;
             target = _rois.FirstOrDefault(r => r.Id == oldId);
 
             if (target is not null && newId != oldId)
@@ -1087,17 +1089,18 @@ private async Task UploadSelectedFilesAsync()
         await InvokeAsync(StateHasChanged);
     }
 
+
     private async Task DeleteRoiAsync()
     {
-        int? rid = null;
+        string? rid = null;
 
         if (_selectedRoiId is not null)
         {
-            rid = _selectedRoiId.Value;
+            rid = _selectedRoiId;
         }
-        else if (int.TryParse((_roiEditor.IdText ?? "").Trim(), out var parsed))
+        else
         {
-            rid = parsed;
+            rid = NormalizeRoiIdSuffix(_roiEditor.IdText);
         }
 
         if (rid is null)
@@ -1106,10 +1109,11 @@ private async Task UploadSelectedFilesAsync()
             return;
         }
 
-        await DeleteRoiByIdAsync(rid.Value);
+        await DeleteRoiByIdAsync(rid);
     }
 
-    private async Task DeleteRoiByIdAsync(int rid)
+
+    private async Task DeleteRoiByIdAsync(string rid)
     {
         var roi = _rois.FirstOrDefault(r => r.Id == rid);
         if (roi is null)
@@ -1134,6 +1138,7 @@ private async Task UploadSelectedFilesAsync()
         await InvokeAsync(StateHasChanged);
     }
 
+
     // =================== Measure ===================
     private async Task AddOrUpdateMeasureAsync()
     {
@@ -1149,11 +1154,11 @@ private async Task UploadSelectedFilesAsync()
         var eId = ParseRoiNameToId(_measureForm.EndText ?? "");
         if (sId is null || eId is null)
         {
-            Log("ERROR: Start/End ROI must be like '1' or 'roi_1'.");
+            Log("ERROR: Start/End ROI must be like '1' or 'roi_1' (also supports 'A_1' or 'roi_A_1').");
             return;
         }
 
-        if (_rois.All(r => r.Id != sId.Value) || _rois.All(r => r.Id != eId.Value))
+        if (_rois.All(r => r.Id != sId) || _rois.All(r => r.Id != eId))
         {
             Log("ERROR: Start/End ROI id not found.");
             return;
@@ -1166,8 +1171,8 @@ private async Task UploadSelectedFilesAsync()
 
         _measures[idx] = new Measure
         {
-            Start = $"roi_{sId.Value}",
-            End = $"roi_{eId.Value}",
+            Start = $"roi_{sId}",
+            End = $"roi_{eId}",
             Direction = string.IsNullOrWhiteSpace(_measureForm.Direction) ? "x" : _measureForm.Direction,
             Gt = gt,
             Margin = margin,
@@ -1181,6 +1186,7 @@ private async Task UploadSelectedFilesAsync()
         await PushCanvasStateAsync();
         await InvokeAsync(StateHasChanged);
     }
+
 
     private async Task DeleteMeasureAsync()
     {
@@ -1214,7 +1220,7 @@ private async Task UploadSelectedFilesAsync()
         }
     }
 
-private string? FindMeasureNearPoint(double x, double y, double thresholdPx)
+    private string? FindMeasureNearPoint(double x, double y, double thresholdPx)
     {
         if (_measures.Count == 0) return null;
 
@@ -1229,7 +1235,7 @@ private string? FindMeasureNearPoint(double x, double y, double thresholdPx)
             var sid = ParseRoiNameToId(m.Start);
             var eid = ParseRoiNameToId(m.End);
             if (sid is null || eid is null) continue;
-            if (!roiMap.TryGetValue(sid.Value, out var sr) || !roiMap.TryGetValue(eid.Value, out var er)) continue;
+            if (!roiMap.TryGetValue(sid, out var sr) || !roiMap.TryGetValue(eid, out var er)) continue;
 
             var ax = sr.X + sr.W / 2;
             var ay = sr.Y + sr.H / 2;
@@ -1366,7 +1372,7 @@ private string? FindMeasureNearPoint(double x, double y, double thresholdPx)
     {
         var data = new Dictionary<string, object?>();
 
-        var validRois = _rois.OrderBy(r => r.Id).ToList();
+        var validRois = _rois.OrderBy(r => GetRoiSortKey(r.Id)).ToList();
         data["n_roi"] = validRois.Count;
 
         foreach (var roi in validRois)
@@ -1405,13 +1411,13 @@ private string? FindMeasureNearPoint(double x, double y, double thresholdPx)
     {
         if (!_jsInited) return;
 
-        var selectedMeasureRoiIds = new List<int>();
+        var selectedMeasureRoiIds = new List<string>();
         if (_selectedMeasureId is not null && _measures.TryGetValue(_selectedMeasureId, out var sm))
         {
             var s = ParseRoiNameToId(sm.Start);
             var e = ParseRoiNameToId(sm.End);
-            if (s is not null) selectedMeasureRoiIds.Add(s.Value);
-            if (e is not null) selectedMeasureRoiIds.Add(e.Value);
+            if (s is not null) selectedMeasureRoiIds.Add(s);
+            if (e is not null) selectedMeasureRoiIds.Add(e);
         }
 
         var payload = new
@@ -1452,12 +1458,35 @@ private string? FindMeasureNearPoint(double x, double y, double thresholdPx)
         return ext is ".jpg" or ".jpeg" or ".png" or ".bmp" or ".webp";
     }
 
-    private static int? ParseRoiNameToId(string s)
+    private static string? ParseRoiNameToId(string s)
+    {
+        return NormalizeRoiIdSuffix(s);
+    }
+
+    private static string? NormalizeRoiIdSuffix(string? s)
     {
         s = (s ?? "").Trim();
         if (string.IsNullOrWhiteSpace(s)) return null;
-        if (s.StartsWith("roi_", StringComparison.OrdinalIgnoreCase)) s = s.Substring(4);
-        return int.TryParse(s, out var id) ? id : null;
+
+        // allow users to type either "roi_xxx" or just "xxx"
+        if (s.StartsWith("roi_", StringComparison.OrdinalIgnoreCase))
+            s = s.Substring(4);
+
+        s = s.Trim();
+        if (string.IsNullOrWhiteSpace(s)) return null;
+
+        // ✅ allow: letters (including non-ASCII), digits, '_' and '-'
+        foreach (var ch in s)
+        {
+            if (!(char.IsLetterOrDigit(ch) || ch == '_' || ch == '-'))
+                return null;
+        }
+
+        // keep legacy behavior: numeric id becomes canonical number string ("01" -> "1")
+        if (int.TryParse(s, out var n))
+            return n.ToString();
+
+        return s;
     }
 
     private static string SanitizeModelName(string s)
@@ -1518,7 +1547,7 @@ private string? FindMeasureNearPoint(double x, double y, double thresholdPx)
 
             var roi = new Roi
             {
-                Id = id.Value,
+                Id = id,
                 X = xn * _imgW,
                 Y = yn * _imgH,
                 W = wn * _imgW,
@@ -1568,19 +1597,11 @@ private string? FindMeasureNearPoint(double x, double y, double thresholdPx)
 
     private static string NormalizeRoiName(string s)
     {
-        s = (s ?? "").Trim();
-        if (string.IsNullOrWhiteSpace(s)) return "";
-
-        if (s.StartsWith("roi_", StringComparison.OrdinalIgnoreCase))
-            return s;
-
-        if (int.TryParse(s, out var id))
-            return $"roi_{id}";
-
-        return s;
+        var id = NormalizeRoiIdSuffix(s);
+        return id is null ? "" : $"roi_{id}";
     }
 
-    
+
     private static string NormalizeMeasureId(string? s)
     {
         s = (s ?? "").Trim();
@@ -1592,7 +1613,7 @@ private string? FindMeasureNearPoint(double x, double y, double thresholdPx)
         return s.Trim();
     }
 
-        // ---------- Measure ordering (Natural sort for No.3-1, No.10-1, CP2-2, ...) ----------
+    // ---------- Measure ordering (Natural sort for No.3-1, No.10-1, CP2-2, ...) ----------
     private static readonly System.Text.RegularExpressions.Regex CpMeasureIndexRegex =
         new(@"^CP(\d+)(?:-(\d+))?$", System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
@@ -1657,7 +1678,7 @@ private string? FindMeasureNearPoint(double x, double y, double thresholdPx)
             .ToList();
     }
 
-private static string ReadString(JsonElement obj, string propName, string defaultValue)
+    private static string ReadString(JsonElement obj, string propName, string defaultValue)
     {
         if (!obj.TryGetProperty(propName, out var el)) return defaultValue;
         if (el.ValueKind == JsonValueKind.String) return el.GetString() ?? defaultValue;
@@ -1690,7 +1711,31 @@ private static string ReadString(JsonElement obj, string propName, string defaul
         return null;
     }
 
-    private int SuggestNextRoiId() => _rois.Count == 0 ? 1 : _rois.Max(r => r.Id) + 1;
+    private string SuggestNextRoiId()
+    {
+        // Keep legacy behavior: new ROI created by drawing uses (max numeric ROI ID) + 1.
+        var max = 0;
+        foreach (var r in _rois)
+        {
+            if (TryParseRoiNumericId(r.Id, out var n) && n > max)
+                max = n;
+        }
+        return (max + 1).ToString();
+    }
+
+    private static bool TryParseRoiNumericId(string? id, out int n)
+        => int.TryParse((id ?? "").Trim(), out n);
+
+    private static (int group, int n, string raw) GetRoiSortKey(string? id)
+    {
+        var s = (id ?? "").Trim();
+        if (TryParseRoiNumericId(s, out var num))
+            return (0, num, s);
+
+        // non-numeric ids are ordered after numeric ones
+        return (1, int.MaxValue, s);
+    }
+
 
     private Rect ClampRectToImage(Rect r)
     {
@@ -1726,7 +1771,7 @@ private static string ReadString(JsonElement obj, string propName, string defaul
     // =================== Models ===================
     private sealed class Roi
     {
-        public int Id { get; set; }
+        public string Id { get; set; } = "";
         public double X { get; set; }
         public double Y { get; set; }
         public double W { get; set; }
