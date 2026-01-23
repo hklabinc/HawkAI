@@ -11,10 +11,10 @@
 
 <style>
     /*
-            ✅ "Modeler"처럼 이미지 자체 크기에 따라 페이지가 커지지 않도록,
-               "보이는 창(Viewer)"을 고정 크기로 만들고 그 안에 이미지를 fit(contain) 시킵니다.
-               (고해상도 이미지여도 항상 창 안에 맞춰서 보임)
-        */
+                ✅ "Modeler"처럼 이미지 자체 크기에 따라 페이지가 커지지 않도록,
+                   "보이는 창(Viewer)"을 고정 크기로 만들고 그 안에 이미지를 fit(contain) 시킵니다.
+                   (고해상도 이미지여도 항상 창 안에 맞춰서 보임)
+            */
     .airuler-resultfile-viewer {
         width: 100%;
         max-width: 100%;
@@ -26,7 +26,14 @@
         overflow: hidden;
         position: relative;
         outline: none;
+        /* ✅ 마우스 Pan(드래그) UX */
+        cursor: grab;
+        user-select: none;
     }
+
+        .airuler-resultfile-viewer.is-panning {
+            cursor: grabbing;
+        }
 
     /* pan/zoom 대상 컨테이너 (viewer 영역과 동일 크기) */
     .airuler-resultfile-transform {
@@ -78,13 +85,20 @@ else if (_record == null)
 else
 {
     <div class="mt-3">
-        <div class="airuler-resultfile-viewer"
+        <div class="airuler-resultfile-viewer @(_isPanning ? "is-panning" : "")"
              tabindex="0"
              @ref="_viewerRef"
-             title="Click to focus · Ctrl+'+'/'-' zoom · Ctrl+0 reset · Ctrl+Arrow pan"
+             title="Click to focus · Wheel zoom · Drag pan · Double click reset · Ctrl+'+'/'-' zoom · Ctrl+0 reset · Ctrl+Arrow pan"
              @onclick="FocusViewerAsync"
+             @ondblclick="OnViewerDoubleClick"
              @onkeydown="OnViewerKeyDown"
-             @onkeydown:preventDefault="true">
+             @onkeydown:preventDefault="true"
+             @onwheel="OnViewerWheel"
+             @onwheel:preventDefault="true"
+             @onmousedown="OnViewerMouseDown"
+             @onmousemove="OnViewerMouseMove"
+             @onmouseup="OnViewerMouseUp"
+             @onmouseleave="OnViewerMouseLeave">
             <div class="airuler-resultfile-transform" style="@TransformStyle">
                 <img class="airuler-resultfile-image" src="@_imageUrl" alt="@FileName" />
             </div>
@@ -129,6 +143,16 @@ else
     private double _zoomFactor = 1.0;
     private int _panX = 0;
     private int _panY = 0;
+
+    // ✅ Mouse pan state
+    private bool _isPanning = false;
+    private double _panStartClientX = 0;
+    private double _panStartClientY = 0;
+    private int _panStartX = 0;
+    private int _panStartY = 0;
+
+    private static double Clamp(double v, double min, double max)
+        => v < min ? min : (v > max ? max : v);
 
     // translate는 화면 픽셀 단위로 적용되도록 "translate(...) scale(...)" 순서 유지
     private string TransformStyle
@@ -185,6 +209,89 @@ else
         return Task.CompletedTask;
     }
 
+    // ✅ Double click: reset (Ctrl+0 대체)
+    private async Task OnViewerDoubleClick(MouseEventArgs e)
+    {
+        _zoomFactor = 1.0;
+        _panX = 0;
+        _panY = 0;
+        _isPanning = false;
+
+        await _viewerRef.FocusAsync();
+        StateHasChanged();
+    }
+
+    // ✅ Mouse Wheel: zoom in/out (Ctrl 없이도)
+    private async Task OnViewerWheel(WheelEventArgs e)
+    {
+        // 휠만 굴려도 동작하게 + 키보드 연속 사용을 위해 포커스 유지
+        await _viewerRef.FocusAsync();
+
+        if (e.DeltaY == 0)
+            return;
+
+        // 트랙패드(작은 delta) / 마우스휠(큰 delta) 모두 자연스럽게:
+        //  - DeltaY=-100 일 때 약 1.1배 확대
+        //  - DeltaY=+100 일 때 약 1/1.1배 축소
+        var factor = Math.Pow(1.1, -e.DeltaY / 100.0);
+        _zoomFactor = Clamp(_zoomFactor * factor, 0.1, 10.0);
+
+        StateHasChanged();
+    }
+
+    // ✅ Mouse Drag: pan
+    private async Task OnViewerMouseDown(MouseEventArgs e)
+    {
+        // 좌클릭만 pan
+        if (e.Button != 0)
+            return;
+
+        _isPanning = true;
+        _panStartClientX = e.ClientX;
+        _panStartClientY = e.ClientY;
+        _panStartX = _panX;
+        _panStartY = _panY;
+
+        // 드래그 시작 시에도 포커스 확보(키보드 확대/이동 기존 기능 유지)
+        await _viewerRef.FocusAsync();
+
+        StateHasChanged();
+    }
+
+    private Task OnViewerMouseMove(MouseEventArgs e)
+    {
+        if (!_isPanning)
+            return Task.CompletedTask;
+
+        var dx = e.ClientX - _panStartClientX;
+        var dy = e.ClientY - _panStartClientY;
+
+        _panX = _panStartX + (int)Math.Round(dx);
+        _panY = _panStartY + (int)Math.Round(dy);
+        return Task.CompletedTask;
+    }
+
+    private Task OnViewerMouseUp(MouseEventArgs e)
+    {
+        if (_isPanning)
+        {
+            _isPanning = false;
+            StateHasChanged();
+        }
+        return Task.CompletedTask;
+    }
+
+    private Task OnViewerMouseLeave(MouseEventArgs e)
+    {
+        // 요소 밖으로 나가면 pan 종료(마우스업 누락 대비)
+        if (_isPanning)
+        {
+            _isPanning = false;
+            StateHasChanged();
+        }
+        return Task.CompletedTask;
+    }
+
     private string BackUrl
         => string.IsNullOrWhiteSpace(ModelName)
             ? "/airuler/results"
@@ -203,6 +310,7 @@ else
         _zoomFactor = 1.0;
         _panX = 0;
         _panY = 0;
+        _isPanning = false;
 
         if (string.IsNullOrWhiteSpace(ModelName) || string.IsNullOrWhiteSpace(FileName))
         {
