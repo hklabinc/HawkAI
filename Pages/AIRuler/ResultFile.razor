@@ -117,8 +117,21 @@ else
 
     <hr class="my-4" />
 
-    <h6><strong>Raw JSON (EXIF UserComment)</strong></h6>
-    <pre style="max-height: 70vh; overflow: auto; background: #fafafa; border: 1px solid #eee; padding: 8px;">@_jsonText</pre>
+    <div class="d-flex align-items-center gap-2">
+        <h6 class="mb-0"><strong>Raw JSON (EXIF UserComment)</strong></h6>
+        <button class="btn btn-sm btn-outline-secondary" @onclick="ToggleRawJson">
+            @(_showRawJson ? "Hide" : "Show")
+        </button>
+    </div>
+
+    @if (_showRawJson)
+    {
+        <pre style="max-height: 70vh; overflow: auto; background: #fafafa; border: 1px solid #eee; padding: 8px;">@_jsonText</pre>
+    }
+    else
+    {
+        <div class="small text-muted mt-2">Hidden. Click <b>Show</b> to view.</div>
+    }
 }
 
 @code {
@@ -130,6 +143,7 @@ else
     private string? _loadError;
     private string _jsonText = string.Empty;
     private string _imageUrl = string.Empty;
+    private bool _showRawJson = false;
 
     // ✅ viewer focus (키보드 확대/이동이 먹도록)
     private ElementReference _viewerRef;
@@ -305,6 +319,7 @@ else
         _loadError = null;
         _jsonText = string.Empty;
         _imageUrl = string.Empty;
+        _showRawJson = false;
 
         // ✅ 새로운 파일로 넘어가면 기본 fit 상태로 리셋
         _zoomFactor = 1.0;
@@ -360,4 +375,9 @@ else
 
     private string JsonFilePath(string modelName, string fileName)
         => Path.Combine(ResultsRoot, Path.GetFileName(modelName), "json", Path.GetFileNameWithoutExtension(fileName) + ".json");
+
+    private void ToggleRawJson()
+    {
+        _showRawJson = !_showRawJson;
+    }
 }
