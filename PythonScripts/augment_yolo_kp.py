@@ -122,6 +122,128 @@ def write_yolo_pose_label(txt_path: Path, boxes, classes, kpts_per_box):
 # Augmentation core
 # -----------------------------
 
+# When passing keypoint identity through Albumentations `label_fields`,
+# keep it as a *scalar*.
+#
+# Using tuple labels like (bbox_id, kp_index) can become problematic depending on
+# albumentations/numpy conversions (it can be flattened to a 1D list of ints).
+# A single scalar id is robust: kp_uid = bbox_id * KP_ID_BASE + kp_index
+KP_ID_BASE = 10000
+
+
+def _as_list(x):
+    """Convert various scalar/array-like outputs to a Python list."""
+    if x is None:
+        return []
+    if isinstance(x, np.ndarray):
+        return x.tolist()
+    if isinstance(x, (list, tuple)):
+        return list(x)
+    return [x]
+
+
+def _normalize_keypoints_xy(keypoints):
+    """Normalize Albumentations keypoints output into list[(x,y)].
+
+    Albumentations typically returns list[(x,y)], but depending on the input type
+    (list vs np.ndarray) and the number of keypoints, it may return:
+      - np.ndarray of shape (N,2)
+      - np.ndarray/list of shape (2,) for a single keypoint
+      - flattened list/array [x1,y1,x2,y2,...] (seen in some edge cases)
+    """
+    if keypoints is None:
+        return []
+
+    # numpy array
+    if isinstance(keypoints, np.ndarray):
+        arr = keypoints
+        if arr.ndim == 1:
+            flat = arr.reshape(-1).tolist()
+            if len(flat) == 2:
+                return [(float(flat[0]), float(flat[1]))]
+            if len(flat) % 2 == 0:
+                return [(float(flat[i]), float(flat[i + 1])) for i in range(0, len(flat), 2)]
+            return []
+        # (N, 2+) -> take first 2 cols
+        return [(float(row[0]), float(row[1])) for row in arr]
+
+    # python list/tuple
+    kps = _as_list(keypoints)
+    if not kps:
+        return []
+
+    first = kps[0]
+    # flattened [x,y,x,y,...] or single (x,y) tuple turned into [x,y]
+    if isinstance(first, (int, float, np.number)):
+        flat = [float(v) for v in kps]
+        if len(flat) == 2:
+            return [(flat[0], flat[1])]
+        if len(flat) % 2 == 0:
+            return [(flat[i], flat[i + 1]) for i in range(0, len(flat), 2)]
+        return []
+
+    out = []
+    for kp in kps:
+        if isinstance(kp, np.ndarray):
+            kp = kp.tolist()
+        if isinstance(kp, (list, tuple)) and len(kp) >= 2:
+            out.append((float(kp[0]), float(kp[1])))
+    return out
+
+
+def _normalize_int_labels(labels, *, base: int | None = None):
+    """Normalize label_fields output into list[int].
+
+    If `labels` is list of pairs (bid, ki), it can be converted into scalar ids
+    using `base` (bid*base+ki) for backward compatibility.
+    """
+    vals = _as_list(labels)
+    if not vals:
+        return []
+
+    first = vals[0]
+
+    # already scalar
+    if not isinstance(first, (list, tuple, np.ndarray)):
+        out = []
+        for v in vals:
+            try:
+                out.append(int(v))
+            except Exception:
+                out.append(0)
+        return out
+
+    # list of pairs -> encode
+    if base is not None:
+        # handle np arrays
+        if isinstance(first, np.ndarray):
+            first = first.tolist()
+        if isinstance(first, (list, tuple)) and len(first) == 2:
+            out = []
+            for v in vals:
+                if isinstance(v, np.ndarray):
+                    v = v.tolist()
+                try:
+                    bid = int(v[0])
+                    ki = int(v[1])
+                    out.append(bid * base + ki)
+                except Exception:
+                    out.append(0)
+            return out
+
+    # fallback: flatten one-level
+    out = []
+    for v in vals:
+        if isinstance(v, np.ndarray):
+            v = v.tolist()
+        if isinstance(v, (list, tuple)) and len(v) == 1:
+            v = v[0]
+        try:
+            out.append(int(v))
+        except Exception:
+            out.append(0)
+    return out
+
 def build_transforms(cfg):
     """Build fixed and random augmentation transforms."""
     fixed_cfg = cfg.get("fixed", {})
@@ -300,6 +422,11 @@ def apply_and_save_pose(image_bgr, boxes, classes, kpts_per_box, transform, out_
     bbox_ids = list(range(len(boxes)))
 
     # Flatten keypoints across boxes, keep ids and visibility in parallel arrays
+    #
+    # NOTE:
+    # - keypoints: list[(x_pix,y_pix)]
+    # - keypoint_ids: list[int] (scalar uid; robust for albumentations label_fields)
+    # - keypoint_vis: list[int] (YOLO visibility)
     keypoints = []
     keypoint_ids = []
     keypoint_vis = []
@@ -311,7 +438,9 @@ def apply_and_save_pose(image_bgr, boxes, classes, kpts_per_box, transform, out_
             x_pix = float(kx) * img_w
             y_pix = float(ky) * img_h
             keypoints.append((x_pix, y_pix))
-            keypoint_ids.append((bid, ki))
+
+            # scalar uid for albumentations label_fields
+            keypoint_ids.append(int(bid) * KP_ID_BASE + int(ki))
             keypoint_vis.append(int(v))
 
     if transform is None:
@@ -346,15 +475,24 @@ def apply_and_save_pose(image_bgr, boxes, classes, kpts_per_box, transform, out_
     # Reconstruct keypoints per bbox
     aug_h, aug_w = aug_img.shape[:2]
 
-    # keypoints output is list of (x_pix,y_pix)
-    aug_keypoints = aug.get("keypoints", [])
-    aug_keypoint_ids = aug.get("keypoint_ids", [])
-    aug_keypoint_vis = aug.get("keypoint_vis", [])
+    # keypoints output is usually list[(x_pix,y_pix)], but normalize to be safe
+    aug_keypoints = _normalize_keypoints_xy(aug.get("keypoints", []))
 
-    # Build map for quick lookup
+    # label_fields may be list[int] (expected) OR in some environments it may
+    # come back as list[[bid,ki]] etc. Normalize to scalar ids.
+    aug_keypoint_ids = _normalize_int_labels(aug.get("keypoint_ids", []), base=KP_ID_BASE)
+    aug_keypoint_vis = _normalize_int_labels(aug.get("keypoint_vis", []))
+
+    # Make lengths consistent
+    n_kp = min(len(aug_keypoints), len(aug_keypoint_ids), len(aug_keypoint_vis))
+    aug_keypoints = aug_keypoints[:n_kp]
+    aug_keypoint_ids = aug_keypoint_ids[:n_kp]
+    aug_keypoint_vis = aug_keypoint_vis[:n_kp]
+
+    # Build map for quick lookup (kp_uid -> (x_pix,y_pix,v))
     kp_map = {}
-    for (x_pix, y_pix), (bid, ki), v in zip(aug_keypoints, aug_keypoint_ids, aug_keypoint_vis):
-        kp_map[(int(bid), int(ki))] = (float(x_pix), float(y_pix), int(v))
+    for (x_pix, y_pix), kp_uid, v in zip(aug_keypoints, aug_keypoint_ids, aug_keypoint_vis):
+        kp_map[int(kp_uid)] = (float(x_pix), float(y_pix), int(v))
 
     keep_bbox_set = set(int(bid) for bid in aug_bbox_ids)
 
@@ -364,7 +502,8 @@ def apply_and_save_pose(image_bgr, boxes, classes, kpts_per_box, transform, out_
         kcnt = kpt_count_per_bbox.get(bid, 0)
         kpts_out = []
         for ki in range(kcnt):
-            x_pix, y_pix, v = kp_map.get((bid, ki), (0.0, 0.0, 0))
+            kp_uid = int(bid) * KP_ID_BASE + int(ki)
+            x_pix, y_pix, v = kp_map.get(kp_uid, (0.0, 0.0, 0))
 
             # If original v was 0, keep as absent regardless of transform result
             if v <= 0:
