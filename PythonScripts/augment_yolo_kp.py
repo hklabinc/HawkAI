@@ -127,12 +127,58 @@ def build_transforms(cfg):
     fixed_cfg = cfg.get("fixed", {})
     rand_cfg = cfg.get("random", {})
 
+    def _normalize_rotate_limit(val, default=15):
+        """Normalize config value to a value accepted by albumentations.Rotate.
+
+        Albumentations Rotate accepts:
+        - number (int/float): interpreted internally as (-limit, +limit)
+        - tuple/list of 2 numbers: (min, max)
+
+        Our Blazor UI (and legacy configs) sometimes send `limit` as an int (e.g. 15).
+        The previous implementation forced tuple(...), which crashes on int.
+        """
+        if val is None:
+            return default
+
+        # If dict-style value is provided
+        if isinstance(val, dict):
+            if "min" in val and "max" in val:
+                try:
+                    return (float(val["min"]), float(val["max"]))
+                except Exception:
+                    return default
+
+        # If list/tuple is provided
+        if isinstance(val, (list, tuple)):
+            if len(val) == 2:
+                try:
+                    return (float(val[0]), float(val[1]))
+                except Exception:
+                    return default
+            if len(val) == 1:
+                try:
+                    return float(val[0])
+                except Exception:
+                    return default
+            return default
+
+        # scalar (int/float/str)
+        try:
+            return float(val)
+        except Exception:
+            return default
+
     # BBox + Keypoint params
     bbox_params = A.BboxParams(format="yolo", label_fields=["class_labels", "bbox_ids"], min_visibility=0.0)
     keypoint_params = A.KeypointParams(format="xy", label_fields=["keypoint_ids", "keypoint_vis"], remove_invisible=False)
 
+    # NOTE:
+    # - "original" should be a true no-op.
+    # - Using A.Compose([]) with bbox/keypoint processors emits warnings
+    #   ("Got processor ... but no transform to process it.")
+    # - We use None for original and treat it as identity in apply_and_save_pose().
     fixed_transforms = {
-        "original": A.Compose([], bbox_params=bbox_params, keypoint_params=keypoint_params),
+        "original": None,
         "rotate90": A.Compose([A.Rotate(limit=(90, 90), p=1.0)], bbox_params=bbox_params, keypoint_params=keypoint_params),
         "rotate180": A.Compose([A.Rotate(limit=(180, 180), p=1.0)], bbox_params=bbox_params, keypoint_params=keypoint_params),
         "rotate270": A.Compose([A.Rotate(limit=(270, 270), p=1.0)], bbox_params=bbox_params, keypoint_params=keypoint_params),
@@ -157,7 +203,10 @@ def build_transforms(cfg):
     # rotate
     rot = rand_cfg.get("rotate", {})
     if rot.get("enabled", False):
-        random_ops.append(A.Rotate(limit=tuple(rot.get("limit", [-15, 15])), p=float(rot.get("p", 0.5))))
+        # Albumentations Rotate supports `limit` as int/float or (min,max).
+        # Our legacy UI/config uses an int (e.g. 15). Handle both safely.
+        limit = _normalize_rotate_limit(rot.get("limit", 15), default=15)
+        random_ops.append(A.Rotate(limit=limit, p=float(rot.get("p", 0.5))))
 
     # affine shear
     shear = rand_cfg.get("affine_shear", {})
