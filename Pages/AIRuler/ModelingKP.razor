@@ -16,6 +16,7 @@
 @using SixLabors.ImageSharp.Processing
 @using HawkAI.Services
 @using System.Text.RegularExpressions;
+@using System.Linq
 
 <h4>Project Manager (@projects.Count)</h4>
 
@@ -96,7 +97,7 @@ else
                             <text> by @p.CreatorUserId</text>
                         }
                     </p>
-                    
+
 
                     <!-- 카드 우측 상단 Merge 체크박스 -->
                     <div class="position-absolute top-0 end-0 m-2">
@@ -109,7 +110,7 @@ else
                         <!-- 왼쪽: Edit / Delete (간격 좁게) -->
                         <div class="d-flex gap-1">
                             <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenEditModal(p)">Edit</button>
-@if (projectHasModelMap.TryGetValue(p.Name, out var hasModels) && hasModels)
+                            @if (projectHasModelMap.TryGetValue(p.Name, out var hasModels) && hasModels)
                             {
                                 <button class="btn btn-sm btn-outline-success px-1" @onclick="() => ShowModelFolders(p.Name)">Models</button>
                             }
@@ -302,14 +303,14 @@ else
                     @if (isExporting)
                     {
                         <div style="
-                            position: absolute;
-                            top: 0; left: 0;
-                            width: 100%; height: 100%;
-                            background: rgba(255,255,255,0.5);
-                            z-index: 10;
-                            display: flex;
-                            justify-content: center;
-                            align-items: center;">
+                                    position: absolute;
+                                    top: 0; left: 0;
+                                    width: 100%; height: 100%;
+                                    background: rgba(255,255,255,0.5);
+                                    z-index: 10;
+                                    display: flex;
+                                    justify-content: center;
+                                    align-items: center;">
                             <img src="/img/loading.gif" alt="Loading..." style="height: 60px;" />
                         </div>
                     }
@@ -354,7 +355,7 @@ else
                                 <input class="form-check-input" type="checkbox" id="autoDownload" @bind="enableAutoDownload" disabled="@isExporting" />
                                 <label class="form-check-label" for="autoDownload">Download ZIP</label>
                             </div>
-</div>
+                        </div>
 
                         <!-- Fixed Augmentations -->
                         <div class="card mb-3">
@@ -489,7 +490,7 @@ else
 
                                 <!-- Etc Augmentations Toggle -->
                                 <button class="btn btn-link p-0 mb-2 mt-3" type="button" data-bs-toggle="collapse" data-bs-target="#etcAug" aria-expanded="false" aria-controls="etcAug">
-                                  Show More ▼
+                                    Show More ▼
                                 </button>
 
                                 <div class="collapse" id="etcAug">
@@ -591,14 +592,14 @@ else
                     @if (isTraining)
                     {
                         <div style="
-                            position: absolute;
-                            top: 0; left: 0;
-                            width: 100%; height: 100%;
-                            background: rgba(255,255,255,0.5);
-                            z-index: 10;
-                            display: flex;
-                            justify-content: center;
-                            align-items: center;">
+                                    position: absolute;
+                                    top: 0; left: 0;
+                                    width: 100%; height: 100%;
+                                    background: rgba(255,255,255,0.5);
+                                    z-index: 10;
+                                    display: flex;
+                                    justify-content: center;
+                                    align-items: center;">
                             <img src="/img/loading.gif" alt="Loading..." style="height: 60px;" />
                         </div>
                     }
@@ -656,7 +657,7 @@ else
                                 <option value="512x512">512 x 512</option>
                                 <option value="512x288">512 x 288</option>
                                 <option value="480x480">480 x 480</option>
-                            </select>                            
+                            </select>
                         </div>
 
                         <div class="row mb-3">
@@ -694,7 +695,7 @@ else
 
                         <div class="mb-3">
                             <label class="form-label">Notification Email(s)</label>
-                            <input class="form-control" @bind="recipientEmails" placeholder="e.g. user1@example.com, user2@example.com" disabled="@isTraining" />                            
+                            <input class="form-control" @bind="recipientEmails" placeholder="e.g. user1@example.com, user2@example.com" disabled="@isTraining" />
                         </div>
                     </div>
                 </div>
@@ -814,7 +815,7 @@ else
     private string mergeProjectName = string.Empty;
     private string mergeLabels = string.Empty;
     private bool allowDuplicateMerge = false;
-    
+
     private ProjectKP? selectedProject = null;
     private bool exportAsSegmentation = false;  // Export 시 detection / segmentation 선택용
     private string augmentStatusMessage = string.Empty;
@@ -824,7 +825,7 @@ else
     private string trainTfliteExport = "fp16"; // ✅ 기본 FP16
     private string trainStatusMessage = string.Empty;
     private int trainImgWidth = 800;    // 기본값은 800x600
-    private int trainImgHeight = 600;    
+    private int trainImgHeight = 600;
     private int trainEpochs = 600;
     private int trainBatch = 32;
     private int trainWorkers = 4;
@@ -892,16 +893,16 @@ else
             .OrderBy(p => p.CreatorUserId) // 알파벳 순 정렬
             .ThenBy(p => p.Name)
             .Select(p => new ProjectViewModel
-                {
-                    Id = p.Id,
-                    Name = p.Name,
-                    Labels = p.Labels,
-                    CreatorUserId = p.CreatorUserId,
-                    CreatedAt = p.CreatedAt,
-                    ImageCount = p.ImageCount,
-                    Images = p.Images,
-                    IsSelectedForMerge = false
-                }).ToList();
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Labels = p.Labels,
+                CreatorUserId = p.CreatorUserId,
+                CreatedAt = p.CreatedAt,
+                ImageCount = p.ImageCount,
+                Images = p.Images,
+                IsSelectedForMerge = false
+            }).ToList();
 
         // 모델 폴더가 있는지 확인
         var runDir = Path.Combine(Env.WebRootPath, "runs");
@@ -929,7 +930,7 @@ else
         // {
         //     //Console.WriteLine($"[SignalR] ✅ Received message: {msg}");  // ✅ 디버깅 출력 추가
         //     augmentStatusMessage = msg; // 덮어쓰기
-                                        
+
         //     // ✅ 모달이 열려 있는 경우에만 UI 업데이트
         //     if (showExportModal)
         //     {
@@ -998,12 +999,12 @@ else
         }
 
         var project = new ProjectKP
-            {
-                Name = newProjectName,
-                Labels = labelInput,
-                CreatorUserId = userId,
-                ImageCount = createUploadedFiles.Count
-            };
+        {
+            Name = newProjectName,
+            Labels = labelInput,
+            CreatorUserId = userId,
+            ImageCount = createUploadedFiles.Count
+        };
 
         await ProjectService.CreateProject(project);
 
@@ -1399,16 +1400,18 @@ else
             sb.AppendLine();
             sb.AppendLine($"nc: {labelList.Count}");
             sb.AppendLine($"names: [{string.Join(", ", labelList.Select(x => $"'{x}'"))}]");
+            sb.AppendLine($"kpt_shape: [{kptCount}, 3]");
+            sb.AppendLine($"flip_idx: [{string.Join(", ", Enumerable.Range(0, kptCount))}]");
             sb.AppendLine();
             sb.AppendLine("hklab:");
-            sb.AppendLine($"  project: {project.Name.ToLower().Replace(" ", "-")}");                        
+            sb.AppendLine($"  project: {project.Name.ToLower().Replace(" ", "-")}");
             sb.AppendLine($"  url: https://hawkai.hknu.ac.kr/airuler/modelingkp/{projectId}");
             sb.AppendLine($"  task: pose");
             sb.AppendLine($"  kpt_shape: [{kptCount}, 3]");
             int imgW = exportImgWidth > 0 ? exportImgWidth : (project.Images.FirstOrDefault()?.Width ?? 0);
             int imgH = exportImgHeight > 0 ? exportImgHeight : (project.Images.FirstOrDefault()?.Height ?? 0);
             sb.AppendLine($"  image_width: {imgW}");
-            sb.AppendLine($"  image_height: {imgH}");            
+            sb.AppendLine($"  image_height: {imgH}");
             sb.AppendLine($"  trainCount: {trainCount}");
             sb.AppendLine($"  validCount: {validCount}");
             sb.AppendLine();
@@ -1532,14 +1535,14 @@ else
     private void OpenEditModal(ProjectKP project)
     {
         editingProject = new ProjectKP
-            {
-                Id = project.Id,
-                Name = project.Name,
-                Labels = project.Labels,
-                CreatorUserId = project.CreatorUserId,
-                CreatedAt = project.CreatedAt,
-                Images = project.Images.ToList()
-            };
+        {
+            Id = project.Id,
+            Name = project.Name,
+            Labels = project.Labels,
+            CreatorUserId = project.CreatorUserId,
+            CreatedAt = project.CreatedAt,
+            Images = project.Images.ToList()
+        };
         showEditModal = true;
     }
 
@@ -1795,7 +1798,7 @@ else
 
     private void PrepareMerge()
     {
-        var selected = projects.Where(p => p.IsSelectedForMerge).ToList();        
+        var selected = projects.Where(p => p.IsSelectedForMerge).ToList();
         if (selected.Count <= 1)
         {
             JS.InvokeVoidAsync("alert", "⚠️ Please select at least two projects to merge.");
@@ -1824,7 +1827,7 @@ else
         }
 
         // ✅ 1. ViewModel에서 선택된 프로젝트 확인
-        var selectedProjectVMs = projects.Where(p => p.IsSelectedForMerge).ToList();        
+        var selectedProjectVMs = projects.Where(p => p.IsSelectedForMerge).ToList();
 
         // ✅ 2. 이름 중복 확인
         if (Db.ProjectsKP.Any(p => p.Name == mergeProjectName))
@@ -1835,12 +1838,12 @@ else
 
         // ✅ 3. 새 프로젝트 생성
         var newProj = new ProjectKP
-            {
-                Name = mergeProjectName,
-                Labels = mergeLabels,
-                CreatorUserId = userId,
-                ImageCount = 0
-            };
+        {
+            Name = mergeProjectName,
+            Labels = mergeLabels,
+            CreatorUserId = userId,
+            ImageCount = 0
+        };
         await ProjectService.CreateProject(newProj);
 
         // ✅ 4. 폴더 준비
@@ -1931,17 +1934,17 @@ else
 
                 // DB에 이미지 추가
                 var newEntry = new ImageEntryKP
-                    {
-                        ProjectId = newProj.Id,
-                        FileName = entry.FileName,
-                        RelativePath = $"datasets_kp/{newProj.Name}/images/{entry.FileName}",
-                        UploadedAt = DateTime.Now,
-                        UploadedByUserId = userId,
-                        Width = entry.Width,
-                        Height = entry.Height,
-                        LabelStatus = entry.LabelStatus,
-                        LabelData = entry.LabelData
-                    };
+                {
+                    ProjectId = newProj.Id,
+                    FileName = entry.FileName,
+                    RelativePath = $"datasets_kp/{newProj.Name}/images/{entry.FileName}",
+                    UploadedAt = DateTime.Now,
+                    UploadedByUserId = userId,
+                    Width = entry.Width,
+                    Height = entry.Height,
+                    LabelStatus = entry.LabelStatus,
+                    LabelData = entry.LabelData
+                };
                 Db.ImagesKP.Add(newEntry);
 
                 // 라벨 파일 복사
@@ -2069,7 +2072,7 @@ else
         public string session_id { get; set; } = "";
         public string message { get; set; } = "";
     }
-        
+
     private void OpenTrainModal(int projectId)
     {
         selectedProject = projects.FirstOrDefault(p => p.Id == projectId);
@@ -2144,7 +2147,7 @@ else
             { "img_width",  trainImgWidth  },   // YOLO 내부에선 (H,W)로 변환됨
             { "img_height", trainImgHeight },
             { "epochs", trainEpochs },
-            { "batch", trainBatch }, 
+            { "batch", trainBatch },
             { "workers", trainWorkers },
             { "tflite_export", trainTfliteExport }
         };
