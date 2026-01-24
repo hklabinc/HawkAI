@@ -1,11 +1,12 @@
-﻿@page "/aidetector/projects"
-@inject HawkAI.Data.ProjectService.IProjectService ProjectService
+﻿@page "/airuler/modelingkp"
+@inject HawkAI.Data.ProjectServiceKP.IProjectServiceKP ProjectService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IWebHostEnvironment Env
 @inject DataDbContext Db
 @inject IJSRuntime JS
 @implements IAsyncDisposable
 @using HawkAI.Data
+@using HawkAI.Data.ProjectServiceKP
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.AspNetCore.SignalR.Client;
 @using System.Text.Json
@@ -58,7 +59,7 @@ else
                     {
                         // 라벨링된 이미지가 존재하면 annotated 폴더 경로 사용
                         var fileName = Path.GetFileName(labeledImage.RelativePath);
-                        displayPath = $"/datasets/{p.Name}/images_annotated/{fileName}";
+                        displayPath = $"/datasets_kp/{p.Name}/images_annotated/{fileName}";
                     }
                     else
                     {
@@ -95,7 +96,7 @@ else
                             <text> by @p.CreatorUserId</text>
                         }
                     </p>
-
+                    
 
                     <!-- 카드 우측 상단 Merge 체크박스 -->
                     <div class="position-absolute top-0 end-0 m-2">
@@ -108,11 +109,7 @@ else
                         <!-- 왼쪽: Edit / Delete (간격 좁게) -->
                         <div class="d-flex gap-1">
                             <button class="btn btn-sm btn-outline-primary" @onclick="() => OpenEditModal(p)">Edit</button>
-                            @if (HasCameraInfo(p.Name))
-                            {
-                                <button class="btn btn-sm btn-outline-warning px-0" @onclick="() => ShowCameraInfo(p.Name)">Cam Info</button>
-                            }
-                            @if (projectHasModelMap.TryGetValue(p.Name, out var hasModels) && hasModels)
+@if (projectHasModelMap.TryGetValue(p.Name, out var hasModels) && hasModels)
                             {
                                 <button class="btn btn-sm btn-outline-success px-1" @onclick="() => ShowModelFolders(p.Name)">Models</button>
                             }
@@ -305,14 +302,14 @@ else
                     @if (isExporting)
                     {
                         <div style="
-                                    position: absolute;
-                                    top: 0; left: 0;
-                                    width: 100%; height: 100%;
-                                    background: rgba(255,255,255,0.5);
-                                    z-index: 10;
-                                    display: flex;
-                                    justify-content: center;
-                                    align-items: center;">
+                            position: absolute;
+                            top: 0; left: 0;
+                            width: 100%; height: 100%;
+                            background: rgba(255,255,255,0.5);
+                            z-index: 10;
+                            display: flex;
+                            justify-content: center;
+                            align-items: center;">
                             <img src="/img/loading.gif" alt="Loading..." style="height: 60px;" />
                         </div>
                     }
@@ -357,11 +354,7 @@ else
                                 <input class="form-check-input" type="checkbox" id="autoDownload" @bind="enableAutoDownload" disabled="@isExporting" />
                                 <label class="form-check-label" for="autoDownload">Download ZIP</label>
                             </div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="exportSeg" @bind="exportAsSegmentation" />
-                                <label class="form-check-label" for="exportSeg">Segment Label</label>
-                            </div>
-                        </div>
+</div>
 
                         <!-- Fixed Augmentations -->
                         <div class="card mb-3">
@@ -496,7 +489,7 @@ else
 
                                 <!-- Etc Augmentations Toggle -->
                                 <button class="btn btn-link p-0 mb-2 mt-3" type="button" data-bs-toggle="collapse" data-bs-target="#etcAug" aria-expanded="false" aria-controls="etcAug">
-                                    Show More ▼
+                                  Show More ▼
                                 </button>
 
                                 <div class="collapse" id="etcAug">
@@ -598,14 +591,14 @@ else
                     @if (isTraining)
                     {
                         <div style="
-                                    position: absolute;
-                                    top: 0; left: 0;
-                                    width: 100%; height: 100%;
-                                    background: rgba(255,255,255,0.5);
-                                    z-index: 10;
-                                    display: flex;
-                                    justify-content: center;
-                                    align-items: center;">
+                            position: absolute;
+                            top: 0; left: 0;
+                            width: 100%; height: 100%;
+                            background: rgba(255,255,255,0.5);
+                            z-index: 10;
+                            display: flex;
+                            justify-content: center;
+                            align-items: center;">
                             <img src="/img/loading.gif" alt="Loading..." style="height: 60px;" />
                         </div>
                     }
@@ -628,6 +621,14 @@ else
                         <div class="mb-3">
                             <label class="form-label">Server</label>
                             <select class="form-select" @bind="selectedTrainServer" disabled="@isTraining">
+                                @* ✅ KP(Pose) 학습 서버는 Object Detection 서버와 분리 운용하는 것을 권장합니다.
+                                   아래는 예시 포트(9004)이며, 운영 환경에 맞게 수정해서 사용하세요. *@
+                                <option value="http://localhost:9004">HawkAI KP (localhost:9004), RTX 3090 24GB</option>
+                                <option value="http://ictrobot.hknu.ac.kr:9004">ICTRobot KP (ictrobot:9004), RTX A4000 16GB</option>
+                                <option value="http://sons.hknu.ac.kr:9004">Server1 KP (sons:9004), RTX 3090 24GB</option>
+                                <option value="http://sons.hknu.ac.kr:9005">Server2 KP (sons:9005), RTX 4090 24GB</option>
+
+                                @* (기존 Object Detection 학습 서버 목록도 남겨둠) *@
                                 <option value="http://localhost:9002">HawkAI (localhost:9002), RTX 3090 24GB</option>
                                 <option value="http://ictrobot.hknu.ac.kr:9002">ICTRobot (ictrobot:9002), RTX A4000 16GB</option>
                                 <option value="http://sons.hknu.ac.kr:9003">Server1 (sons:9003), RTX 3090 24GB</option>
@@ -655,7 +656,7 @@ else
                                 <option value="512x512">512 x 512</option>
                                 <option value="512x288">512 x 288</option>
                                 <option value="480x480">480 x 480</option>
-                            </select>
+                            </select>                            
                         </div>
 
                         <div class="row mb-3">
@@ -693,7 +694,7 @@ else
 
                         <div class="mb-3">
                             <label class="form-label">Notification Email(s)</label>
-                            <input class="form-control" @bind="recipientEmails" placeholder="e.g. user1@example.com, user2@example.com" disabled="@isTraining" />
+                            <input class="form-control" @bind="recipientEmails" placeholder="e.g. user1@example.com, user2@example.com" disabled="@isTraining" />                            
                         </div>
                     </div>
                 </div>
@@ -714,41 +715,6 @@ else
     </div>
 }
 
-@if (showCameraModal)
-{
-    <div class="modal show d-block" style="background: rgba(0,0,0,0.5);">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header bg-warning">
-                    <h5 class="modal-title">Camera Info - @cameraProjectName</h5>
-                    <button type="button" class="btn-close" @onclick="() => showCameraModal = false"></button>
-                </div>
-                @if (isCameraJsonEditable)
-                {
-                    <textarea class="form-control" style="height: 300px; white-space: pre-wrap;" @bind="editableCameraJsonContent"></textarea>
-                }
-                else
-                {
-                    <pre style="white-space: pre-wrap;">@cameraJsonContent</pre>
-                }
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" @onclick="() => showCameraModal = false">Close</button>
-
-                    @if (!isCameraJsonEditable)
-                    {
-                        <button class="btn btn-outline-primary" @onclick="EnableCameraJsonEdit">Edit</button>
-                    }
-                    else
-                    {
-                        <button class="btn btn-success" @onclick="SaveCameraJsonEdits">Save</button>
-                    }
-
-                    <button class="btn btn-danger" @onclick="DeleteCameraJson">Delete</button>
-                </div>
-            </div>
-        </div>
-    </div>
-}
 
 @if (showModelModal)
 {
@@ -840,7 +806,7 @@ else
     private int exportImgHeight = 0;
 
     private bool showEditModal = false;
-    private Project editingProject = new();
+    private ProjectKP editingProject = new();
     private IBrowserFile[] editUploadedFiles = Array.Empty<IBrowserFile>();
     private bool isAdmin = false;
 
@@ -848,8 +814,8 @@ else
     private string mergeProjectName = string.Empty;
     private string mergeLabels = string.Empty;
     private bool allowDuplicateMerge = false;
-
-    private Project? selectedProject = null;
+    
+    private ProjectKP? selectedProject = null;
     private bool exportAsSegmentation = false;  // Export 시 detection / segmentation 선택용
     private string augmentStatusMessage = string.Empty;
 
@@ -858,7 +824,7 @@ else
     private string trainTfliteExport = "fp16"; // ✅ 기본 FP16
     private string trainStatusMessage = string.Empty;
     private int trainImgWidth = 800;    // 기본값은 800x600
-    private int trainImgHeight = 600;
+    private int trainImgHeight = 600;    
     private int trainEpochs = 600;
     private int trainBatch = 32;
     private int trainWorkers = 4;
@@ -869,7 +835,8 @@ else
     private bool showCameraModal = false;
     private string cameraJsonContent = string.Empty;
     private string cameraProjectName = string.Empty;
-    private string selectedTrainServer = "http://localhost:9002";
+    // ✅ KP(Pose) 학습 서버 기본 포트(예시: 9004)
+    private string selectedTrainServer = "http://localhost:9004";
     private bool isCameraJsonEditable = false;
     private string editableCameraJsonContent = string.Empty;
 
@@ -925,16 +892,16 @@ else
             .OrderBy(p => p.CreatorUserId) // 알파벳 순 정렬
             .ThenBy(p => p.Name)
             .Select(p => new ProjectViewModel
-            {
-                Id = p.Id,
-                Name = p.Name,
-                Labels = p.Labels,
-                CreatorUserId = p.CreatorUserId,
-                CreatedAt = p.CreatedAt,
-                ImageCount = p.ImageCount,
-                Images = p.Images,
-                IsSelectedForMerge = false
-            }).ToList();
+                {
+                    Id = p.Id,
+                    Name = p.Name,
+                    Labels = p.Labels,
+                    CreatorUserId = p.CreatorUserId,
+                    CreatedAt = p.CreatedAt,
+                    ImageCount = p.ImageCount,
+                    Images = p.Images,
+                    IsSelectedForMerge = false
+                }).ToList();
 
         // 모델 폴더가 있는지 확인
         var runDir = Path.Combine(Env.WebRootPath, "runs");
@@ -942,13 +909,14 @@ else
             ? Directory.GetDirectories(runDir).Select(Path.GetFileName).OfType<string>().ToList()
             : new List<string>();
 
-        // ✅ KP(Pose) 모델 런 폴더(_kp_)는 Detector 페이지에서 제외
+        // ✅ KP 모델(run 폴더)은 학습 서버에서 "_kp_" 구분자를 붙여 저장하도록 했습니다.
+        //    따라서 KP 페이지에서는 _kp_ 런만 표시/판정합니다.
         projectHasModelMap = projects.ToDictionary(
             p => p.Name,
             p => runFolders.Any(f =>
                 !string.IsNullOrWhiteSpace(f)
                 && f.StartsWith(p.Name, StringComparison.OrdinalIgnoreCase)
-                && !f.Contains("_kp_", StringComparison.OrdinalIgnoreCase))
+                && f.Contains("_kp_", StringComparison.OrdinalIgnoreCase))
         );
 
         // Augment Hub 연결 설정
@@ -961,7 +929,7 @@ else
         // {
         //     //Console.WriteLine($"[SignalR] ✅ Received message: {msg}");  // ✅ 디버깅 출력 추가
         //     augmentStatusMessage = msg; // 덮어쓰기
-
+                                        
         //     // ✅ 모달이 열려 있는 경우에만 UI 업데이트
         //     if (showExportModal)
         //     {
@@ -982,11 +950,11 @@ else
 
         // Train Hub 연결 설정
         trainHubConnection = new HubConnectionBuilder()
-            .WithUrl(Navigation.ToAbsoluteUri("/trainHub"))
+            .WithUrl(Navigation.ToAbsoluteUri("/trainHubKP"))
             .WithAutomaticReconnect()
             .Build();
 
-        trainHubConnection.On<string, string>("ReceiveTrainStatus", (sessionId, msg) =>
+        trainHubConnection.On<string, string>("ReceiveTrainStatusKP", (sessionId, msg) =>
         {
             // Console.WriteLine($"[SignalR] ▶️ Train: {sessionId} → {msg}");
             trainStatusMessage = msg;
@@ -1029,17 +997,17 @@ else
             return;
         }
 
-        var project = new Project
-        {
-            Name = newProjectName,
-            Labels = labelInput,
-            CreatorUserId = userId,
-            ImageCount = createUploadedFiles.Count
-        };
+        var project = new ProjectKP
+            {
+                Name = newProjectName,
+                Labels = labelInput,
+                CreatorUserId = userId,
+                ImageCount = createUploadedFiles.Count
+            };
 
         await ProjectService.CreateProject(project);
 
-        var imagePath = Path.Combine(Env.WebRootPath, "datasets", newProjectName, "images");
+        var imagePath = Path.Combine(Env.WebRootPath, "datasets_kp", newProjectName, "images");
         Directory.CreateDirectory(imagePath);
 
         const long maxSize = 50 * 1024 * 1024;
@@ -1058,11 +1026,11 @@ else
             var filePath = Path.Combine(imagePath, file.Name);
             await File.WriteAllBytesAsync(filePath, ms.ToArray());
 
-            Db.Images.Add(new ImageEntry
+            Db.ImagesKP.Add(new ImageEntryKP
             {
                 ProjectId = project.Id,
                 FileName = file.Name,
-                RelativePath = $"datasets/{newProjectName}/images/{file.Name}",
+                RelativePath = $"datasets_kp/{newProjectName}/images/{file.Name}",
                 Width = image.Width,
                 Height = image.Height,
                 LabelStatus = "Unlabeled",
@@ -1083,7 +1051,7 @@ else
 
     private void OpenProject(int id)
     {
-        Navigation.NavigateTo($"/aidetector/projects/{id}");
+        Navigation.NavigateTo($"/airuler/modelingkp/{id}");
     }
 
     private async Task ReloadProjects()
@@ -1166,7 +1134,7 @@ else
         try
         {
             // 1) 프로젝트/이미지 로드 및 검증
-            var project = await Db.Projects.Include(p => p.Images).FirstOrDefaultAsync(p => p.Id == projectId);
+            var project = await Db.ProjectsKP.Include(p => p.Images).FirstOrDefaultAsync(p => p.Id == projectId);
             if (project == null || project.Images.Count == 0)
             {
                 await JS.InvokeVoidAsync("alert", "❌ Project not found or no images.");
@@ -1201,6 +1169,32 @@ else
             // 3) 이미지/라벨 내보내기 (모두 train/*로 저장)
             var labelList = project.Labels.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()).ToList();
 
+            // ✅ KP: project 전체에서 최대 keypoint 개수 계산 (YOLO pose는 고정 K 필요)
+            int kptCount = 0;
+            foreach (var imgForKpt in project.Images)
+            {
+                if (string.IsNullOrWhiteSpace(imgForKpt.LabelData) || imgForKpt.LabelData == "{}") continue;
+                try
+                {
+                    using var docK = JsonDocument.Parse(imgForKpt.LabelData);
+                    foreach (var b in docK.RootElement.EnumerateArray())
+                    {
+                        if (b.TryGetProperty("keypoints", out var kpArr) && kpArr.ValueKind == JsonValueKind.Array)
+                            kptCount = Math.Max(kptCount, kpArr.GetArrayLength());
+                    }
+                }
+                catch
+                {
+                    // ignore malformed label JSON
+                }
+            }
+
+            if (kptCount <= 0)
+            {
+                await JS.InvokeVoidAsync("alert", "❌ No keypoints found in labels. Please label keypoints before exporting.");
+                return;
+            }
+
             foreach (var image in project.Images)
             {
                 var srcImg = Path.Combine(Env.WebRootPath, image.RelativePath);
@@ -1221,36 +1215,59 @@ else
                 {
                     var labelLines = new List<string>();
                     using var jsonDoc = JsonDocument.Parse(image.LabelData);
+
                     foreach (var box in jsonDoc.RootElement.EnumerateArray())
                     {
                         var cls = labelList.IndexOf(box.GetProperty("label").GetString() ?? "");
+                        if (cls < 0) cls = 0;
+
                         var xMin = box.GetProperty("x").GetDouble();
                         var yMin = box.GetProperty("y").GetDouble();
                         var width = box.GetProperty("w").GetDouble();
                         var height = box.GetProperty("h").GetDouble();
 
-                        if (!exportAsSegmentation)
+                        // YOLO pose: cls xc yc w h + (kx ky v) * K
+                        var x_center = (xMin + width / 2.0) / image.Width;
+                        var y_center = (yMin + height / 2.0) / image.Height;
+                        var w_norm = width / image.Width;
+                        var h_norm = height / image.Height;
+
+                        var lineSb = new System.Text.StringBuilder();
+                        lineSb.Append($"{cls} {x_center:F6} {y_center:F6} {w_norm:F6} {h_norm:F6}");
+
+                        int written = 0;
+                        if (box.TryGetProperty("keypoints", out var kpArr) && kpArr.ValueKind == JsonValueKind.Array)
                         {
-                            // YOLO detection (x_center, y_center, w, h) normalized
-                            var x_center = (xMin + width / 2.0) / image.Width;
-                            var y_center = (yMin + height / 2.0) / image.Height;
-                            var w_norm = width / image.Width;
-                            var h_norm = height / image.Height;
-                            labelLines.Add($"{cls} {x_center:F6} {y_center:F6} {w_norm:F6} {h_norm:F6}");
+                            foreach (var kp in kpArr.EnumerateArray())
+                            {
+                                if (written >= kptCount) break;
+
+                                var v = (kp.TryGetProperty("v", out var vEl) && vEl.ValueKind == JsonValueKind.Number)
+                                    ? vEl.GetInt32()
+                                    : 2;
+
+                                if (v > 0)
+                                {
+                                    var kx = kp.TryGetProperty("x", out var kxEl) ? kxEl.GetDouble() : 0;
+                                    var ky = kp.TryGetProperty("y", out var kyEl) ? kyEl.GetDouble() : 0;
+                                    var kx_norm = kx / image.Width;
+                                    var ky_norm = ky / image.Height;
+                                    lineSb.Append($" {kx_norm:F6} {ky_norm:F6} {v}");
+                                }
+                                else
+                                {
+                                    lineSb.Append(" 0 0 0");
+                                }
+
+                                written++;
+                            }
                         }
-                        else
-                        {
-                            // YOLO segmentation (사각형 4점)
-                            var x1 = xMin / image.Width;
-                            var y1 = yMin / image.Height;
-                            var x2 = (xMin + width) / image.Width;
-                            var y2 = yMin / image.Height;
-                            var x3 = (xMin + width) / image.Width;
-                            var y3 = (yMin + height) / image.Height;
-                            var x4 = xMin / image.Width;
-                            var y4 = (yMin + height) / image.Height;
-                            labelLines.Add($"{cls} {x1:F6} {y1:F6} {x2:F6} {y2:F6} {x3:F6} {y3:F6} {x4:F6} {y4:F6}");
-                        }
+
+                        // pad
+                        for (; written < kptCount; written++)
+                            lineSb.Append(" 0 0 0");
+
+                        labelLines.Add(lineSb.ToString());
                     }
                     await File.WriteAllLinesAsync(labelPath, labelLines);
                 }
@@ -1300,7 +1317,7 @@ else
 
             // 파이썬 실행
             string pythonExe = Environment.GetEnvironmentVariable("PYTHON_PATH") ?? "python";
-            var scriptPath = Path.Combine(Env.ContentRootPath, "PythonScripts", "augment_yolo.py");
+            var scriptPath = Path.Combine(Env.ContentRootPath, "PythonScripts", "augment_yolo_kp.py");
 
             if (!File.Exists(scriptPath))
             {
@@ -1384,13 +1401,14 @@ else
             sb.AppendLine($"names: [{string.Join(", ", labelList.Select(x => $"'{x}'"))}]");
             sb.AppendLine();
             sb.AppendLine("hklab:");
-            sb.AppendLine($"  project: {project.Name.ToLower().Replace(" ", "-")}");
-            sb.AppendLine($"  url: https://hawkai.hknu.ac.kr/aidetector/projects/{projectId}");
-            sb.AppendLine($"  task: {(exportAsSegmentation ? "segment" : "detect")}");
+            sb.AppendLine($"  project: {project.Name.ToLower().Replace(" ", "-")}");                        
+            sb.AppendLine($"  url: https://hawkai.hknu.ac.kr/airuler/modelingkp/{projectId}");
+            sb.AppendLine($"  task: pose");
+            sb.AppendLine($"  kpt_shape: [{kptCount}, 3]");
             int imgW = exportImgWidth > 0 ? exportImgWidth : (project.Images.FirstOrDefault()?.Width ?? 0);
             int imgH = exportImgHeight > 0 ? exportImgHeight : (project.Images.FirstOrDefault()?.Height ?? 0);
             sb.AppendLine($"  image_width: {imgW}");
-            sb.AppendLine($"  image_height: {imgH}");
+            sb.AppendLine($"  image_height: {imgH}");            
             sb.AppendLine($"  trainCount: {trainCount}");
             sb.AppendLine($"  validCount: {validCount}");
             sb.AppendLine();
@@ -1511,17 +1529,17 @@ else
     }
 
 
-    private void OpenEditModal(Project project)
+    private void OpenEditModal(ProjectKP project)
     {
-        editingProject = new Project
-        {
-            Id = project.Id,
-            Name = project.Name,
-            Labels = project.Labels,
-            CreatorUserId = project.CreatorUserId,
-            CreatedAt = project.CreatedAt,
-            Images = project.Images.ToList()
-        };
+        editingProject = new ProjectKP
+            {
+                Id = project.Id,
+                Name = project.Name,
+                Labels = project.Labels,
+                CreatorUserId = project.CreatorUserId,
+                CreatedAt = project.CreatedAt,
+                Images = project.Images.ToList()
+            };
         showEditModal = true;
     }
 
@@ -1537,12 +1555,12 @@ else
             errorMessage2 = "Project name cannot be empty.";
             return;
         }
-        if (Db.Projects.Any(p => p.Name == editingProject.Name && p.Id != editingProject.Id))
+        if (Db.ProjectsKP.Any(p => p.Name == editingProject.Name && p.Id != editingProject.Id))
         {
             errorMessage2 = "Project name already exists. Please choose a different name.";
             return;
         }
-        var project = await Db.Projects.Include(p => p.Images).FirstOrDefaultAsync(p => p.Id == editingProject.Id);
+        var project = await Db.ProjectsKP.Include(p => p.Images).FirstOrDefaultAsync(p => p.Id == editingProject.Id);
         if (project != null)
         {
             var oldProjectName = project.Name;
@@ -1556,8 +1574,8 @@ else
             // If project name changed, rename folder and update paths
             if (!string.Equals(oldProjectName, project.Name, StringComparison.OrdinalIgnoreCase))
             {
-                var oldFolder = Path.Combine(Env.WebRootPath, "datasets", oldProjectName);
-                var newFolder = Path.Combine(Env.WebRootPath, "datasets", project.Name);
+                var oldFolder = Path.Combine(Env.WebRootPath, "datasets_kp", oldProjectName);
+                var newFolder = Path.Combine(Env.WebRootPath, "datasets_kp", project.Name);
                 if (Directory.Exists(oldFolder))
                 {
                     Directory.Move(oldFolder, newFolder);
@@ -1566,15 +1584,15 @@ else
                 foreach (var img in project.Images)
                 {
                     var fileName = Path.GetFileName(img.RelativePath);
-                    img.RelativePath = Path.Combine("datasets", project.Name, "images", fileName).Replace("\\", "/");
-                    Db.Images.Update(img);
+                    img.RelativePath = Path.Combine("datasets_kp", project.Name, "images", fileName).Replace("\\", "/");
+                    Db.ImagesKP.Update(img);
                 }
             }
             project.ImageCount = project.Images.Count + editUploadedFiles.Length;
-            Db.Projects.Update(project);
+            Db.ProjectsKP.Update(project);
             await Db.SaveChangesAsync();
 
-            var uploadPath = Path.Combine(Env.WebRootPath, "datasets", project.Name, "images");
+            var uploadPath = Path.Combine(Env.WebRootPath, "datasets_kp", project.Name, "images");
             Directory.CreateDirectory(uploadPath);
 
             const long maxSize = 50 * 1024 * 1024; // 50MB
@@ -1595,7 +1613,7 @@ else
 
                     if (existingEntry != null && existingEntry.LabelStatus == "Labeled")
                     {
-                        var annotatedPath = Path.Combine(Env.WebRootPath, "datasets", project.Name, "images_annotated", fileName);
+                        var annotatedPath = Path.Combine(Env.WebRootPath, "datasets_kp", project.Name, "images_annotated", fileName);
                         if (File.Exists(annotatedPath))
                         {
                             File.Delete(annotatedPath);
@@ -1620,15 +1638,15 @@ else
                     existingEntry.Height = imageInfo.Height;
                     existingEntry.LabelStatus = "Unlabeled";
                     existingEntry.LabelData = "{}";
-                    Db.Images.Update(existingEntry);
+                    Db.ImagesKP.Update(existingEntry);
                 }
                 else
                 {
-                    Db.Images.Add(new ImageEntry
+                    Db.ImagesKP.Add(new ImageEntryKP
                     {
                         ProjectId = project.Id,
                         FileName = fileName,
-                        RelativePath = Path.Combine("datasets", project.Name, "images", fileName).Replace("\\", "/"),
+                        RelativePath = Path.Combine("datasets_kp", project.Name, "images", fileName).Replace("\\", "/"),
                         LabelStatus = "Unlabeled",
                         Width = imageInfo.Width,
                         Height = imageInfo.Height,
@@ -1681,20 +1699,20 @@ else
             return;
         }
 
-        var source = await Db.Projects.Include(p => p.Images).FirstOrDefaultAsync(p => p.Id == copySourceProject.Id);
+        var source = await Db.ProjectsKP.Include(p => p.Images).FirstOrDefaultAsync(p => p.Id == copySourceProject.Id);
         if (source == null)
         {
             await JS.InvokeVoidAsync("alert", $"❌ Source project '{copySourceProject.Name}' not found.");
             return;
         }
 
-        if (Db.Projects.Any(p => p.Name == mergeProjectName))
+        if (Db.ProjectsKP.Any(p => p.Name == mergeProjectName))
         {
             await JS.InvokeVoidAsync("alert", $"❌ A project named '{mergeProjectName}' already exists.");
             return;
         }
 
-        var newProj = new Project
+        var newProj = new ProjectKP
         {
             Name = mergeProjectName,
             Labels = source.Labels,
@@ -1703,7 +1721,7 @@ else
         };
         await ProjectService.CreateProject(newProj);
 
-        var newDir = Path.Combine(Env.WebRootPath, "datasets", newProj.Name);
+        var newDir = Path.Combine(Env.WebRootPath, "datasets_kp", newProj.Name);
         var imgDir = Path.Combine(newDir, "images");
         var lblDir = Path.Combine(newDir, "labels");
         var annDir = Path.Combine(newDir, "images_annotated");
@@ -1721,11 +1739,11 @@ else
                 File.Copy(srcPath, newPath, overwrite: false);
             }
 
-            Db.Images.Add(new ImageEntry
+            Db.ImagesKP.Add(new ImageEntryKP
             {
                 ProjectId = newProj.Id,
                 FileName = newFile,
-                RelativePath = $"datasets/{newProj.Name}/images/{newFile}",
+                RelativePath = $"datasets_kp/{newProj.Name}/images/{newFile}",
                 UploadedAt = DateTime.Now,
                 UploadedByUserId = userId,
                 Width = entry.Width,
@@ -1735,18 +1753,18 @@ else
             });
 
             // label 파일 복사
-            var labelSrc = Path.Combine(Env.WebRootPath, "datasets", source.Name, "labels", Path.ChangeExtension(entry.FileName, ".txt"));
+            var labelSrc = Path.Combine(Env.WebRootPath, "datasets_kp", source.Name, "labels", Path.ChangeExtension(entry.FileName, ".txt"));
             var labelDest = Path.Combine(lblDir, Path.GetFileName(labelSrc));
             if (File.Exists(labelSrc)) File.Copy(labelSrc, labelDest, false);
 
             // annotated 이미지 복사
-            var annSrc = Path.Combine(Env.WebRootPath, "datasets", source.Name, "images_annotated", entry.FileName);
+            var annSrc = Path.Combine(Env.WebRootPath, "datasets_kp", source.Name, "images_annotated", entry.FileName);
             var annDest = Path.Combine(annDir, entry.FileName);
             if (File.Exists(annSrc)) File.Copy(annSrc, annDest, false);
         }
 
         // 카메라 설정 복사
-        var camSrc = Path.Combine(Env.WebRootPath, "datasets", source.Name, "camera.json");
+        var camSrc = Path.Combine(Env.WebRootPath, "datasets_kp", source.Name, "camera.json");
         var camDest = Path.Combine(newDir, "camera.json");
         if (File.Exists(camSrc)) File.Copy(camSrc, camDest, false);
 
@@ -1777,7 +1795,7 @@ else
 
     private void PrepareMerge()
     {
-        var selected = projects.Where(p => p.IsSelectedForMerge).ToList();
+        var selected = projects.Where(p => p.IsSelectedForMerge).ToList();        
         if (selected.Count <= 1)
         {
             JS.InvokeVoidAsync("alert", "⚠️ Please select at least two projects to merge.");
@@ -1806,27 +1824,27 @@ else
         }
 
         // ✅ 1. ViewModel에서 선택된 프로젝트 확인
-        var selectedProjectVMs = projects.Where(p => p.IsSelectedForMerge).ToList();
+        var selectedProjectVMs = projects.Where(p => p.IsSelectedForMerge).ToList();        
 
         // ✅ 2. 이름 중복 확인
-        if (Db.Projects.Any(p => p.Name == mergeProjectName))
+        if (Db.ProjectsKP.Any(p => p.Name == mergeProjectName))
         {
             await JS.InvokeVoidAsync("alert", $"❌ A project named '{mergeProjectName}' already exists. Please choose a different name.");
             return;
         }
 
         // ✅ 3. 새 프로젝트 생성
-        var newProj = new Project
-        {
-            Name = mergeProjectName,
-            Labels = mergeLabels,
-            CreatorUserId = userId,
-            ImageCount = 0
-        };
+        var newProj = new ProjectKP
+            {
+                Name = mergeProjectName,
+                Labels = mergeLabels,
+                CreatorUserId = userId,
+                ImageCount = 0
+            };
         await ProjectService.CreateProject(newProj);
 
         // ✅ 4. 폴더 준비
-        var newDir = Path.Combine(Env.WebRootPath, "datasets", newProj.Name);
+        var newDir = Path.Combine(Env.WebRootPath, "datasets_kp", newProj.Name);
         var imgDir = Path.Combine(newDir, "images");
         var lblDir = Path.Combine(newDir, "labels");
         var annDir = Path.Combine(newDir, "images_annotated");
@@ -1848,7 +1866,7 @@ else
 
         foreach (var proj in selectedProjects)
         {
-            var imageEntries = await Db.Images.Where(img => img.ProjectId == proj.Id).ToListAsync();
+            var imageEntries = await Db.ImagesKP.Where(img => img.ProjectId == proj.Id).ToListAsync();
             foreach (var entry in imageEntries)
             {
                 string originalFileName = entry.FileName;
@@ -1912,28 +1930,28 @@ else
 
 
                 // DB에 이미지 추가
-                var newEntry = new ImageEntry
-                {
-                    ProjectId = newProj.Id,
-                    FileName = entry.FileName,
-                    RelativePath = $"datasets/{newProj.Name}/images/{entry.FileName}",
-                    UploadedAt = DateTime.Now,
-                    UploadedByUserId = userId,
-                    Width = entry.Width,
-                    Height = entry.Height,
-                    LabelStatus = entry.LabelStatus,
-                    LabelData = entry.LabelData
-                };
-                Db.Images.Add(newEntry);
+                var newEntry = new ImageEntryKP
+                    {
+                        ProjectId = newProj.Id,
+                        FileName = entry.FileName,
+                        RelativePath = $"datasets_kp/{newProj.Name}/images/{entry.FileName}",
+                        UploadedAt = DateTime.Now,
+                        UploadedByUserId = userId,
+                        Width = entry.Width,
+                        Height = entry.Height,
+                        LabelStatus = entry.LabelStatus,
+                        LabelData = entry.LabelData
+                    };
+                Db.ImagesKP.Add(newEntry);
 
                 // 라벨 파일 복사
-                var labelSrc = Path.Combine(Env.WebRootPath, "datasets", proj.Name, "labels", Path.ChangeExtension(entry.FileName, ".txt"));
+                var labelSrc = Path.Combine(Env.WebRootPath, "datasets_kp", proj.Name, "labels", Path.ChangeExtension(entry.FileName, ".txt"));
                 var labelDest = Path.Combine(lblDir, Path.GetFileName(labelSrc));
                 if (File.Exists(labelSrc))
                     File.Copy(labelSrc, labelDest, overwrite: false);
 
                 // annotated 이미지 복사
-                var annSrc = Path.Combine(Env.WebRootPath, "datasets", proj.Name, "images_annotated", entry.FileName);
+                var annSrc = Path.Combine(Env.WebRootPath, "datasets_kp", proj.Name, "images_annotated", entry.FileName);
                 var annDest = Path.Combine(annDir, entry.FileName);  // 초기 경로
 
                 if (File.Exists(annSrc))
@@ -1971,11 +1989,11 @@ else
 
         // ✅ 7. 이미지 수 업데이트
         newProj.ImageCount = addedFileNames.Count;
-        Db.Projects.Update(newProj);
+        Db.ProjectsKP.Update(newProj);
 
         // ✅ 7.1 가장 최근 camera.json 복사
         var cameraJsonCandidates = selectedProjects
-            .Select(p => Path.Combine(Env.WebRootPath, "datasets", p.Name, "camera.json"))
+            .Select(p => Path.Combine(Env.WebRootPath, "datasets_kp", p.Name, "camera.json"))
             .Where(File.Exists)
             .Select(path => new FileInfo(path))
             .OrderByDescending(f => f.LastWriteTime)
@@ -2022,7 +2040,7 @@ else
     }
 
 
-    public class ProjectViewModel : HawkAI.Data.ProjectService.Project
+    public class ProjectViewModel : ProjectKP
     {
         public bool IsSelectedForMerge { get; set; } = false;
     }
@@ -2051,7 +2069,7 @@ else
         public string session_id { get; set; } = "";
         public string message { get; set; } = "";
     }
-
+        
     private void OpenTrainModal(int projectId)
     {
         selectedProject = projects.FirstOrDefault(p => p.Id == projectId);
@@ -2126,7 +2144,7 @@ else
             { "img_width",  trainImgWidth  },   // YOLO 내부에선 (H,W)로 변환됨
             { "img_height", trainImgHeight },
             { "epochs", trainEpochs },
-            { "batch", trainBatch },
+            { "batch", trainBatch }, 
             { "workers", trainWorkers },
             { "tflite_export", trainTfliteExport }
         };
@@ -2233,14 +2251,14 @@ else
 
         foreach (var p in selectedProjects)
         {
-            var project = await Db.Projects.FindAsync(p.Id);
+            var project = await Db.ProjectsKP.FindAsync(p.Id);
             if (project == null) continue;
 
-            var images = Db.Images.Where(i => i.ProjectId == project.Id);
-            Db.Images.RemoveRange(images);
-            Db.Projects.Remove(project);
+            var images = Db.ImagesKP.Where(i => i.ProjectId == project.Id);
+            Db.ImagesKP.RemoveRange(images);
+            Db.ProjectsKP.Remove(project);
 
-            var folder = Path.Combine(Env.WebRootPath, "datasets", project.Name);
+            var folder = Path.Combine(Env.WebRootPath, "datasets_kp", project.Name);
             if (Directory.Exists(folder))
                 Directory.Delete(folder, true);
         }
@@ -2255,7 +2273,7 @@ else
 
     private void ShowCameraInfo(string projectName)
     {
-        var jsonPath = Path.Combine(Env.WebRootPath, "datasets", projectName, "camera.json");
+        var jsonPath = Path.Combine(Env.WebRootPath, "datasets_kp", projectName, "camera.json");
 
         if (File.Exists(jsonPath))
         {
@@ -2267,7 +2285,7 @@ else
 
     private bool HasCameraInfo(string projectName)
     {
-        var jsonPath = Path.Combine(Env.WebRootPath, "datasets", projectName, "camera.json");
+        var jsonPath = Path.Combine(Env.WebRootPath, "datasets_kp", projectName, "camera.json");
         return File.Exists(jsonPath);
     }
 
@@ -2287,7 +2305,7 @@ else
                 .OfType<string>()
                 .Where(name =>
                     name.StartsWith(projectName, StringComparison.OrdinalIgnoreCase)
-                    && !name.Contains("_kp_", StringComparison.OrdinalIgnoreCase))
+                    && name.Contains("_kp_", StringComparison.OrdinalIgnoreCase))
                 .ToList();
         }
 
@@ -2377,7 +2395,7 @@ else
 
     private async Task DeleteCameraJson()
     {
-        var jsonPath = Path.Combine(Env.WebRootPath, "datasets", cameraProjectName, "camera.json");
+        var jsonPath = Path.Combine(Env.WebRootPath, "datasets_kp", cameraProjectName, "camera.json");
 
         if (File.Exists(jsonPath))
         {
@@ -2410,7 +2428,7 @@ else
 
     private async Task SaveCameraJsonEdits()
     {
-        var jsonPath = Path.Combine(Env.WebRootPath, "datasets", cameraProjectName, "camera.json");
+        var jsonPath = Path.Combine(Env.WebRootPath, "datasets_kp", cameraProjectName, "camera.json");
 
         try
         {

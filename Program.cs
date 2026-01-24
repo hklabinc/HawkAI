@@ -4,6 +4,7 @@ using HawkAI.Data.CameraService;
 using HawkAI.Data.EventService;
 using HawkAI.Data.GameService;
 using HawkAI.Data.ProjectService;
+using HawkAI.Data.ProjectServiceKP;
 using HawkAI.Data.SuperHeroService;
 using HawkAI.Data.UpdateService;
 using HawkAI.Hubs;
@@ -47,10 +48,11 @@ builder.Services.AddSingleton<WeatherForecastService>();
 builder.Services.AddProgressiveWebApp();    // for PWA
 
 builder.Services.AddScoped<ICameraService, CameraService>();
-builder.Services.AddScoped<IEventService, EventService>(); 
+builder.Services.AddScoped<IEventService, EventService>();
 builder.Services.AddScoped<IGameService, GameService>();
 builder.Services.AddScoped<ISuperHeroService, SuperHeroService>();
 builder.Services.AddScoped<IProjectService, ProjectService>();
+builder.Services.AddScoped<IProjectServiceKP, ProjectServiceKP>();
 
 builder.Services.Configure<ReleaseStorageOptions>(
     builder.Configuration.GetSection("ReleaseStorage"));
@@ -118,9 +120,9 @@ builder.WebHost.UseUrls("http://*:8080;https://*:8081");
 //builder.WebHost.UseUrls("http://*:8080");  // Only for http
 
 // Flask 서버 API를 사용하기 위해 HttpClient 등록
-builder.Services.AddScoped(sp => new HttpClient 
-{ 
-    BaseAddress = new Uri(builder.Configuration["BaseAddress"] ?? "http://localhost:5001/") 
+builder.Services.AddScoped(sp => new HttpClient
+{
+    BaseAddress = new Uri(builder.Configuration["BaseAddress"] ?? "http://localhost:5001/")
 });
 
 
@@ -188,6 +190,7 @@ app.MapHub<ChatHub>("/chathub", options =>      // Server에서 메시지 사이즈 관련
 
 //app.MapHub<AugmentHub>("/augmentHub");
 app.MapHub<TrainHub>("/trainHub");
+app.MapHub<TrainHubKP>("/trainHubKP");
 
 app.MapControllers();
 

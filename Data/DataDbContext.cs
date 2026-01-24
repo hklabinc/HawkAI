@@ -4,6 +4,7 @@ using HawkAI.Data.GameService;
 using HawkAI.Data.CameraService;
 using HawkAI.Data.EventService;
 using HawkAI.Data.ProjectService;
+using HawkAI.Data.ProjectServiceKP;
 using HawkAI.Data.AirulerResultService;
 
 namespace HawkAI.Data
@@ -122,6 +123,10 @@ namespace HawkAI.Data
 
         public DbSet<Project> Projects => Set<Project>();
         public DbSet<ImageEntry> Images => Set<ImageEntry>();
+        // ✅ YOLO Pose(Keypoint) 전용 테이블
+        public DbSet<ProjectKP> ProjectsKP => Set<ProjectKP>();
+        public DbSet<ImageEntryKP> ImagesKP => Set<ImageEntryKP>();
+
 
         public DbSet<AirulerFilmMeasureResult> AirulerFilmMeasureResults => Set<AirulerFilmMeasureResult>();
 
