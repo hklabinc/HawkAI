@@ -40,7 +40,12 @@ window.initLabelingCanvasKP = (dotNetHelper, labelJson) => {
     let keypointPlacementBoxIndex = -1;
 
     const HANDLE_SIZE = 8;
-    const KEYPOINT_RADIUS = 6;
+
+    // Keypoint rendering / hit-test
+    // - Draw size: 1px (user request)
+    // - Hit area stays larger so it's still easy to click/drag
+    const KEYPOINT_DRAW_SIZE_PX = 1;          // on-canvas pixel size
+    const KEYPOINT_HIT_RADIUS_CANVAS_PX = 8;  // on-canvas hit radius
     const KEYPOINT_TEXT_OFFSET = 8;
 
     const canvas = document.getElementById('labelCanvas');
@@ -108,6 +113,13 @@ window.initLabelingCanvasKP = (dotNetHelper, labelJson) => {
         return colors[(index < 0 ? 0 : index) % colors.length];
     }
 
+    // 특정 라벨(예: film 박스)은 실수로 선택/이동되지 않도록 조작 방식을 제한
+    const CORNER_HANDLE_KEYS = ['tl', 'tr', 'bl', 'br'];
+    function isFilmBox(box) {
+        const lbl = (box?.label ?? '').toString().trim().toLowerCase();
+        return lbl === 'film';
+    }
+
     function isPointNear(px, py, x, y, radiusPx) {
         const dx = px - x;
         const dy = py - y;
@@ -119,6 +131,9 @@ window.initLabelingCanvasKP = (dotNetHelper, labelJson) => {
         const { invScaleX, invScaleY } = getInverseScaleFactors();
         const px = clickX_canvas / invScaleX; // convert to image pixel
         const py = clickY_canvas / invScaleY;
+
+        // Keep hit-test radius consistent in *screen/canvas* pixels
+        const hitRadiusImgPx = KEYPOINT_HIT_RADIUS_CANVAS_PX / Math.min(invScaleX, invScaleY);
 
         // Prefer selected box first
         const boxOrder = [];
@@ -135,7 +150,7 @@ window.initLabelingCanvasKP = (dotNetHelper, labelJson) => {
                 if (!kp) continue;
                 const kpx = kp.x;
                 const kpy = kp.y;
-                if (isPointNear(px, py, kpx, kpy, KEYPOINT_RADIUS * 1.2)) {
+                if (isPointNear(px, py, kpx, kpy, hitRadiusImgPx)) {
                     return { boxIndex: bi, kpIndex: ki };
                 }
             }
@@ -195,7 +210,9 @@ window.initLabelingCanvasKP = (dotNetHelper, labelJson) => {
             // handles
             if (i === selectedBoxIndex) {
                 const handles = getHandles(box);
-                for (const { x, y } of Object.values(handles)) {
+                const keys = isFilmBox(box) ? CORNER_HANDLE_KEYS : Object.keys(handles);
+                for (const key of keys) {
+                    const { x, y } = handles[key];
                     const hx = x * invScaleX;
                     const hy = y * invScaleY;
                     ctx.fillStyle = 'cyan';
@@ -203,7 +220,9 @@ window.initLabelingCanvasKP = (dotNetHelper, labelJson) => {
                 }
             } else if (multiSelectedIndexes.includes(i)) {
                 const handles = getHandles(box);
-                for (const { x, y } of Object.values(handles)) {
+                const keys = isFilmBox(box) ? CORNER_HANDLE_KEYS : Object.keys(handles);
+                for (const key of keys) {
+                    const { x, y } = handles[key];
                     const hx = x * invScaleX;
                     const hy = y * invScaleY;
                     ctx.fillStyle = 'lightgreen';
@@ -220,18 +239,20 @@ window.initLabelingCanvasKP = (dotNetHelper, labelJson) => {
 
                     const isSel = (i === selectedBoxIndex) && (ki === selectedKeypointIndex);
 
-                    // point
-                    ctx.beginPath();
-                    ctx.arc(kx, ky, KEYPOINT_RADIUS, 0, Math.PI * 2);
+                    // point (1px)
+                    const px1 = Math.round(kx);
+                    const py1 = Math.round(ky);
                     ctx.fillStyle = isSel ? 'red' : 'yellow';
-                    ctx.fill();
-                    ctx.closePath();
+                    ctx.fillRect(px1, py1, KEYPOINT_DRAW_SIZE_PX, KEYPOINT_DRAW_SIZE_PX);
 
-                    // name
+                    // name + (x,y) in original image pixels
                     const name = (kp.name && kp.name.trim().length > 0) ? kp.name : `P${ki + 1}`;
+                    const ix = Math.round(kp.x);
+                    const iy = Math.round(kp.y);
+                    const nameWithCoord = `${name}(${ix},${iy})`;
                     ctx.font = '14px Arial';
-                    ctx.fillStyle = 'yellow';
-                    ctx.fillText(name, kx + KEYPOINT_TEXT_OFFSET, ky - KEYPOINT_TEXT_OFFSET);
+                    ctx.fillStyle = isSel ? 'red' : 'yellow';
+                    ctx.fillText(nameWithCoord, kx + KEYPOINT_TEXT_OFFSET, ky - KEYPOINT_TEXT_OFFSET);
                 });
             }
         });
@@ -289,7 +310,9 @@ window.initLabelingCanvasKP = (dotNetHelper, labelJson) => {
 
             // handles
             const handles = getHandles(box);
-            for (const [key, { x, y }] of Object.entries(handles)) {
+            const handleKeys = isFilmBox(box) ? CORNER_HANDLE_KEYS : Object.keys(handles);
+            for (const key of handleKeys) {
+                const { x, y } = handles[key];
                 const hx = x * (canvas.clientWidth / img.naturalWidth);
                 const hy = y * (canvas.clientHeight / img.naturalHeight);
                 const dx = clickX - hx;
@@ -310,29 +333,32 @@ window.initLabelingCanvasKP = (dotNetHelper, labelJson) => {
             }
 
             // edges (move box)
-            const sx = box.x * (canvas.clientWidth / img.naturalWidth);
-            const sy = box.y * (canvas.clientHeight / img.naturalHeight);
-            const sw = box.w * (canvas.clientWidth / img.naturalWidth);
-            const sh = box.h * (canvas.clientHeight / img.naturalHeight);
+            // - film 박스는 실수로 움직이지 않도록: 모서리로만 선택/조작 (edge 이동 비활성)
+            if (!isFilmBox(box)) {
+                const sx = box.x * (canvas.clientWidth / img.naturalWidth);
+                const sy = box.y * (canvas.clientHeight / img.naturalHeight);
+                const sw = box.w * (canvas.clientWidth / img.naturalWidth);
+                const sh = box.h * (canvas.clientHeight / img.naturalHeight);
 
-            const margin = 5;
-            const onLeftEdge = Math.abs(clickX - sx) < margin && clickY >= sy && clickY <= sy + sh;
-            const onRightEdge = Math.abs(clickX - (sx + sw)) < margin && clickY >= sy && clickY <= sy + sh;
-            const onTopEdge = Math.abs(clickY - sy) < margin && clickX >= sx && clickX <= sx + sw;
-            const onBottomEdge = Math.abs(clickY - (sy + sh)) < margin && clickX >= sx && clickX <= sx + sw;
+                const margin = 5;
+                const onLeftEdge = Math.abs(clickX - sx) < margin && clickY >= sy && clickY <= sy + sh;
+                const onRightEdge = Math.abs(clickX - (sx + sw)) < margin && clickY >= sy && clickY <= sy + sh;
+                const onTopEdge = Math.abs(clickY - sy) < margin && clickX >= sx && clickX <= sx + sw;
+                const onBottomEdge = Math.abs(clickY - (sy + sh)) < margin && clickX >= sx && clickX <= sx + sw;
 
-            if (onLeftEdge || onRightEdge || onTopEdge || onBottomEdge) {
-                selectedBoxIndex = i;
-                selectedKeypointIndex = -1;
+                if (onLeftEdge || onRightEdge || onTopEdge || onBottomEdge) {
+                    selectedBoxIndex = i;
+                    selectedKeypointIndex = -1;
 
-                redoStack = [];
-                history.push(deepClone(boxes));
+                    redoStack = [];
+                    history.push(deepClone(boxes));
 
-                isMovingBox = true;
-                lastMouseX = clickX;
-                lastMouseY = clickY;
-                redraw();
-                return;
+                    isMovingBox = true;
+                    lastMouseX = clickX;
+                    lastMouseY = clickY;
+                    redraw();
+                    return;
+                }
             }
 
             // label text click -> cycle label
@@ -347,15 +373,17 @@ window.initLabelingCanvasKP = (dotNetHelper, labelJson) => {
                 const currentIndex = options.findIndex(opt => opt.value === box.label);
                 const nextIndex = options.length > 0 ? (currentIndex + 1) % options.length : -1;
                 if (nextIndex >= 0) box.label = options[nextIndex].value;
-                selectedBoxIndex = i;
+                // film 박스는 모서리로만 선택되도록: 라벨 클릭으로는 선택 상태를 바꾸지 않음
+                if (!isFilmBox(box)) selectedBoxIndex = i;
                 redraw();
                 return;
             }
 
-            // inside box -> select AND allow keypoint placement
+            // inside box -> allow keypoint placement
             const insideBox = (px >= box.x && px <= box.x + box.w && py >= box.y && py <= box.y + box.h);
             if (insideBox) {
-                selectedBoxIndex = i;
+                // film 박스는 내부 클릭으로 선택되지 않게 (모서리로만 선택)
+                if (!isFilmBox(box)) selectedBoxIndex = i;
                 selectedKeypointIndex = -1;
 
                 // potential keypoint placement
@@ -530,7 +558,9 @@ window.initLabelingCanvasKP = (dotNetHelper, labelJson) => {
         if (selectedBoxIndex !== -1) {
             const box = boxes[selectedBoxIndex];
             const handles = getHandles(box);
-            for (const [key, { x, y }] of Object.entries(handles)) {
+            const handleKeys = isFilmBox(box) ? CORNER_HANDLE_KEYS : Object.keys(handles);
+            for (const key of handleKeys) {
+                const { x, y } = handles[key];
                 const hx = x * invScaleX;
                 const hy = y * invScaleY;
                 if (Math.abs(moveX - hx) < HANDLE_SIZE && Math.abs(moveY - hy) < HANDLE_SIZE) {
@@ -582,6 +612,7 @@ window.initLabelingCanvasKP = (dotNetHelper, labelJson) => {
         const margin = 5;
         for (let i = boxes.length - 1; i >= 0; i--) {
             const box = boxes[i];
+            if (isFilmBox(box)) continue;
             const sx = box.x * invScaleX;
             const sy = box.y * invScaleY;
             const sw = box.w * invScaleX;
@@ -819,8 +850,41 @@ window.initLabelingCanvasKP = (dotNetHelper, labelJson) => {
             return;
         }
 
-        // Shift + arrows = resize box
-        if (selectedBoxIndex !== -1 && e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        const isArrowKey = (
+            e.key === 'ArrowLeft' || e.key === 'ArrowRight' ||
+            e.key === 'ArrowUp' || e.key === 'ArrowDown'
+        );
+
+        // ✅ Arrows = move selected keypoint (when keypoint is selected)
+        if (isArrowKey && !e.ctrlKey && !e.metaKey && selectedBoxIndex !== -1 && selectedKeypointIndex !== -1) {
+            const moveAmount = 1;
+            const box = boxes[selectedBoxIndex];
+            ensureBoxKeypoints(box);
+            const kp = box.keypoints?.[selectedKeypointIndex];
+            if (kp) {
+                redoStack = [];
+                history.push(deepClone(boxes));
+
+                switch (e.key) {
+                    case 'ArrowLeft': kp.x -= moveAmount; break;
+                    case 'ArrowRight': kp.x += moveAmount; break;
+                    case 'ArrowUp': kp.y -= moveAmount; break;
+                    case 'ArrowDown': kp.y += moveAmount; break;
+                }
+
+                // clamp to image bounds
+                kp.x = Math.max(0, Math.min(img.naturalWidth - 1, kp.x));
+                kp.y = Math.max(0, Math.min(img.naturalHeight - 1, kp.y));
+                kp.v = 2;
+
+                redraw();
+                e.preventDefault();
+                return;
+            }
+        }
+
+        // Shift + arrows = resize box (only when no keypoint selected)
+        if (isArrowKey && selectedBoxIndex !== -1 && selectedKeypointIndex === -1 && e.shiftKey && !e.ctrlKey && !e.metaKey) {
             const box = boxes[selectedBoxIndex];
             redoStack = [];
             history.push(deepClone(boxes));
@@ -836,8 +900,8 @@ window.initLabelingCanvasKP = (dotNetHelper, labelJson) => {
             return;
         }
 
-        // Arrows = move box(es)
-        if (!e.ctrlKey && !e.metaKey) {
+        // Arrows = move box(es) (only when no keypoint selected)
+        if (isArrowKey && selectedKeypointIndex === -1 && !e.ctrlKey && !e.metaKey) {
             const moveAmount = 1;
 
             if (multiSelectedIndexes.length > 0) {
