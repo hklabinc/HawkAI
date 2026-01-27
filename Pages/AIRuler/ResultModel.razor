@@ -2,6 +2,8 @@
 @page "/airuler/results/{ModelName}/device/{DeviceId}"
 
 @using System.Text.Json
+@using System.Globalization
+@using System.Text.RegularExpressions
 @using HawkAI.Data
 @using HawkAI.Data.AirulerResultService
 @using Microsoft.EntityFrameworkCore
@@ -112,7 +114,11 @@ else if (_records.Count > 0)
 
                     @foreach (var col in _measureColumns)
                     {
-                        <th style="min-width: 80px;">
+                        <th style="min-width: 80px; cursor:pointer;"
+                            role="button"
+                            tabindex="0"
+                            title="Show statistics"
+                            @onclick="() => OpenStatsModalAsync(col)">
                             <div style="line-height: 1.05;">
                                 <div><strong>@col.Index</strong></div>
                                 @if (!string.IsNullOrWhiteSpace(col.Gt))
@@ -407,6 +413,117 @@ else if (_records.Count > 0)
     </div>
 }
 
+@if (_showStatsModal)
+{
+    <!-- Backdrop -->
+    <div class="modal-backdrop fade show" @onclick="CloseStatsModalAsync"></div>
+
+    <!-- Modal -->
+    <div class="modal fade show d-block"
+         tabindex="-1"
+         role="dialog"
+         style="background: rgba(0,0,0,0.2);"
+         @onclick="CloseStatsModalAsync">
+        <div class="modal-dialog modal-dialog-centered modal-xl"
+             role="document"
+             style="max-width:90vw; width:90vw;"
+             @onclick:stopPropagation="true">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h6 class="modal-title">
+                        <b>Stats</b>
+                        @if (!string.IsNullOrWhiteSpace(_statsMeasureIndex))
+                        {
+                            <span class="text-muted" style="font-size: 0.95rem;">(@_statsMeasureIndex)</span>
+                        }
+                    </h6>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="CloseStatsModalAsync"></button>
+                </div>
+
+                <div class="modal-body" style="background:#fff;">
+                    @if (!string.IsNullOrWhiteSpace(_statsError))
+                    {
+                        <div class="alert alert-warning" style="white-space: pre-wrap;">@_statsError</div>
+                    }
+                    else
+                    {
+                        <div class="small mb-2">
+                            <div>
+                                <b>Scope</b>:
+                                @if (_statsUsingSelection)
+                                {
+                                    <span>Selected No only (@_statsRecordCount records)</span>
+                                }
+                                else
+                                {
+                                    <span>All data (@_statsRecordCount records)</span>
+                                }
+                            </div>
+
+                            @if (_statsGt.HasValue)
+                            {
+                                <div>
+                                    <b>GT</b>: @_statsGt.Value.ToString("0.###", CultureInfo.InvariantCulture)
+                                    @if (_statsTol.HasValue)
+                                    {
+                                        <span class="text-muted"> (± @_statsTol.Value.ToString("0.###", CultureInfo.InvariantCulture))</span>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        <div id="airuler-stats-plot" style="width:100%; height:55vh;"></div>
+
+                        @if ((_statsRows?.Count ?? 0) > 0)
+                        {
+                            <div class="table-responsive mt-2">
+                                <table class="table table-sm table-hover align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="min-width:80px;">Film</th>
+                                            <th style="min-width:80px;">N</th>
+                                            <th style="min-width:120px;">Mean</th>
+                                            <th style="min-width:120px;">Median</th>
+                                            <th style="min-width:120px;">Min</th>
+                                            <th style="min-width:120px;">Max</th>
+                                            <th style="min-width:120px;">Std</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var s in _statsRows!)
+                                        {
+                                            <tr>
+                                                <td>@(s.Film > 0 ? $"#{s.Film}" : "")</td>
+                                                <td>@s.N</td>
+                                                <td>@Fmt(s.Mean)</td>
+                                                <td>@Fmt(s.Median)</td>
+                                                <td>@Fmt(s.Min)</td>
+                                                <td>@Fmt(s.Max)</td>
+                                                <td>@Fmt(s.Std)</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-muted">No numeric data.</div>
+                        }
+
+                        <div class="text-muted small">
+                            * Std is population standard deviation (divide by N).
+                        </div>
+                    }
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-sm btn-outline-secondary" type="button" @onclick="CloseStatsModalAsync">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
 @code {
     [Parameter] public string? ModelName { get; set; }
     [Parameter] public string? DeviceId { get; set; }
@@ -414,7 +531,7 @@ else if (_records.Count > 0)
     private bool _showError = true;
 
     // Pagination (records per page)
-    private int _pageSize = 10;   // default
+    private int _pageSize = 50;   // default
     private int PageSize
     {
         get => _pageSize;
@@ -1017,4 +1134,326 @@ else if (_records.Count > 0)
         yield return total - 1;
         yield return total;
     }
+
+    // ---- Stats modal (Measure column) ----
+    private bool _showStatsModal = false;
+    private bool _statsUsingSelection = false;
+    private string? _statsMeasureIndex;
+    private int _statsRecordCount = 0;
+    private double? _statsGt;
+    private double? _statsTol;
+    private string? _statsError;
+
+    private bool _statsPendingRender = false;
+    private StatsPlotPayload? _statsPlot;
+    private List<StatsRowVm>? _statsRows;
+
+    private sealed class StatsRowVm
+    {
+        public int Film { get; init; }
+        public int N { get; init; }
+        public double Mean { get; init; }
+        public double Median { get; init; }
+        public double Min { get; init; }
+        public double Max { get; init; }
+        public double Std { get; init; }
+    }
+
+    private sealed class StatsPlotPayload
+    {
+        public string? Title { get; init; }
+        public double? Gt { get; init; }
+        public double? Tol { get; init; }
+        public List<StatsFilmSeries> Films { get; init; } = new();
+    }
+
+    private sealed class StatsFilmSeries
+    {
+        public int Film { get; init; }
+        public string Label { get; init; } = string.Empty;
+        public double[] Values { get; init; } = Array.Empty<double>();
+    }
+
+    private async Task OpenStatsModalAsync(MeasureColumnVm col)
+    {
+        _statsError = null;
+        _statsMeasureIndex = col.Index;
+        _statsPlot = null;
+        _statsRows = null;
+        _statsGt = null;
+        _statsTol = null;
+
+        // ✅ 선택된 No가 있으면 그것만, 없으면 전체
+        var selected = _records.Where(r => r.IsSelected).ToList();
+        _statsUsingSelection = selected.Count > 0;
+        var scope = _statsUsingSelection ? selected : _records;
+        _statsRecordCount = scope.Count;
+
+        // 1) 값 수집(필름별)
+        var byFilm = new SortedDictionary<int, List<double>>();
+
+        foreach (var r in scope)
+        {
+            foreach (var film in r.Films)
+            {
+                if (film.Film <= 0) continue; // film=0 placeholder ignore
+
+                if (!film.Cells.TryGetValue(col.Index, out var cell))
+                    continue;
+
+                if (!TryParseDouble(cell.Value, out var v))
+                    continue;
+
+                if (!byFilm.TryGetValue(film.Film, out var list))
+                {
+                    list = new List<double>();
+                    byFilm[film.Film] = list;
+                }
+                list.Add(v);
+            }
+        }
+
+        if (byFilm.Count == 0)
+        {
+            _statsError = $"No numeric values found for '{col.Index}'.";
+            _showStatsModal = true;
+            return;
+        }
+
+        // 2) GT / 허용오차(=margin) 읽기
+        var (gtFromModel, marginFromModel) = await TryReadGtMarginFromModelJsonAsync(col.Index);
+
+        // fallback: header GT string
+        var (gtFromHeader, tolFromHeader) = TryParseGtTol(col.Gt);
+
+        _statsGt = gtFromModel ?? gtFromHeader;
+        _statsTol = marginFromModel ?? tolFromHeader;
+
+        // 3) 통계 계산
+        var rows = new List<StatsRowVm>();
+        foreach (var (filmNo, values) in byFilm)
+        {
+            var arr = values.ToArray();
+            Array.Sort(arr);
+
+            var n = arr.Length;
+            var mean = arr.Average();
+            var median = ComputeMedianSorted(arr);
+            var min = arr.First();
+            var max = arr.Last();
+            var std = ComputeStdPopulation(arr, mean);
+
+            rows.Add(new StatsRowVm
+            {
+                Film = filmNo,
+                N = n,
+                Mean = mean,
+                Median = median,
+                Min = min,
+                Max = max,
+                Std = std
+            });
+        }
+        _statsRows = rows;
+
+        // 4) Plot payload
+        _statsPlot = new StatsPlotPayload
+        {
+            Title = $"{col.Index}",
+            Gt = _statsGt,
+            Tol = _statsTol,
+            Films = byFilm.Select(kvp => new StatsFilmSeries
+            {
+                Film = kvp.Key,
+                Label = kvp.Key > 0 ? $"Film #{kvp.Key}" : "Film",
+                Values = kvp.Value.ToArray()
+            }).ToList()
+        };
+
+        _showStatsModal = true;
+        _statsPendingRender = true;
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task CloseStatsModalAsync()
+    {
+        _showStatsModal = false;
+        _statsPendingRender = false;
+
+        try
+        {
+            await JS.InvokeVoidAsync("hkAirulerStats.purge", "airuler-stats-plot");
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_statsPendingRender && _showStatsModal && _statsPlot != null)
+        {
+            _statsPendingRender = false;
+
+            try
+            {
+                await JS.InvokeVoidAsync("hkAirulerStats.renderBoxPlot", "airuler-stats-plot", _statsPlot);
+            }
+            catch (Exception ex)
+            {
+                _statsError = $"Plot render failed: {ex.Message}";
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    private static string Fmt(double v)
+        => v.ToString("0.###", CultureInfo.InvariantCulture);
+
+    private static bool TryParseDouble(string? s, out double v)
+    {
+        v = 0;
+        if (string.IsNullOrWhiteSpace(s)) return false;
+        s = s.Trim();
+
+        // 1) invariant
+        if (double.TryParse(s, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out v))
+            return true;
+
+        // 2) current culture fallback
+        if (double.TryParse(s, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.CurrentCulture, out v))
+            return true;
+
+        return false;
+    }
+
+    /// <summary>
+    /// Parse GT string. Supports:
+    /// - "12.3"
+    /// - "12.3±0.2" / "12.3 +/- 0.2" / "12.3+-0.2"
+    /// Returns (gt, tol). tol is null if not found.
+    /// </summary>
+    private static (double? gt, double? tol) TryParseGtTol(string? gtText)
+    {
+        if (string.IsNullOrWhiteSpace(gtText))
+            return (null, null);
+
+        var s = gtText.Trim();
+        s = s.Trim('(', ')');
+
+        // normalize
+        s = s.Replace("+/-", "±").Replace("+-", "±");
+
+        // capture numbers (gt and optional tol)
+        // ex) 12.3±0.2
+        var m = Regex.Match(s, @"(?<gt>[+-]?(?:\d+\.?\d*|\d*\.?\d+))(?:\s*±\s*(?<tol>[+-]?(?:\d+\.?\d*|\d*\.?\d+)))?");
+        if (!m.Success)
+            return (null, null);
+
+        double? gt = null;
+        double? tol = null;
+
+        if (TryParseDouble(m.Groups["gt"].Value, out var g))
+            gt = g;
+
+        if (m.Groups["tol"].Success && TryParseDouble(m.Groups["tol"].Value, out var t))
+            tol = Math.Abs(t);
+
+        return (gt, tol);
+    }
+
+    private static double ComputeMedianSorted(double[] sorted)
+    {
+        if (sorted.Length == 0) return 0;
+        var mid = sorted.Length / 2;
+        if (sorted.Length % 2 == 1)
+            return sorted[mid];
+        return (sorted[mid - 1] + sorted[mid]) / 2.0;
+    }
+
+    private static double ComputeStdPopulation(double[] values, double mean)
+    {
+        if (values.Length == 0) return 0;
+        double sum = 0;
+        foreach (var v in values)
+        {
+            var d = v - mean;
+            sum += d * d;
+        }
+        return Math.Sqrt(sum / values.Length);
+    }
+
+    /// <summary>
+    /// Try read gt/margin from model json file: wwwroot/airuler/models/{model}.json
+    /// </summary>
+    private async Task<(double? gt, double? margin)> TryReadGtMarginFromModelJsonAsync(string measureIndex)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(ModelName))
+                return (null, null);
+
+            // Try exact ModelName first, then fallback to prefix before '_'
+            var candidates = new List<string>();
+            var m0 = ModelName.Trim();
+            if (!string.IsNullOrWhiteSpace(m0)) candidates.Add(m0);
+
+            var under = m0.IndexOf('_');
+            if (under > 0)
+            {
+                var baseName = m0.Substring(0, under);
+                if (!string.IsNullOrWhiteSpace(baseName) && !candidates.Contains(baseName, StringComparer.OrdinalIgnoreCase))
+                    candidates.Add(baseName);
+            }
+
+            foreach (var model in candidates)
+            {
+                var path = Path.Combine(Env.WebRootPath, "airuler", "models", $"{Path.GetFileName(model)}.json");
+                if (!System.IO.File.Exists(path))
+                    continue;
+
+                var txt = await System.IO.File.ReadAllTextAsync(path);
+                using var doc = JsonDocument.Parse(txt);
+                if (doc.RootElement.ValueKind != JsonValueKind.Object)
+                    continue;
+
+                var key = $"measure_{measureIndex}";
+
+                // direct
+                if (doc.RootElement.TryGetProperty(key, out var meas) && meas.ValueKind == JsonValueKind.Object)
+                    return (ReadNullableDouble(meas, "gt"), ReadNullableDouble(meas, "margin"));
+
+                // case-insensitive fallback
+                foreach (var prop in doc.RootElement.EnumerateObject())
+                {
+                    if (!string.Equals(prop.Name, key, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    if (prop.Value.ValueKind == JsonValueKind.Object)
+                        return (ReadNullableDouble(prop.Value, "gt"), ReadNullableDouble(prop.Value, "margin"));
+                }
+            }
+        }
+        catch
+        {
+            // ignore
+        }
+
+        return (null, null);
+    }
+
+    private static double? ReadNullableDouble(JsonElement obj, string prop)
+    {
+        if (obj.TryGetProperty(prop, out var p))
+        {
+            if (p.ValueKind == JsonValueKind.Number && p.TryGetDouble(out var d))
+                return d;
+            if (p.ValueKind == JsonValueKind.String && TryParseDouble(p.GetString(), out var s))
+                return s;
+        }
+        return null;
+    }
+
 }
