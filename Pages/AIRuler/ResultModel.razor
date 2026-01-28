@@ -424,9 +424,9 @@ else if (_records.Count > 0)
          role="dialog"
          style="background: rgba(0,0,0,0.2);"
          @onclick="CloseStatsModalAsync">
-        <div class="modal-dialog modal-dialog-centered modal-xl"
+        <div class="modal-dialog modal-dialog-centered modal-lg"
              role="document"
-             style="max-width:90vw; width:90vw;"
+             style="max-width:70vw; width:70vw;"
              @onclick:stopPropagation="true">
             <div class="modal-content">
                 <div class="modal-header">
@@ -486,6 +486,7 @@ else if (_records.Count > 0)
                                             <th style="min-width:120px;">Median</th>
                                             <th style="min-width:120px;">Min</th>
                                             <th style="min-width:120px;">Max</th>
+                                            <th style="min-width:120px;">Diff</th>
                                             <th style="min-width:120px;">Std</th>
                                         </tr>
                                     </thead>
@@ -499,6 +500,7 @@ else if (_records.Count > 0)
                                                 <td>@Fmt(s.Median)</td>
                                                 <td>@Fmt(s.Min)</td>
                                                 <td>@Fmt(s.Max)</td>
+                                                <td>@Fmt(s.Diff)</td>
                                                 <td>@Fmt(s.Std)</td>
                                             </tr>
                                         }
@@ -1156,6 +1158,7 @@ else if (_records.Count > 0)
         public double Median { get; init; }
         public double Min { get; init; }
         public double Max { get; init; }
+        public double Diff { get; init; }
         public double Std { get; init; }
     }
 
@@ -1241,6 +1244,7 @@ else if (_records.Count > 0)
             var median = ComputeMedianSorted(arr);
             var min = arr.First();
             var max = arr.Last();
+            var diff = max - min;
             var std = ComputeStdPopulation(arr, mean);
 
             rows.Add(new StatsRowVm
@@ -1251,6 +1255,7 @@ else if (_records.Count > 0)
                 Median = median,
                 Min = min,
                 Max = max,
+                Diff = diff,
                 Std = std
             });
         }
