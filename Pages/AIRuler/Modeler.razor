@@ -210,19 +210,24 @@
                     </div>
 
                     <div class="row g-1 mb-2">
-                        <div class="col-4">
+                        <div class="col-3">
                             <label class="form-label">GT</label>
                             <input class="form-control" @bind="_measureForm.GtText" placeholder="e.g. 0.85" />
                         </div>
 
-                        <div class="col-4">
+                        <div class="col-3">
                             <label class="form-label">Margin</label>
                             <input class="form-control" @bind="_measureForm.MarginText" placeholder="e.g. 0.1" />
                         </div>
 
-                        <div class="col-4">
+                        <div class="col-3">
                             <label class="form-label">Adjust</label>
                             <input class="form-control" @bind="_measureForm.AdjustText" placeholder="+-*/숫자" />
+                        </div>
+
+                        <div class="col-3">
+                            <label class="form-label">Offset</label>
+                            <input class="form-control" @bind="_measureForm.OffsetText" placeholder="+-*/숫자" />
                         </div>
                     </div>
 
@@ -865,6 +870,7 @@
             _measureForm.GtText = m.Gt.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
             _measureForm.MarginText = m.Margin.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
             _measureForm.AdjustText = m.Adjust ?? "";
+            _measureForm.OffsetText = m.Offset ?? "";
         }
 
         Log($"Selected measure_{id}");
@@ -1169,6 +1175,7 @@
         if (!double.TryParse(_measureForm.MarginText, out var margin)) margin = 0;
 
         var adjust = (_measureForm.AdjustText ?? "").Trim();
+        var offset = (_measureForm.OffsetText ?? "").Trim();
 
         _measures[idx] = new Measure
         {
@@ -1177,7 +1184,8 @@
             Direction = string.IsNullOrWhiteSpace(_measureForm.Direction) ? "x" : _measureForm.Direction,
             Gt = gt,
             Margin = margin,
-            Adjust = adjust
+            Adjust = adjust,
+            Offset = offset
         };
 
         _selectedMeasureId = idx;
@@ -1400,7 +1408,8 @@
                 ["direction"] = m.Direction,
                 ["gt"] = m.Gt,
                 ["margin"] = m.Margin,
-                ["adjust"] = m.Adjust
+                ["adjust"] = m.Adjust,
+                ["offset"] = m.Offset
             };
         }
 
@@ -1577,12 +1586,13 @@
             var end = NormalizeRoiName(ReadString(obj, "end", ""));
 
             var dir = ReadString(obj, "direction", "x");
-            if (dir != "x" && dir != "y") dir = "x";
+            if (dir != "x" && dir != "y" && dir != "xy") dir = "x";
 
             // gt/margin은 json에 null일 수도 있으니 안전하게
             var gt = ReadNullableDouble(obj, "gt") ?? 0;
             var margin = ReadNullableDouble(obj, "margin") ?? 0;
             var adjust = ReadString(obj, "adjust", "");
+            var offset = ReadString(obj, "offset", "");
 
             _measures[mid] = new Measure
             {
@@ -1591,7 +1601,8 @@
                 Direction = dir,
                 Gt = gt,
                 Margin = margin,
-                Adjust = adjust
+                Adjust = adjust,
+                Offset = offset
             };
         }
     }
@@ -1803,6 +1814,7 @@
         public double Gt { get; set; }
         public double Margin { get; set; }
         public string Adjust { get; set; } = "";
+        public string Offset { get; set; } = "";
     }
 
     private readonly record struct Rect(double X, double Y, double W, double H);
@@ -1827,6 +1839,7 @@
         public string GtText { get; set; } = "0";
         public string MarginText { get; set; } = "0.15";
         public string AdjustText { get; set; } = "";
+        public string OffsetText { get; set; } = "";
     }
 
     private MeasureFormModel _measureForm = new();
