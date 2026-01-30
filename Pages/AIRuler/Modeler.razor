@@ -153,8 +153,8 @@
 
                     <div class="mb-2">
                         <label class="form-label">Parameter</label>
-                        <input class="form-control" type="number" step="0.01" min="0" max="255" @bind="_roiEditor.ParameterText" />
-                        <div class="form-text">default=0.5, 0~1 (작을수록 어두운쪽 bias)</div>
+                        <input class="form-control" type="number" step="1" @bind="_roiEditor.ParameterText" />
+                        <div class="form-text">Allowed range depends on method (e.g., probability uses 0~1, level uses 0~255).</div>
                     </div>
 
                     <div class="d-flex gap-2 flex-wrap">
@@ -696,13 +696,21 @@
         if (Array.IndexOf(RoiMethodOptions, method) < 0)
             method = DefaultRoiMethod;
 
-        var param = 0.5;
-        if (!string.IsNullOrWhiteSpace(_roiEditor.ParameterText) && double.TryParse(_roiEditor.ParameterText.Trim(), out var p))
-            param = p;
+        var spec = GetParameterSpec(method);
 
-        // clamp 0~1
-        if (param < 0) param = 0;
-        if (param > 1) param = 1;
+        var param = spec.def;
+        if (!string.IsNullOrWhiteSpace(_roiEditor.ParameterText) &&
+            double.TryParse(_roiEditor.ParameterText.Trim(),
+                System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var p))
+        {
+            param = p;
+        }
+
+        // clamp or validate (여기서는 clamp)
+        if (param < spec.min) param = spec.min;
+        if (param > spec.max) param = spec.max;
 
         var roi = new Roi
         {
@@ -1021,23 +1029,29 @@
             return;
         }
 
-        // parameter (0~1)
+        // parameter Parsing
+        var spec = GetParameterSpec(method);
+
         double param;
         var pText = (_roiEditor.ParameterText ?? "").Trim();
+
         if (string.IsNullOrWhiteSpace(pText))
         {
-            param = 0.5;
+            param = spec.def;
         }
-        else if (!double.TryParse(pText, out param))
+        else if (!double.TryParse(pText,
+            System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out param))
         {
-            Log("ERROR: Parameter must be a number.");
-            return;
+            // fallback
+            if (!double.TryParse(pText, out param))
+            {
+                Log("ERROR: Parameter must be a number.");
+                return;
+            }
         }
-        else if (param < 0 || param > 1)
-        {
-            Log("ERROR: Parameter must be between 0 and 1.");
-            return;
-        }
+
 
         Roi? target = null;
 
@@ -1098,6 +1112,17 @@
         await InvokeAsync(StateHasChanged);
     }
 
+    private static (double min, double max, double def, double step) GetParameterSpec(string method)
+    {
+        method = (method ?? "").Trim();
+
+        // level 계열: 0~255
+        if (method.EndsWith("_by_level", StringComparison.OrdinalIgnoreCase))
+            return (0, 255, 200, 1);
+
+        // 기본(prob/curve 등): 0~1
+        return (0, 1, 0.5, 0.01);
+    }
 
     private async Task DeleteRoiAsync()
     {
