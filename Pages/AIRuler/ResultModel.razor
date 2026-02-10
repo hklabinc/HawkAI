@@ -68,13 +68,27 @@
             @(_calibrationPreviewLoading ? "Calibration..." : "Calibration")
         </button>
 
-        <a class="btn btn-sm btn-success @(!CanExport ? "disabled" : "")"
-           href="@ExportUrl"
-           target="_blank"
-           aria-disabled="@(!CanExport)"
-           tabindex="@(!CanExport ? "-1" : null)">
-            Save to CSV
-        </a>
+        @if (UseSplitFilmView)
+        {
+            <!-- ✅ L1825-03 / L1824-03 계열: 화면에 보이는 형태(필름 분리/측정명 -1/-2 제거)로 CSV 저장 -->
+            <button class="btn btn-sm btn-success"
+                    type="button"
+                    disabled="@(!CanExport)"
+                    @onclick="ExportCsvClientAsync">
+                Save to CSV
+            </button>
+        }
+        else
+        {
+            <!-- 기존 동작 유지: 서버 Export API 사용 -->
+            <a class="btn btn-sm btn-success @(!CanExport ? "disabled" : "")"
+               href="@ExportUrl"
+               target="_blank"
+               aria-disabled="@(!CanExport)"
+               tabindex="@(!CanExport ? "-1" : null)">
+                Save to CSV
+            </a>
+        }
     </div>
 </div>
 
@@ -82,6 +96,29 @@
 {
     <div class="alert alert-warning mt-2">@_loadError</div>
 }
+
+<script>
+    // Client-side CSV download helper (isolated, no external JS dependency)
+    window.hkAirulerExport = window.hkAirulerExport || {
+        downloadCsv: function (fileName, content) {
+            try {
+                var blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = fileName || 'export.csv';
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            } catch (e) {
+                console.error('CSV download failed', e);
+                alert('CSV download failed: ' + (e && e.message ? e.message : e));
+            }
+        }
+    };
+</script>
 @if (!string.IsNullOrWhiteSpace(_statusMessage))
 {
     <div class="text-muted small mt-2">@_statusMessage</div>
@@ -700,6 +737,39 @@ else if (_records.Count > 0)
                   : $"&deviceId={Uri.EscapeDataString(DeviceId)}")
             : "#";
 
+    // ✅ L1825-03 / L1824-03 계열은 결과 JSON 내부에서 measure index가
+    //    `XX-1`, `XX-2` 형태이며, 화면 테이블/CSV에서는 이를
+    //    - (표시) 항목명: `XX` 로 통일
+    //    - (표시) 필름: 원본 Film#N 의 `-1` → Film#(2N-1), `-2` → Film#(2N)
+    //    으로 재매핑하여 보여줍니다.
+    //    ⚠️ 캘리브레이션/모델 JSON 키는 기존 그대로(XX-1/XX-2)를 사용합니다.
+    private bool UseSplitFilmView => IsSplitFilmModel(ModelName);
+
+    private static bool IsSplitFilmModel(string? modelName)
+    {
+        var m = (modelName ?? string.Empty).Trim();
+        return m.StartsWith("L1825-03", StringComparison.OrdinalIgnoreCase)
+               || m.StartsWith("L1824-03", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TrySplitIndexSuffix12(string rawIndex, out string baseIndex, out int suffix)
+    {
+        baseIndex = rawIndex;
+        suffix = 0;
+
+        if (string.IsNullOrWhiteSpace(rawIndex) || rawIndex.Length < 3)
+            return false;
+
+        // fast path: ends with "-1" or "-2"
+        var last = rawIndex[^1];
+        if (rawIndex[^2] != '-' || (last != '1' && last != '2'))
+            return false;
+
+        baseIndex = rawIndex.Substring(0, rawIndex.Length - 2);
+        suffix = last == '1' ? 1 : 2;
+        return !string.IsNullOrWhiteSpace(baseIndex);
+    }
+
     protected override async Task OnParametersSetAsync()
     {
         await ReloadAsync();
@@ -743,6 +813,9 @@ else if (_records.Count > 0)
         if (string.IsNullOrWhiteSpace(ModelName))
             return;
 
+        // ✅ 화면/CSV에서만 필름 분리/측정명 suffix 제거가 필요한 모델인지 판정
+        var splitForView = IsSplitFilmModel(ModelName);
+
         try
         {
             IQueryable<AirulerFilmMeasureResult> query = Db.AirulerFilmMeasureResults
@@ -764,7 +837,7 @@ else if (_records.Count > 0)
             var vms = new List<RecordVm>(rows.Count);
             foreach (var e in rows)
             {
-                var films = ParseFilms(e.ResultsJson, cols, seen);
+                var films = ParseFilms(e.ResultsJson, cols, seen, splitForView);
                 vms.Add(new RecordVm
                 {
                     Entity = e,
@@ -786,7 +859,11 @@ else if (_records.Count > 0)
         }
     }
 
-    private static List<FilmRowVm> ParseFilms(string resultsJson, List<MeasureColumnVm> cols, HashSet<string> seen)
+    private static List<FilmRowVm> ParseFilms(
+        string resultsJson,
+        List<MeasureColumnVm> cols,
+        HashSet<string> seen,
+        bool splitFilmSuffixForView)
     {
         var films = new List<FilmRowVm>();
 
@@ -805,37 +882,116 @@ else if (_records.Count > 0)
                 if (filmEl.TryGetProperty("film", out var fno) && fno.ValueKind == JsonValueKind.Number)
                     fno.TryGetInt32(out filmNo);
 
-                var row = new FilmRowVm { Film = filmNo };
-
-                if (filmEl.TryGetProperty("measures", out var meas) && meas.ValueKind == JsonValueKind.Array)
+                // ---- 기본: 기존 동작을 100% 유지
+                if (!splitFilmSuffixForView)
                 {
-                    foreach (var m in meas.EnumerateArray())
-                    {
-                        var idx = GetString(m, "index");
-                        if (string.IsNullOrWhiteSpace(idx)) continue;
+                    var row = new FilmRowVm { Film = filmNo };
 
-                        var gtStr = GetNumberAsString(m, "gt");
-                        if (!seen.Contains(idx))
+                    if (filmEl.TryGetProperty("measures", out var meas) && meas.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var m in meas.EnumerateArray())
                         {
-                            cols.Add(new MeasureColumnVm { Index = idx, Gt = gtStr });
-                            seen.Add(idx);
+                            var idx = GetString(m, "index");
+                            if (string.IsNullOrWhiteSpace(idx)) continue;
+
+                            var gtStr = GetNumberAsString(m, "gt");
+                            if (!seen.Contains(idx))
+                            {
+                                cols.Add(new MeasureColumnVm { Index = idx, Gt = gtStr });
+                                seen.Add(idx);
+                            }
+
+                            var valueStr = GetNumberAsString(m, "value");
+                            var errStr = GetNumberAsString(m, "err");
+                            var result = GetString(m, "result");
+                            var isFail = string.Equals(result, "FAIL", StringComparison.OrdinalIgnoreCase);
+
+                            row.Cells[idx] = new MeasureCellVm
+                            {
+                                Value = valueStr,
+                                Err = errStr,
+                                IsFail = isFail
+                            };
                         }
+                    }
+
+                    films.Add(row);
+                    continue;
+                }
+
+                // ---- 분리 모드: measure index suffix(-1/-2)별로 필름을 2배로 분리
+                var mappedFilm1 = filmNo > 0 ? (filmNo * 2 - 1) : filmNo;
+                var mappedFilm2 = filmNo > 0 ? (filmNo * 2) : filmNo;
+
+                var row1 = new FilmRowVm { Film = mappedFilm1 };
+                var row2 = new FilmRowVm { Film = mappedFilm2 };
+                var has1 = false;
+                var has2 = false;
+
+                if (filmEl.TryGetProperty("measures", out var meas2) && meas2.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var m in meas2.EnumerateArray())
+                    {
+                        var rawIdx = GetString(m, "index");
+                        if (string.IsNullOrWhiteSpace(rawIdx)) continue;
 
                         var valueStr = GetNumberAsString(m, "value");
                         var errStr = GetNumberAsString(m, "err");
                         var result = GetString(m, "result");
                         var isFail = string.Equals(result, "FAIL", StringComparison.OrdinalIgnoreCase);
 
-                        row.Cells[idx] = new MeasureCellVm
+                        // 정상 케이스: XX-1 / XX-2 → XX
+                        if (TrySplitIndexSuffix12(rawIdx, out var baseIdx, out var suffix))
                         {
-                            Value = valueStr,
-                            Err = errStr,
-                            IsFail = isFail
-                        };
+                            var gtStr = GetNumberAsString(m, "gt");
+                            if (!seen.Contains(baseIdx))
+                            {
+                                cols.Add(new MeasureColumnVm { Index = baseIdx, Gt = gtStr });
+                                seen.Add(baseIdx);
+                            }
+
+                            var cell = new MeasureCellVm
+                            {
+                                Value = valueStr,
+                                Err = errStr,
+                                IsFail = isFail
+                            };
+
+                            if (suffix == 1)
+                            {
+                                row1.Cells[baseIdx] = cell;
+                                has1 = true;
+                            }
+                            else
+                            {
+                                row2.Cells[baseIdx] = cell;
+                                has2 = true;
+                            }
+                        }
+                        else
+                        {
+                            // 방어: 예상치 못한 index는 기존 filmNo(=row1)에 그대로 유지
+                            var idx = rawIdx;
+                            var gtStr = GetNumberAsString(m, "gt");
+                            if (!seen.Contains(idx))
+                            {
+                                cols.Add(new MeasureColumnVm { Index = idx, Gt = gtStr });
+                                seen.Add(idx);
+                            }
+
+                            row1.Cells[idx] = new MeasureCellVm
+                            {
+                                Value = valueStr,
+                                Err = errStr,
+                                IsFail = isFail
+                            };
+                            has1 = true;
+                        }
                     }
                 }
 
-                films.Add(row);
+                if (has1) films.Add(row1);
+                if (has2) films.Add(row2);
             }
         }
         catch
@@ -868,6 +1024,139 @@ else if (_records.Count > 0)
         }
 
         return string.Empty;
+    }
+
+    // -------------------------------
+    // CSV export (client-side)
+    // -------------------------------
+    // L1825-03 / L1824-03 계열은 서버 Export API가 아닌, 화면에 보이는 형태 그대로 CSV를 내려받습니다.
+    // (다른 모델은 기존대로 /api/airuler/export 사용)
+    private async Task ExportCsvClientAsync()
+    {
+        if (!CanExport) return;
+
+        try
+        {
+            var csv = BuildCsvForCurrentView();
+            var baseName = SanitizeExportFileName(ModelName ?? "export");
+            var fileName = $"{baseName}_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+            await JS.InvokeVoidAsync("hkAirulerExport.downloadCsv", fileName, csv);
+        }
+        catch (Exception ex)
+        {
+            _statusMessage = $"CSV export failed: {ex.Message}";
+        }
+    }
+
+    private string BuildCsvForCurrentView()
+    {
+        var sb = new System.Text.StringBuilder(64 * 1024);
+
+        // Excel 호환용 UTF-8 BOM
+        sb.Append('\uFEFF');
+
+        // Header
+        var header = new List<string>
+        {
+            "No",
+            "FileName",
+            "Timestamp",
+            "DeviceId",
+            "ImageSize",
+            "MeasureMethod",
+            "Film"
+        };
+        foreach (var col in _measureColumns)
+        {
+            header.Add(string.IsNullOrWhiteSpace(col.Gt)
+                ? col.Index
+                : $"{col.Index} ({col.Gt})");
+        }
+        sb.AppendLine(string.Join(',', header.Select(CsvEscape)));
+
+        // Body
+        for (var recIdx = 0; recIdx < _records.Count; recIdx++)
+        {
+            var r = _records[recIdx];
+            var no = recIdx + 1;
+            var filmRows = r.Films.Count > 0 ? r.Films : new List<FilmRowVm> { new FilmRowVm { Film = 0 } };
+
+            for (var i = 0; i < filmRows.Count; i++)
+            {
+                var film = filmRows[i];
+                var row = new List<string>(7 + _measureColumns.Count);
+
+                if (i == 0)
+                {
+                    row.Add(no.ToString(CultureInfo.InvariantCulture));
+                    row.Add(r.Entity.FileName ?? string.Empty);
+                    row.Add(r.TimestampLocal);
+                    row.Add(r.Entity.DeviceId ?? string.Empty);
+                    row.Add(r.Entity.ImageSize ?? string.Empty);
+                    row.Add(r.Entity.MeasureMethod ?? string.Empty);
+                }
+                else
+                {
+                    // 동일 파일의 다음 Film 라인은 Info 컬럼들을 비웁니다 (기존 Export 형식 유지)
+                    row.Add(string.Empty);
+                    row.Add(string.Empty);
+                    row.Add(string.Empty);
+                    row.Add(string.Empty);
+                    row.Add(string.Empty);
+                    row.Add(string.Empty);
+                }
+
+                row.Add(film.Film > 0 ? $"#{film.Film}" : string.Empty);
+
+                foreach (var col in _measureColumns)
+                {
+                    if (film.Cells.TryGetValue(col.Index, out var cell))
+                        row.Add(FormatCsvCell(cell));
+                    else
+                        row.Add(string.Empty);
+                }
+
+                sb.AppendLine(string.Join(',', row.Select(CsvEscape)));
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    private string FormatCsvCell(MeasureCellVm cell)
+    {
+        // showError=false 면 value만, true면 "value (err)" 형태
+        var v = (cell.Value ?? string.Empty).Trim();
+        if (!_showError) return v;
+
+        var e = (cell.Err ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(e)) return v;
+        if (string.IsNullOrWhiteSpace(v)) return $"({e})";
+        return $"{v} ({e})";
+    }
+
+    private static string CsvEscape(string? s)
+    {
+        s ??= string.Empty;
+        // 콤마/따옴표/개행 포함 시 RFC4180 스타일로 감쌈
+        if (s.IndexOfAny(new[] { ',', '"', '\n', '\r' }) < 0)
+            return s;
+        return "\"" + s.Replace("\"", "\"\"") + "\"";
+    }
+
+    private static string SanitizeExportFileName(string name)
+    {
+        name = (name ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(name)) return "export";
+
+        var sb = new System.Text.StringBuilder(name.Length);
+        foreach (var ch in name)
+        {
+            // 파일명에 무난한 문자만
+            if (char.IsLetterOrDigit(ch) || ch == '_' || ch == '-' || ch == '.') sb.Append(ch);
+        }
+        var outName = sb.ToString();
+        return string.IsNullOrWhiteSpace(outName) ? "export" : outName;
     }
 
     private async Task OpenSpecModalAsync()
@@ -1424,20 +1713,33 @@ else if (_records.Count > 0)
                 if (doc.RootElement.ValueKind != JsonValueKind.Object)
                     continue;
 
-                var key = $"measure_{measureIndex}";
+                var keysToTry = new List<string> { $"measure_{measureIndex}" };
 
-                // direct
-                if (doc.RootElement.TryGetProperty(key, out var meas) && meas.ValueKind == JsonValueKind.Object)
-                    return (ReadNullableDouble(meas, "gt"), ReadNullableDouble(meas, "margin"));
-
-                // case-insensitive fallback
-                foreach (var prop in doc.RootElement.EnumerateObject())
+                // ✅ 화면에서는 suffix(-1/-2)를 제거해 보여주므로, GT/Margin 조회 시에는
+                //    원본 키(measure_XX-1 / measure_XX-2)도 함께 시도합니다.
+                if (UseSplitFilmView && !string.IsNullOrWhiteSpace(measureIndex)
+                    && !measureIndex.EndsWith("-1", StringComparison.OrdinalIgnoreCase)
+                    && !measureIndex.EndsWith("-2", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (!string.Equals(prop.Name, key, StringComparison.OrdinalIgnoreCase))
-                        continue;
+                    keysToTry.Add($"measure_{measureIndex}-1");
+                    keysToTry.Add($"measure_{measureIndex}-2");
+                }
 
-                    if (prop.Value.ValueKind == JsonValueKind.Object)
-                        return (ReadNullableDouble(prop.Value, "gt"), ReadNullableDouble(prop.Value, "margin"));
+                foreach (var key in keysToTry)
+                {
+                    // direct
+                    if (doc.RootElement.TryGetProperty(key, out var meas) && meas.ValueKind == JsonValueKind.Object)
+                        return (ReadNullableDouble(meas, "gt"), ReadNullableDouble(meas, "margin"));
+
+                    // case-insensitive fallback
+                    foreach (var prop in doc.RootElement.EnumerateObject())
+                    {
+                        if (!string.Equals(prop.Name, key, StringComparison.OrdinalIgnoreCase))
+                            continue;
+
+                        if (prop.Value.ValueKind == JsonValueKind.Object)
+                            return (ReadNullableDouble(prop.Value, "gt"), ReadNullableDouble(prop.Value, "margin"));
+                    }
                 }
             }
         }
