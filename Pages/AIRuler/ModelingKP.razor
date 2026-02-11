@@ -819,7 +819,7 @@ else
     private bool allowDuplicateMerge = false;
 
     private ProjectKP? selectedProject = null;
-    private bool exportAsSegmentation = false;  // Export 시 detection / segmentation 선택용
+    //private bool exportAsSegmentation = false;  // Export 시 detection / segmentation 선택용
     private string augmentStatusMessage = string.Empty;
 
     private bool showTrainModal = false;
@@ -835,12 +835,10 @@ else
 
     private bool showBulkDeleteConfirm = false;
 
-    private bool showCameraModal = false;
     private string cameraJsonContent = string.Empty;
     private string cameraProjectName = string.Empty;
     // ✅ KP(Pose) 학습 서버 기본 포트(예시: 9004)
     private string selectedTrainServer = "http://localhost:9004";
-    private bool isCameraJsonEditable = false;
     private string editableCameraJsonContent = string.Empty;
 
     private bool showModelModal = false;
@@ -2276,25 +2274,6 @@ else
         await ReloadProjects();
     }
 
-    private void ShowCameraInfo(string projectName)
-    {
-        var jsonPath = Path.Combine(Env.WebRootPath, "datasets_kp", projectName, "camera.json");
-
-        if (File.Exists(jsonPath))
-        {
-            cameraJsonContent = File.ReadAllText(jsonPath);
-            cameraProjectName = projectName;
-            showCameraModal = true;
-        }
-    }
-
-    private bool HasCameraInfo(string projectName)
-    {
-        var jsonPath = Path.Combine(Env.WebRootPath, "datasets_kp", projectName, "camera.json");
-        return File.Exists(jsonPath);
-    }
-
-
     private void ShowModelFolders(string projectName)
     {
         var runsPath = Path.Combine(Env.WebRootPath, "runs");
@@ -2395,63 +2374,4 @@ else
             StateHasChanged();
         }
     }
-
-
-
-    private async Task DeleteCameraJson()
-    {
-        var jsonPath = Path.Combine(Env.WebRootPath, "datasets_kp", cameraProjectName, "camera.json");
-
-        if (File.Exists(jsonPath))
-        {
-            var confirm = await JS.InvokeAsync<bool>("confirm", $"Are you sure you want to delete the camera.json for project '{cameraProjectName}'?");
-            if (confirm)
-            {
-                try
-                {
-                    File.Delete(jsonPath);
-                    showCameraModal = false;
-                    // await JS.InvokeVoidAsync("alert", "✅ camera.json has been deleted.");
-                }
-                catch (Exception ex)
-                {
-                    await JS.InvokeVoidAsync("alert", $"❌ Failed to delete camera.json: {ex.Message}");
-                }
-            }
-        }
-        else
-        {
-            await JS.InvokeVoidAsync("alert", "❌ camera.json file not found.");
-        }
-    }
-
-    private void EnableCameraJsonEdit()
-    {
-        editableCameraJsonContent = cameraJsonContent;
-        isCameraJsonEditable = true;
-    }
-
-    private async Task SaveCameraJsonEdits()
-    {
-        var jsonPath = Path.Combine(Env.WebRootPath, "datasets_kp", cameraProjectName, "camera.json");
-
-        try
-        {
-            // 유효한 JSON인지 검증
-            JsonDocument.Parse(editableCameraJsonContent);
-
-            await File.WriteAllTextAsync(jsonPath, editableCameraJsonContent);
-
-            // UI 업데이트
-            cameraJsonContent = editableCameraJsonContent;
-            isCameraJsonEditable = false;
-
-            await JS.InvokeVoidAsync("alert", "✅ camera.json has been updated.");
-        }
-        catch (Exception ex)
-        {
-            await JS.InvokeVoidAsync("alert", $"❌ Invalid JSON format: {ex.Message}");
-        }
-    }
-
 }
