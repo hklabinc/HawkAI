@@ -116,8 +116,9 @@ builder.WebHost.ConfigureKestrel(options =>
 
 /************ 포트 번호 변경 관련 ************/
 // Add for external access
-builder.WebHost.UseUrls("http://*:8080;https://*:8081");
+//builder.WebHost.UseUrls("http://*:8080;https://*:8081");
 //builder.WebHost.UseUrls("http://*:8080");  // Only for http
+builder.WebHost.UseUrls("http://127.0.0.1:8080");   // Nginx가 SSL(443)을 처리하므로, Kestrel은 로컬만 받게 하는 게 베스트
 
 // Flask 서버 API를 사용하기 위해 HttpClient 등록
 builder.Services.AddScoped(sp => new HttpClient
