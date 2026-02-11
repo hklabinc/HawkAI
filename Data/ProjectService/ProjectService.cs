@@ -33,7 +33,7 @@ namespace HawkAI.Data.ProjectService
         {
             _context.Projects.Add(project);
             await _context.SaveChangesAsync();
-            _navigationManager.NavigateTo("projects");
+            _navigationManager.NavigateTo("aidetector/projects");
         }
 
         public async Task DeleteProject(int id)
@@ -43,7 +43,7 @@ namespace HawkAI.Data.ProjectService
                 throw new Exception("No project found.");
             _context.Projects.Remove(project);
             await _context.SaveChangesAsync();
-            _navigationManager.NavigateTo("projects");
+            _navigationManager.NavigateTo("aidetector/projects");
         }
 
         public async Task<IEnumerable<Project>> GetAllProjects()

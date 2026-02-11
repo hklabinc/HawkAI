@@ -20,7 +20,7 @@ namespace HawkAI.Data.CameraService
         {
             _context.Cameras.Add(camera);
             await _context.SaveChangesAsync();
-            _navigationManager.NavigateTo("cameras");
+            _navigationManager.NavigateTo("aicamera/cameras");
         }
 
         public async Task DeleteCamera(int id)
@@ -31,7 +31,7 @@ namespace HawkAI.Data.CameraService
 
             _context.Cameras.Remove(dbCamera);
             await _context.SaveChangesAsync();
-            _navigationManager.NavigateTo("cameras");
+            _navigationManager.NavigateTo("aicamera/cameras");
         }
 
         public async Task<Camera> GetSingleCamera(int id)
@@ -64,7 +64,7 @@ namespace HawkAI.Data.CameraService
             dbCamera.Parameter = camera.Parameter;
 
             await _context.SaveChangesAsync();
-            _navigationManager.NavigateTo("cameras");
+            _navigationManager.NavigateTo("aicamera/cameras");
         }
 
         public async Task<IEnumerable<Camera>> GetAllCameras()

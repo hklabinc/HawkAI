@@ -22,7 +22,7 @@ namespace HawkAI.Data.EventService
         {
             _context.Events.Add(objEvent);
             await _context.SaveChangesAsync();
-            _navigationManager.NavigateTo("events");
+            _navigationManager.NavigateTo("aicamera/events");
         }
 
         public async Task DeleteEvent(int id)
@@ -33,7 +33,7 @@ namespace HawkAI.Data.EventService
 
             _context.Events.Remove(dbEvent);
             await _context.SaveChangesAsync();
-            _navigationManager.NavigateTo("events");
+            _navigationManager.NavigateTo("aicamera/events");
         }
 
         public async Task<int> DeleteAllEvents()
@@ -68,7 +68,7 @@ namespace HawkAI.Data.EventService
             dbEvent.User = objEvent.User;
 
             await _context.SaveChangesAsync();
-            _navigationManager.NavigateTo("events");
+            _navigationManager.NavigateTo("aicamera/events");
         }
 
         public async Task<IEnumerable<Event>> GetAllEvents()
