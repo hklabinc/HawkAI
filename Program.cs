@@ -9,44 +9,51 @@ using HawkAI.Data.SuperHeroService;
 using HawkAI.Data.UpdateService;
 using HawkAI.Hubs;
 using HawkAI.Services;
-using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
-using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.UI;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.FileProviders;
 using MQTTnet;
 using System.Net.Http;
-using Microsoft.AspNetCore.DataProtection;
-using System.IO;
-using Microsoft.AspNetCore.HttpOverrides;
-using System.Net;
-
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 /************ DB 관련 ************/
-/* To use mariadb */
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
 builder.Services.AddDbContext<AuthDbContext>(options =>
-    options.UseMySql(connectionString, new MySqlServerVersion(new Version(10, 3, 37))));    // hawkai 서버것
+    options.UseMySql(connectionString, new MySqlServerVersion(new Version(10, 3, 37))));
+
 builder.Services.AddDbContext<DataDbContext>(options =>
-    options.UseMySql(connectionString, new MySqlServerVersion(new Version(10, 3, 37))));    // hawkai 서버것
-//builder.Services.AddDbContext<ApplicationDbContext>(options =>
-//    options.UseSqlServer(connectionString));
+    options.UseMySql(connectionString, new MySqlServerVersion(new Version(10, 3, 37))));
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
-builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = true)
-    .AddRoles<IdentityRole>()       // for Role-based Authorization
-    .AddEntityFrameworkStores<AuthDbContext>();
+
+builder.Services.AddDefaultIdentity<IdentityUser>(options =>
+{
+    options.SignIn.RequireConfirmedAccount = true;
+})
+.AddRoles<IdentityRole>()
+.AddEntityFrameworkStores<AuthDbContext>();
+
 builder.Services.AddRazorPages();
-builder.Services.AddServerSideBlazor();
-builder.Services.AddScoped<AuthenticationStateProvider, RevalidatingIdentityAuthenticationStateProvider<IdentityUser>>();
+
+builder.Services.AddServerSideBlazor()
+    .AddCircuitOptions(options =>
+    {
+        options.DetailedErrors = true;
+    })
+    .AddHubOptions(options =>
+    {
+        options.MaximumReceiveMessageSize = 1024 * 1024 * 300; // 300MB
+    });
+
+builder.Services.AddScoped<AuthenticationStateProvider,
+    RevalidatingIdentityAuthenticationStateProvider<IdentityUser>>();
+
 builder.Services.AddSingleton<WeatherForecastService>();
 
 builder.Services.AddProgressiveWebApp();    // for PWA
@@ -74,34 +81,25 @@ builder.Services.AddAuthentication()
 
 
 /************ SignalR 관련 ************/
-// SignalR - JSON serialization options 추가 (전송 패킷 사이즈와 관련이 있는건가?) 
 builder.Services.AddSignalR()
-    .AddJsonProtocol(options => {
+    .AddJsonProtocol(options =>
+    {
         options.PayloadSerializerOptions.PropertyNamingPolicy = null;
     });
 
-// Server에서 메시지 사이즈 관련 옵션 변경 
 builder.Services.AddSignalR(hubOptions =>
 {
     hubOptions.EnableDetailedErrors = true;
-    //hubOptions.KeepAliveInterval = TimeSpan.FromMinutes(5);         // 관련성이 있나? 
-    //hubOptions.ClientTimeoutInterval = TimeSpan.FromMinutes(10);    // ClientTimeoutInterval은 KeepAliveInterval의 두배가 되어야
     hubOptions.StreamBufferCapacity = 1000000;
-    hubOptions.MaximumReceiveMessageSize = 100000000;       // 제한 풀려면 null로 셋팅?
+    hubOptions.MaximumReceiveMessageSize = 100000000;
 });
 
 
 /************ 업로드 파일 크기 제한 해제 관련 설정 ************/
-builder.Services.AddServerSideBlazor()
-    .AddHubOptions(options =>
-    {
-        options.MaximumReceiveMessageSize = 1024 * 1024 * 300; // 300MB 등 충분히 크게
-    });
-
 builder.Services.Configure<FormOptions>(options =>
 {
-    options.ValueCountLimit = 10000; // 기본은 1024 → 넉넉하게 증가
-    options.MultipartBodyLengthLimit = 1024L * 1024L * 1024L; // 선택: 1GB 제한
+    options.ValueCountLimit = 10000;
+    options.MultipartBodyLengthLimit = 1024L * 1024L * 1024L; // 1GB
 });
 
 
@@ -110,20 +108,19 @@ builder.Services.AddSingleton<MqttFactory>();
 builder.Services.AddScoped<IMqttHub, MqttHub>();
 builder.Services.AddHostedService<HostedMqttHub>();
 
-/*  Web API Controller 사용을 위해 */
-builder.Services.AddControllers(); // API controller 활성화
+
+/* Web API Controller 사용을 위해 */
+builder.Services.AddControllers();
 
 builder.WebHost.ConfigureKestrel(options =>
 {
     options.Limits.MaxRequestBodySize = 500 * 1024 * 1024; // 500MB
 });
 
+
 /************ 포트 번호 변경 관련 ************/
-// Add for external access
-//builder.WebHost.UseUrls("http://*:8080;https://*:8081");
-//builder.WebHost.UseUrls("http://*:8080");  // Only for http
-//builder.WebHost.UseUrls("http://127.0.0.1:8080");   // Nginx가 SSL(443)을 처리하므로, Kestrel은 로컬만 받게 하는 게 베스트
 builder.WebHost.UseUrls("http://0.0.0.0:8083");
+
 
 // Flask 서버 API를 사용하기 위해 HttpClient 등록
 builder.Services.AddScoped(sp => new HttpClient
@@ -132,44 +129,29 @@ builder.Services.AddScoped(sp => new HttpClient
 });
 
 
-
 /************ 이메일 발송 관련 ************/
 var email = builder.Configuration["Email:Sender"]!;
 var pw = builder.Configuration["Email:AppPassword"]!;
 builder.Services.AddSingleton(new EmailService(email, pw));
 
 
-/************ 인증 쿠키 설정 추가 ************/
-builder.Services.AddDataProtection()
-    .PersistKeysToFileSystem(new DirectoryInfo("/var/lib/hawkai-legacy-keys"))
-    .SetApplicationName("HawkAI.Legacy");
-
+/************ 인증 쿠키 설정 ************/
 builder.Services.ConfigureApplicationCookie(options =>
 {
-    options.Cookie.Name = "HawkAI.Legacy.Auth";   // 기본 쿠키명 대신 8083 전용 이름
+    options.Cookie.Name = "HawkAI.Legacy.Auth";   // 기존 앱/다른 포트와 쿠키 충돌 방지
     options.Cookie.HttpOnly = true;
     options.ExpireTimeSpan = TimeSpan.FromMinutes(60);
+
+    // 현재 8083에서 HTTP 직접 접속 기준
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
     options.Cookie.SameSite = SameSiteMode.Lax;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; // 8083 HTTP 직결이면 유지
+
     options.LoginPath = "/Identity/Account/Login";
     options.AccessDeniedPath = "/Identity/Account/AccessDenied";
     options.SlidingExpiration = true;
 });
 
-
-builder.Services.Configure<ForwardedHeadersOptions>(options =>
-{
-    options.ForwardedHeaders =
-        ForwardedHeaders.XForwardedFor |
-        ForwardedHeaders.XForwardedProto |
-        ForwardedHeaders.XForwardedHost;
-
-    options.KnownProxies.Add(IPAddress.Parse("127.0.0.1"));
-});
-
 var app = builder.Build();
-
-app.UseForwardedHeaders();   // <- 인증보다 먼저
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -179,29 +161,27 @@ if (app.Environment.IsDevelopment())
 else
 {
     app.UseExceptionHandler("/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 
-//app.UseHttpsRedirection();
+// app.UseHttpsRedirection();
 
 var provider = new FileExtensionContentTypeProvider();
-//provider.Mappings[".obj"] = "text/plain";  // MIME 타입 설정 (text 형태로)
-provider.Mappings[".obj"] = "application/octet-stream";  // MIME 타입 설정 (binary 형태로) - .obj 파일 받아오기 위해 필요!
-provider.Mappings[".pt"] = "application/octet-stream";  // .pt 파일도 binary로 응답하도록 추가
-provider.Mappings[".onnx"] = "application/octet-stream";  // ONNX
-provider.Mappings[".tflite"] = "application/octet-stream";  // TensorFlow Lite
-provider.Mappings[".pb"] = "application/octet-stream";  // TensorFlow SavedModel (protobuf)
+provider.Mappings[".obj"] = "application/octet-stream";
+provider.Mappings[".pt"] = "application/octet-stream";
+provider.Mappings[".onnx"] = "application/octet-stream";
+provider.Mappings[".tflite"] = "application/octet-stream";
+provider.Mappings[".pb"] = "application/octet-stream";
 provider.Mappings[".yaml"] = "application/x-yaml";
 provider.Mappings[".yml"] = "application/x-yaml";
 provider.Mappings[".json"] = "application/json";
-provider.Mappings[".apk"] = "application/vnd.android.package-archive"; // APK
+provider.Mappings[".apk"] = "application/vnd.android.package-archive";
 
 app.UseStaticFiles(new StaticFileOptions
 {
     ContentTypeProvider = provider
 });
-app.UseStaticFiles();  // 정적 파일 사용을 활성화 (이것도 있어야 WebGL 동작됨)
+app.UseStaticFiles();
 
 app.UseRouting();
 
@@ -210,23 +190,24 @@ app.UseAuthorization();
 
 
 /************ SignalR 관련 ************/
-//app.MapHub<ChatHub>("/chathub");
-app.MapHub<ChatHub>("/chathub", options =>      // Server에서 메시지 사이즈 관련 옵션 추가 
+app.MapRazorPages();   // Identity Razor Pages 포함
+
+app.MapBlazorHub();
+
+app.MapHub<ChatHub>("/chathub", options =>
 {
     options.Transports =
         HttpTransportType.WebSockets |
         HttpTransportType.LongPolling;
-    options.ApplicationMaxBufferSize = 100000000;   // 제한 풀려면 0으로 셋팅?
+    options.ApplicationMaxBufferSize = 100000000;
     options.TransportMaxBufferSize = 100000000;
 });
 
-//app.MapHub<AugmentHub>("/augmentHub");
 app.MapHub<TrainHub>("/trainHub");
 app.MapHub<TrainHubKP>("/trainHubKP");
 
-app.MapRazorPages();
 app.MapControllers();
-app.MapBlazorHub();
+
 app.MapFallbackToPage("/_Host");
 
 app.Run();

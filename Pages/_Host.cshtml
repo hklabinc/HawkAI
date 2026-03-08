@@ -2,44 +2,7 @@
 @namespace HawkAI.Pages
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @{
-    Layout = "_Layout";    
+    Layout = "_Layout";
 }
 
 <component type="typeof(App)" render-mode="Server" />
-
-@section Scripts {
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-
-            // 사용자 상호작용 감지 후 새로고침
-            function waitUserInteractionToReload() {
-
-                window.addEventListener('click', () => {
-                    location.reload();
-                }, { once: true });
-
-                window.addEventListener('keydown', () => {
-                    location.reload();
-                }, { once: true });
-
-                window.addEventListener('touchstart', () => {
-                    location.reload();
-                }, { once: true });
-
-                window.addEventListener('scroll', () => {
-                    location.reload();
-                }, { once: true });
-            }
-
-            // 연결 끊김 감지 (components-reconnect-modal이 보이려는 시점)
-            const interval = setInterval(() => {
-                const modal = document.getElementById('components-reconnect-modal');
-                if (modal && !modal.hasAttribute('hidden')) {
-                    modal.remove();  // 모달 DOM 자체 제거
-                    waitUserInteractionToReload();
-                    clearInterval(interval);
-                }
-            }, 1000);
-        });
-    </script>
-}
