@@ -21,6 +21,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using MQTTnet;
 using System.Net.Http;
+using Microsoft.AspNetCore.DataProtection;
+using System.IO;
+using Microsoft.AspNetCore.HttpOverrides;
+using System.Net;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -136,22 +140,36 @@ builder.Services.AddSingleton(new EmailService(email, pw));
 
 
 /************ 인증 쿠키 설정 추가 ************/
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo("/var/lib/hawkai-legacy-keys"))
+    .SetApplicationName("HawkAI.Legacy");
+
 builder.Services.ConfigureApplicationCookie(options =>
 {
+    options.Cookie.Name = "HawkAI.Legacy.Auth";   // 기본 쿠키명 대신 8083 전용 이름
     options.Cookie.HttpOnly = true;
-    options.ExpireTimeSpan = TimeSpan.FromMinutes(60); // 로그인 유지 시간
-
-    // HTTP 접속이므로 Secure 정책을 SameAsRequest로 변경 (Always이면 HTTP에서 쿠키 안 구워짐)
-    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-    options.Cookie.SameSite = SameSiteMode.Lax; // 브라우저 호환성을 위해 Lax 설정
-
+    options.ExpireTimeSpan = TimeSpan.FromMinutes(60);
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; // 8083 HTTP 직결이면 유지
     options.LoginPath = "/Identity/Account/Login";
     options.AccessDeniedPath = "/Identity/Account/AccessDenied";
     options.SlidingExpiration = true;
 });
 
 
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor |
+        ForwardedHeaders.XForwardedProto |
+        ForwardedHeaders.XForwardedHost;
+
+    options.KnownProxies.Add(IPAddress.Parse("127.0.0.1"));
+});
+
 var app = builder.Build();
+
+app.UseForwardedHeaders();   // <- 인증보다 먼저
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -192,7 +210,6 @@ app.UseAuthorization();
 
 
 /************ SignalR 관련 ************/
-app.MapBlazorHub();
 //app.MapHub<ChatHub>("/chathub");
 app.MapHub<ChatHub>("/chathub", options =>      // Server에서 메시지 사이즈 관련 옵션 추가 
 {
@@ -207,8 +224,9 @@ app.MapHub<ChatHub>("/chathub", options =>      // Server에서 메시지 사이즈 관련
 app.MapHub<TrainHub>("/trainHub");
 app.MapHub<TrainHubKP>("/trainHubKP");
 
+app.MapRazorPages();
 app.MapControllers();
-
+app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
 
 app.Run();
