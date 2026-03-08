@@ -135,7 +135,20 @@ var pw = builder.Configuration["Email:AppPassword"]!;
 builder.Services.AddSingleton(new EmailService(email, pw));
 
 
+/************ 인증 쿠키 설정 추가 ************/
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.Cookie.HttpOnly = true;
+    options.ExpireTimeSpan = TimeSpan.FromMinutes(60); // 로그인 유지 시간
 
+    // HTTP 접속이므로 Secure 정책을 SameAsRequest로 변경 (Always이면 HTTP에서 쿠키 안 구워짐)
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    options.Cookie.SameSite = SameSiteMode.Lax; // 브라우저 호환성을 위해 Lax 설정
+
+    options.LoginPath = "/Identity/Account/Login";
+    options.AccessDeniedPath = "/Identity/Account/AccessDenied";
+    options.SlidingExpiration = true;
+});
 
 
 var app = builder.Build();
